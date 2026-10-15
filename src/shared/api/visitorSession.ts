@@ -52,6 +52,12 @@ export async function getClientVisitorData(): Promise<string> {
         expiresAt: Date.now() + SESSION_TTL_MS,
       };
 
+      console.info(
+        `%c[VisitorSession]%c Ready: ${visitorData.slice(0, 16)}... (valid 5.5h)`,
+        "color: #10b981; font-weight: bold;",
+        "color: inherit;",
+      );
+
       return visitorData;
     } catch (err) {
       console.warn("[VisitorSession] Failed to fetch fresh visitorData:", err);
