@@ -497,8 +497,10 @@ export class PlayerRuntime {
           if (controller.signal.aborted) return;
           url = direct.url;
           streamMimeType = direct.mimeType;
-        } else {
+        } else if (session.streamUrl) {
           url = mediaUrl(session.streamUrl);
+        } else {
+          return;
         }
         const response = await fetch(url, {
           headers: { Range: "bytes=0-" },
@@ -695,10 +697,12 @@ export class PlayerRuntime {
         streamMimeType = direct.mimeType;
         const expiry = direct.expiresAt ? new Date(direct.expiresAt).getTime() : null;
         this.currentSessionExpiresAt = Number.isFinite(expiry) ? expiry : null;
-      } else {
+      } else if (session.streamUrl) {
         const expiry = session.expiresAt ? new Date(session.expiresAt).getTime() : null;
         this.currentSessionExpiresAt = Number.isFinite(expiry) ? expiry : null;
         url = mediaUrl(session.streamUrl);
+      } else {
+        throw new Error("No playable stream URL returned by server");
       }
       if (this.activeBlobUrl) {
         URL.revokeObjectURL(this.activeBlobUrl);
