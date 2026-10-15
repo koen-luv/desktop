@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, screen, dialog, session, nativeImage } from "electron";
+import { app, BrowserWindow, ipcMain, shell, screen, dialog, session, nativeImage, powerSaveBlocker } from "electron";
 import { autoUpdater } from "electron-updater";
 import path from "node:path";
 import fs from "node:fs";
@@ -33,6 +33,7 @@ import {
 import { TouchBarManager } from "./touchbar.js";
 import { OverlayManager } from "./overlay.js";
 import { BundleManager } from "./bundle-manager.js";
+import { createSleepBlocker } from "./sleep-blocker.js";
 
 // root error handling for main process
 process.on("uncaughtException", (error) => {
@@ -243,6 +244,11 @@ if (!gotTheLock) {
       RENDERER_DIST,
     );
     touchBarManager.registerShortcut();
+
+    const updateSleepBlocker = createSleepBlocker(powerSaveBlocker);
+    ipcMain.on("touchbar:update-state", (_event, state: { status: string }) => {
+      updateSleepBlocker(state.status);
+    });
 
     overlayManager = new OverlayManager(
       path.join(__dirname, "preload.cjs"),
