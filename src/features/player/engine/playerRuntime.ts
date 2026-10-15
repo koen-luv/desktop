@@ -1,5 +1,6 @@
 import { usePlayerStore } from "../store/playerStore";
 import { api, mediaUrl, ApiError } from "@/shared/api";
+import { getClientVisitorData } from "@/shared/api/visitorSession";
 import { log } from "@/shared/utils/logger";
 import { telemetry } from "@/shared/telemetry";
 import { linerDb } from "@/shared/storage";
@@ -20,10 +21,28 @@ async function resolveDirectInnertubeStream(plan: {
   headers: Record<string, string>;
   body: Record<string, unknown>;
 }, signal?: AbortSignal): Promise<ResolvedAudioStream> {
+  // Obtain fresh local client visitorData so YouTube trusts the residential IP
+  const localVisitorData = await getClientVisitorData().catch(() => "");
+
+  const headers = { ...plan.headers };
+  const body = JSON.parse(JSON.stringify(plan.body)) as Record<string, any>;
+
+  if (localVisitorData) {
+    headers["x-goog-visitor-id"] = localVisitorData;
+    if (body.context?.client) {
+      body.context.client.visitorData = localVisitorData;
+    }
+  }
+
+  // Remove datacenter-bound poToken from direct requests to prevent botguard failure
+  if (body.context?.serviceIntegrityDimensions) {
+    delete body.context.serviceIntegrityDimensions;
+  }
+
   const res = await fetch(plan.endpoint, {
     method: plan.method || 'POST',
-    headers: plan.headers,
-    body: JSON.stringify(plan.body),
+    headers,
+    body: JSON.stringify(body),
     signal,
   });
 
