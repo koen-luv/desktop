@@ -6,6 +6,11 @@ import { linerDb } from "@/shared/storage";
 import type { Track } from "@/shared/types";
 import { pitchShifter } from "./pitchShifter";
 
+// =============================================================================
+// ТЕСТОВЫЙ РЕЖИМ: принудительно ходить только через Edge / Proxy (WARP pool)
+// Чтобы выключить тест: поставь TEMPORARY_FORCE_EDGE_PROXY = false
+// =============================================================================
+export const TEMPORARY_FORCE_EDGE_PROXY = true;
 
 interface ResolvedAudioStream {
   url: string;
@@ -483,6 +488,7 @@ export class PlayerRuntime {
           track.id,
           undefined,
           controller.signal,
+          TEMPORARY_FORCE_EDGE_PROXY ? "proxy" : undefined,
         );
         if (controller.signal.aborted) return;
 
@@ -668,6 +674,7 @@ export class PlayerRuntime {
         track.id,
         undefined,
         controller.signal,
+        TEMPORARY_FORCE_EDGE_PROXY ? "proxy" : undefined,
       );
       this.ttfbMs = Math.round(performance.now() - this.loadStartTime);
 
