@@ -139,13 +139,7 @@ Compiled distributions will be placed in the `release/` directory.
 
 ## Contributing
 
-Contributions, bug fixes, and feature enhancements are welcome:
-
-1. Fork the repository.
-2. Create your feature branch (`git checkout -b feat/my-feature`).
-3. Commit your changes (`git commit -m 'feat: add amazing feature'`).
-4. Push to your branch (`git push origin feat/my-feature`).
-5. Open a Pull Request to `tryliner/desktop`.
+Bug fixes, small features, and docs fixes are welcome. Read [CONTRIBUTING.md](./CONTRIBUTING.md) before you open a pull request. The [license](./LICENSE) limits what a fork is allowed to do.
 
 ---
 
