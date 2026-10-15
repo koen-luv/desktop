@@ -3,6 +3,7 @@ import { api, mediaUrl, ApiError } from "@/shared/api";
 import { log } from "@/shared/utils/logger";
 import { telemetry } from "@/shared/telemetry";
 import { linerDb } from "@/shared/storage";
+import { isStandaloneAudioFile } from "@/shared/storage/audioFormat";
 import type { Track } from "@/shared/types";
 import { pitchShifter } from "./pitchShifter";
 
@@ -261,7 +262,12 @@ export class PlayerRuntime {
         this.recoveryAttempts++;
         const posMs = store.positionMs;
         log("yellow", "playback", `audio error encountered — recovering via cache/stream at ${posMs}ms`);
-        void this.loadAndPlay(currentTrack, posMs);
+        // an unreadable cached file would be served again on retry, so drop it and go to the network
+        const dropCorruptCache =
+          this.activeBlobUrl && audioEl.src === this.activeBlobUrl
+            ? linerDb.deleteAudio(currentTrack.id).catch(() => {})
+            : Promise.resolve();
+        void dropCorruptCache.then(() => this.loadAndPlay(currentTrack, posMs));
         return;
       }
 
@@ -428,6 +434,7 @@ export class PlayerRuntime {
 
         const arrayBuffer = await response.arrayBuffer();
         if (controller.signal.aborted) return;
+        if (!isStandaloneAudioFile(new Uint8Array(arrayBuffer, 0, Math.min(16, arrayBuffer.byteLength)))) return;
 
         const mimeType =
           session.mimeType ||
@@ -526,7 +533,6 @@ export class PlayerRuntime {
 
       if (cachedAudio) {
         this.currentSessionExpiresAt = null;
-        this.recoveryAttempts = 0;
         void linerDb.putTrack(track);
         const blobUrl = URL.createObjectURL(cachedAudio.blob);
         this.activeBlobUrl = blobUrl;
@@ -828,6 +834,10 @@ export class PlayerRuntime {
         if (!res.ok && res.status !== 206) return;
         const arrayBuffer = await res.arrayBuffer();
         if (signal?.aborted) return;
+        if (!isStandaloneAudioFile(new Uint8Array(arrayBuffer, 0, Math.min(16, arrayBuffer.byteLength)))) {
+          log("yellow", "playback", `not caching ${track.title}: stream is not a standalone audio file`);
+          return;
+        }
         const mimeType = preferredMimeType || res.headers.get("content-type") || "audio/webm";
         const blob = new Blob([arrayBuffer], { type: mimeType });
         await linerDb.putAudio(track.id, blob, mimeType);
