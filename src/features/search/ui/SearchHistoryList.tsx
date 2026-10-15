@@ -1,5 +1,5 @@
 import { memo, useRef } from "react";
-import { Search3Line } from "@mingcute/react";
+import { CloseLine, Search3Line } from "@mingcute/react";
 import SongCardWithMenu from "@/features/player/ui/SongCardWithMenu";
 import { useTranslation } from "@/languages";
 import { useSearchHistoryStore } from "../store/searchHistoryStore";
@@ -27,6 +27,7 @@ export const SearchHistoryList = memo(function SearchHistoryList({
 
   const items = useSearchHistoryStore((state) => state.items);
   const clearHistory = useSearchHistoryStore((state) => state.clearHistory);
+  const removeItem = useSearchHistoryStore((state) => state.removeItem);
 
   if (items.length === 0) {
     return null;
@@ -60,9 +61,9 @@ export const SearchHistoryList = memo(function SearchHistoryList({
               <div
                 key={item.id}
                 onClick={() => onSelectQuery(item.title)}
-                className="group relative flex items-center px-[12px] py-[9px] rounded-[8px] hover:bg-border-alpha-14 cursor-pointer transition-colors select-none"
+                className="group flex items-center w-full min-w-0 rounded-[8px] hover:bg-border-alpha-14 cursor-pointer transition-colors select-none"
               >
-                <div className="flex items-center gap-[12px] min-w-0">
+                <div className="flex flex-1 items-center gap-[12px] min-w-0 pl-[12px] py-[9px]">
                   <span className="shrink-0 text-text-tertiary group-hover:text-text-primary transition-colors">
                     <Search3Line size={17} />
                   </span>
@@ -70,6 +71,7 @@ export const SearchHistoryList = memo(function SearchHistoryList({
                     {item.title}
                   </span>
                 </div>
+                <RemoveHistoryButton label={t("common.remove")} onRemove={() => removeItem(item.id)} />
               </div>
             );
           }
@@ -78,8 +80,9 @@ export const SearchHistoryList = memo(function SearchHistoryList({
           const data = item.itemData ?? item;
 
           return (
-            <div key={item.id} className="w-full min-w-0">
-              <SongCardWithMenu
+            <div key={item.id} className="group flex items-center w-full min-w-0">
+              <div className="min-w-0 flex-1">
+                <SongCardWithMenu
                 id={item.id}
                 title={item.title}
                 artistId={data?.artistId ?? data?.artist_id}
@@ -99,6 +102,8 @@ export const SearchHistoryList = memo(function SearchHistoryList({
                 }
                 onNavigate={() => onNavigateItem(data)}
               />
+              </div>
+              <RemoveHistoryButton label={t("common.remove")} onRemove={() => removeItem(item.id)} />
             </div>
           );
         })}
@@ -106,5 +111,23 @@ export const SearchHistoryList = memo(function SearchHistoryList({
     </div>
   );
 });
+
+function RemoveHistoryButton({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onRemove();
+      }}
+      className="shrink-0 flex items-center justify-center w-[28px] h-[28px] rounded-[6px] text-text-tertiary group-hover:text-text-primary border-none bg-transparent cursor-pointer"
+    >
+      <CloseLine size={16} />
+    </button>
+  );
+}
 
 export default SearchHistoryList;
