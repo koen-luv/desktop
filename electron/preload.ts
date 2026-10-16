@@ -45,7 +45,6 @@ export interface LinerElectronApi {
   isMaximized: () => Promise<boolean>;
   isFullScreen: () => Promise<boolean>;
   onWindowStateChange: (cb: (state: WindowState) => void) => () => void;
-  startWindowMove: () => void;
   dragStart: () => void;
   dragMove: (deltaX: number, deltaY: number) => void;
   dragEnd: () => void;
@@ -143,9 +142,6 @@ const api: LinerElectronApi = {
     return () => {
       ipcRenderer.removeListener("window:state-changed", listener);
     };
-  },
-  startWindowMove: () => {
-    ipcRenderer.send("window:start-drag");
   },
   dragStart: () => {
     ipcRenderer.send("window:drag-start");

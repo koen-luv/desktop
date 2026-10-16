@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Refresh1Line } from "@mingcute/react";
 import { useTranslation } from "@/languages";
@@ -11,10 +11,10 @@ import {
 import { ToggleSwitch } from "@/shared/ui";
 import { SettingRow, SettingSection, SegmentedControl } from "../controls";
 
-const POSITION_OPTIONS = [
-  { value: "top-left" as const, label: "Top Left" },
-  { value: "top-center" as const, label: "Top Middle" },
-  { value: "top-right" as const, label: "Top Right" },
+const POSITION_CONFIG = [
+  { value: "top-left" as const, key: "settings.overlay.position.top_left", fallback: "Top Left" },
+  { value: "top-center" as const, key: "settings.overlay.position.top_center", fallback: "Top Middle" },
+  { value: "top-right" as const, key: "settings.overlay.position.top_right", fallback: "Top Right" },
 ] as const;
 
 const DEFAULT_SHORTCUT = "Alt+Shift+O";
@@ -39,6 +39,15 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
 
   const position = useOverlaySettingsStore((s) => s.position);
   const setPosition = useOverlaySettingsStore((s) => s.setPosition);
+
+  const positionOptions = useMemo(
+    () =>
+      POSITION_CONFIG.map((opt) => ({
+        value: opt.value,
+        label: t(opt.key) || opt.fallback,
+      })),
+    [t],
+  );
 
   const shortcut = useOverlaySettingsStore((s) => s.shortcut);
   const setShortcut = useOverlaySettingsStore((s) => s.setShortcut);
@@ -179,7 +188,7 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
           searchQuery={searchQuery}
           control={
             <SegmentedControl<OverlayPosition>
-              options={POSITION_OPTIONS}
+              options={positionOptions}
               value={position}
               onChange={setPosition}
               disabled={!enabled}

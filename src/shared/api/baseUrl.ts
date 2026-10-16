@@ -38,12 +38,8 @@ export function setApiBaseUrl(url: string): void {
   persistBaseUrl(currentBaseUrl);
 }
 
+// never fall back to the edge relay while it is plain http: it would carry tokens and passwords unencrypted
 export function switchToFallbackEdge(): boolean {
-  if (currentBaseUrl === DEFAULT_PRIMARY_API) {
-    currentBaseUrl = FALLBACK_EDGE_API;
-    persistBaseUrl(currentBaseUrl);
-    return true;
-  }
   return false;
 }
 
@@ -77,9 +73,7 @@ export function initApiEndpointProbe(timeoutMs = HEALTH_TIMEOUT_MS): Promise<str
     } catch {}
 
     clearTimeout(timer);
-    currentBaseUrl = FALLBACK_EDGE_API;
-    persistBaseUrl(FALLBACK_EDGE_API);
-    return FALLBACK_EDGE_API;
+    return DEFAULT_PRIMARY_API;
   })();
 
   return probePromise;

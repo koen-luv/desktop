@@ -27,6 +27,7 @@ import {
   MAIN_NET_HOST_RE,
   MAIN_NET_MAX_HOSTS,
   MAIN_NET_TRACE_MAX_HOPS,
+  maskIp,
   parseTraceOutput,
   type MainNetResult,
 } from "./netdiag.js";
@@ -548,26 +549,10 @@ if (!gotTheLock) {
       }
     });
 
-    // native os window move + system cursor fallback to stop wayland jitter feedback loop
+    // manual window move for windows/macos, anchored on the system cursor.
+    // linux uses css app-region instead (see useWindowDrag): wayland ignores setPosition
     let dragStartCursor: { x: number; y: number } | null = null;
     let dragStartWinPos: { x: number; y: number } | null = null;
-
-    ipcMain.on("window:start-drag", () => {
-      if (!mainWindow || mainWindow.isFullScreen()) return;
-      try {
-        if (typeof (mainWindow as any).startWindowMove === "function") {
-          (mainWindow as any).startWindowMove();
-        }
-      } catch {
-        // fallback to manual cursor drag if startWindowMove is unsupported
-      }
-      if (mainWindow.isMaximized()) {
-        mainWindow.unmaximize();
-      }
-      const [wx, wy] = mainWindow.getPosition();
-      dragStartCursor = screen.getCursorScreenPoint();
-      dragStartWinPos = { x: wx, y: wy };
-    });
 
     ipcMain.on("window:drag-start", () => {
       if (!mainWindow || mainWindow.isFullScreen()) return;
@@ -840,10 +825,10 @@ if (!gotTheLock) {
       const controls = await Promise.all([
         fetchControl("google", "https://www.google.com/generate_204"),
         fetchControl("cloudflare", "https://cloudflare.com/cdn-cgi/trace", (body) => {
-          // egress fingerprint for support: exit ip + colo, nothing else
+          // egress fingerprint for support: masked exit ip + colo, nothing else
           const ip = /^ip=(.+)$/m.exec(body)?.[1]?.trim();
           const loc = /^loc=(.+)$/m.exec(body)?.[1]?.trim();
-          return ip ? `ip ${ip}${loc ? ` · ${loc}` : ""}` : loc ? loc : undefined;
+          return ip ? `ip ${maskIp(ip)}${loc ? ` · ${loc}` : ""}` : loc ? loc : undefined;
         }),
       ]);
 

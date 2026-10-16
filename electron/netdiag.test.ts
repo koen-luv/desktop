@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { parseTraceOutput } from "./netdiag";
+import { maskIp, parseTraceOutput } from "./netdiag";
+
+describe("maskIp", () => {
+  it("keeps only the network part of the egress ip", () => {
+    expect(maskIp("201.239.110.195")).toBe("201.239.x.x");
+    expect(maskIp("2a01:cb00:1234:5678::1")).toBe("2a01:cb00:x:x");
+    expect(maskIp("garbage")).toBe("x");
+  });
+});
 
 describe("parseTraceOutput", () => {
   it("drops the header and keeps hop lines", () => {
