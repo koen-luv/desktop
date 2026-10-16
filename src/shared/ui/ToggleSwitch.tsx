@@ -16,7 +16,7 @@ export function ToggleSwitch({
       type="button"
       disabled={disabled}
       onClick={() => !disabled && onChange(!checked)}
-      className={`group relative inline-flex h-[22px] w-[40px] items-center rounded-full transition-all duration-200 select-none border-0 ${
+      className={`group relative inline-flex h-[22px] w-[40px] shrink-0 items-center rounded-full transition-all duration-200 select-none border-0 ${
         disabled
           ? "cursor-not-allowed opacity-40 " + (checked ? "bg-text-tertiary" : "bg-black/[0.08] dark:bg-white/[0.04]")
           : "cursor-pointer " + (checked ? "bg-text-primary" : "bg-black/[0.12] dark:bg-white/[0.07] hover:bg-black/[0.16] dark:hover:bg-white/[0.11]")

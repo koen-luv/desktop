@@ -306,6 +306,7 @@
       "email_invalid": "Enter a valid email address.",
       "password_min_8": "Password must contain at least 8 characters.",
       "server_unavailable": "Unable to reach the server. Please check your connection.",
+      "server_error": "Liner's servers are having trouble right now. Please try again in a few minutes.",
       "invalid_credentials": "Email or password is incorrect.",
       "email_already_used": "This email is already in use.",
       "username_invalid": "Username must be 3-30 lowercase letters, numbers, or underscores.",
@@ -851,6 +852,8 @@
   "connectivity": {
     "wall_title": "Connection failed",
     "wall_subtitle": "Liner can't reach its servers. Your music and library are safe.",
+    "wall_title_server": "Liner's servers are having trouble",
+    "wall_subtitle_server": "Your connection is fine, the server answered with an error. Your music and library are safe, try again in a few minutes.",
     "steps_title": "Quick fixes worth trying",
     "step_net": "Check that Wi-Fi or cable is connected and pages open in a browser.",
     "step_vpn": "Pause VPN, proxy or DNS filters for a minute — they often block the app.",

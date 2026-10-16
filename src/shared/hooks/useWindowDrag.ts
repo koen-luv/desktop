@@ -48,6 +48,39 @@ export function resetWindowDragTimeForTests(): void {
   lastWindowDragTime = 0;
 }
 
+export const NATIVE_WINDOW_DRAG_CLASS = "native-window-drag";
+const WINDOW_DRAG_STRIP_ID = "window-drag-strip";
+
+// wayland ignores client-side setPosition, so linux hands the drag to the compositor via css app-region
+function usesNativeWindowDrag(): boolean {
+  return window.linerElectron?.platform === "linux";
+}
+
+// app-region only applies to real boxes, so the top drag strip the js path
+// emulates with clientY gets its own element. prepended so interactive
+// elements later in the document can punch no-drag holes into it.
+function enableNativeWindowDrag(topAreaHeight: number): () => void {
+  const root = document.documentElement;
+  root.classList.add(NATIVE_WINDOW_DRAG_CLASS);
+
+  let strip = document.getElementById(WINDOW_DRAG_STRIP_ID);
+  const ownsStrip = !strip;
+  if (!strip) {
+    strip = document.createElement("div");
+    strip.id = WINDOW_DRAG_STRIP_ID;
+    strip.setAttribute("aria-hidden", "true");
+    document.body.prepend(strip);
+  }
+  strip.style.height = `${topAreaHeight}px`;
+
+  return () => {
+    if (ownsStrip) {
+      strip?.remove();
+      root.classList.remove(NATIVE_WINDOW_DRAG_CLASS);
+    }
+  };
+}
+
 export function useWindowDrag({
   topAreaHeight = 32,
   dragThreshold = 5,
@@ -55,6 +88,11 @@ export function useWindowDrag({
   enableDoubleClickMaximize = true,
 }: WindowDragOptions = {}) {
   useEffect(() => {
+    // the compositor handles move and double click maximize natively
+    if (usesNativeWindowDrag()) {
+      return enableNativeWindowDrag(topAreaHeight);
+    }
+
     let isMouseDown = false;
     let isDragging = false;
     let startScreenX = 0;
@@ -128,10 +166,7 @@ export function useWindowDrag({
       startScreenY = e.screenY;
       lastScreenX = e.screenX;
       lastScreenY = e.screenY;
-
-      // trigger OS native window drag loop immediately (handles wayland windowing smoothly)
       lastWindowDragTime = Date.now();
-      window.linerElectron?.startWindowMove?.();
 
       window.addEventListener("pointermove", handlePointerMove, { capture: true });
       window.addEventListener("pointerup", handlePointerUp, { capture: true });

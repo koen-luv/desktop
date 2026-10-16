@@ -1,11 +1,97 @@
 import { usePlayerStore } from "../store/playerStore";
 import { api, mediaUrl, ApiError } from "@/shared/api";
+import { getClientVisitorData } from "@/shared/api/visitorSession";
 import { log } from "@/shared/utils/logger";
 import { telemetry } from "@/shared/telemetry";
 import { linerDb } from "@/shared/storage";
 import { isStandaloneAudioFile } from "@/shared/storage/audioFormat";
 import type { Track } from "@/shared/types";
 import { pitchShifter } from "./pitchShifter";
+
+interface ResolvedAudioStream {
+  url: string;
+  mimeType: string;
+  codec: string;
+  bitrate: number;
+  expiresAt: string | null;
+}
+
+async function resolveDirectInnertubeStream(plan: {
+  endpoint: string;
+  method?: string;
+  headers: Record<string, string>;
+  body: Record<string, unknown>;
+}, signal?: AbortSignal): Promise<ResolvedAudioStream> {
+  // Obtain fresh local client visitorData so YouTube trusts the residential IP
+  const localVisitorData = await getClientVisitorData().catch(() => "");
+
+  const headers = { ...plan.headers };
+  const body = JSON.parse(JSON.stringify(plan.body)) as Record<string, any>;
+
+  if (localVisitorData) {
+    headers["x-goog-visitor-id"] = localVisitorData;
+    if (body.context?.client) {
+      body.context.client.visitorData = localVisitorData;
+    }
+  }
+
+  // Remove datacenter-bound poToken from direct requests to prevent botguard failure
+  if (body.context?.serviceIntegrityDimensions) {
+    delete body.context.serviceIntegrityDimensions;
+  }
+
+  const res = await fetch(plan.endpoint, {
+    method: plan.method || 'POST',
+    headers,
+    body: JSON.stringify(body),
+    signal,
+  });
+
+  if (!res.ok) {
+    throw new Error(`Innertube player returned HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  const playability = data.playabilityStatus?.status;
+  if (playability && playability !== 'OK') {
+    throw new Error(data.playabilityStatus?.reason || 'Track not playable via direct Innertube');
+  }
+
+  const formats: any[] = data.streamingData?.adaptiveFormats || [];
+  const audioFormats = formats.filter(
+    (f: any) => typeof f.mimeType === 'string' && f.mimeType.includes('audio') && f.url,
+  );
+
+  if (audioFormats.length === 0) {
+    throw new Error('No direct audio formats returned by Innertube');
+  }
+
+  // Prefer Opus (audio/webm, itag 251) or highest bitrate audio/mp4
+  const opus = audioFormats.find((f: any) => f.mimeType.includes('webm') || f.mimeType.includes('opus'));
+  const best = opus || audioFormats.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+
+  const codec = best.mimeType.includes('opus') ? 'opus' : 'aac';
+  const mimeType = best.mimeType.split(';')[0] || 'audio/webm';
+  const bitrate = best.bitrate || best.averageBitrate || 160000;
+
+  // Extract expiration timestamp if present in query params (&expire=...)
+  let expiresAt: string | null = null;
+  try {
+    const u = new URL(best.url);
+    const exp = u.searchParams.get('expire');
+    if (exp) {
+      expiresAt = new Date(Number(exp) * 1000).toISOString();
+    }
+  } catch {}
+
+  return {
+    url: best.url,
+    mimeType,
+    codec,
+    bitrate,
+    expiresAt,
+  };
+}
 
 export class PlayerRuntime {
   private audio: HTMLAudioElement;
@@ -261,13 +347,10 @@ export class PlayerRuntime {
       ) {
         this.recoveryAttempts++;
         const posMs = store.positionMs;
-        log("yellow", "playback", `audio error encountered — recovering via cache/stream at ${posMs}ms`);
-        // an unreadable cached file would be served again on retry, so drop it and go to the network
-        const dropCorruptCache =
-          this.activeBlobUrl && audioEl.src === this.activeBlobUrl
-            ? linerDb.deleteAudio(currentTrack.id).catch(() => {})
-            : Promise.resolve();
-        void dropCorruptCache.then(() => this.loadAndPlay(currentTrack, posMs));
+        const failedFromCache = Boolean(this.activeBlobUrl) && this.audio.src === this.activeBlobUrl;
+        log("yellow", "playback", `audio error encountered — recovering via ${failedFromCache ? "fresh stream (dropping bad cache)" : "cache/stream"} at ${posMs}ms`);
+        const evict = failedFromCache ? linerDb.deleteAudio(currentTrack.id) : Promise.resolve();
+        void evict.finally(() => this.loadAndPlay(currentTrack, posMs));
         return;
       }
 
@@ -424,7 +507,23 @@ export class PlayerRuntime {
         );
         if (controller.signal.aborted) return;
 
-        const url = mediaUrl(session.streamUrl);
+        let url: string;
+        let streamMimeType = session.mimeType || 'audio/webm';
+        if (session.transport === 'direct_innertube' && session.endpoint && session.headers && session.body) {
+          const direct = await resolveDirectInnertubeStream({
+            endpoint: session.endpoint,
+            method: session.method,
+            headers: session.headers,
+            body: session.body,
+          }, controller.signal);
+          if (controller.signal.aborted) return;
+          url = direct.url;
+          streamMimeType = direct.mimeType;
+        } else if (session.streamUrl) {
+          url = mediaUrl(session.streamUrl);
+        } else {
+          return;
+        }
         const response = await fetch(url, {
           headers: { Range: "bytes=0-" },
           signal: controller.signal,
@@ -437,7 +536,7 @@ export class PlayerRuntime {
         if (!isStandaloneAudioFile(new Uint8Array(arrayBuffer, 0, Math.min(16, arrayBuffer.byteLength)))) return;
 
         const mimeType =
-          session.mimeType ||
+          streamMimeType ||
           response.headers.get("content-type") ||
           "audio/webm";
         const blob = new Blob([arrayBuffer], { type: mimeType });
@@ -600,10 +699,33 @@ export class PlayerRuntime {
         return;
       }
 
-      const expiry = session.expiresAt ? new Date(session.expiresAt).getTime() : null;
-      this.currentSessionExpiresAt = Number.isFinite(expiry) ? expiry : null;
+      let url: string;
+      let streamCodec = session.codec || 'opus';
+      let streamBitrate = session.bitrate || 160000;
+      let streamMimeType = session.mimeType || 'audio/webm';
 
-      const url = mediaUrl(session.streamUrl);
+      if (session.transport === 'direct_innertube' && session.endpoint && session.headers && session.body) {
+        log("cyan", "playback", `resolving direct innertube stream on client for ${track.title}`);
+        const direct = await resolveDirectInnertubeStream({
+          endpoint: session.endpoint,
+          method: session.method,
+          headers: session.headers,
+          body: session.body,
+        }, controller.signal);
+        if (epoch !== this.loadEpoch || controller.signal.aborted) return;
+        url = direct.url;
+        streamCodec = direct.codec as any;
+        streamBitrate = direct.bitrate;
+        streamMimeType = direct.mimeType;
+        const expiry = direct.expiresAt ? new Date(direct.expiresAt).getTime() : null;
+        this.currentSessionExpiresAt = Number.isFinite(expiry) ? expiry : null;
+      } else if (session.streamUrl) {
+        const expiry = session.expiresAt ? new Date(session.expiresAt).getTime() : null;
+        this.currentSessionExpiresAt = Number.isFinite(expiry) ? expiry : null;
+        url = mediaUrl(session.streamUrl);
+      } else {
+        throw new Error("No playable stream URL returned by server");
+      }
       if (this.activeBlobUrl) {
         URL.revokeObjectURL(this.activeBlobUrl);
         this.activeBlobUrl = null;
@@ -621,10 +743,10 @@ export class PlayerRuntime {
       log(
         "green",
         "playback",
-        `stream attached: ${session.codec} ${session.bitrate} bps (${track.title})`,
+        `stream attached: ${streamCodec} ${streamBitrate} bps (${track.title})`,
       );
 
-      this.cacheAudioInBackground(track, url, session.mimeType, bgCacheController.signal);
+      this.cacheOncePlaying(track, url, streamMimeType, bgCacheController.signal);
 
       if (this.audio.readyState < 3) {
         await new Promise<void>((resolve) => {
@@ -662,8 +784,8 @@ export class PlayerRuntime {
 
       telemetry.trackPlaybackHealth("INIT_LATENCY", {
         trackId: track.id,
-        codec: session.codec,
-        bitrate: session.bitrate,
+        codec: streamCodec,
+        bitrate: streamBitrate,
         timeToFirstByteMs: this.ttfbMs,
         audioStartLatencyMs,
       });
@@ -820,6 +942,21 @@ export class PlayerRuntime {
     } catch {
       // Ignore seek error if media not yet ready
     }
+  }
+
+  private cacheOncePlaying(
+    track: Track,
+    url: string,
+    preferredMimeType: string | undefined,
+    signal: AbortSignal,
+  ) {
+    const onPlaying = () => {
+      this.audio.removeEventListener("playing", onPlaying);
+      if (signal.aborted || this.currentTrackId !== track.id || this.audio.error) return;
+      this.cacheAudioInBackground(track, url, preferredMimeType, signal);
+    };
+    this.audio.addEventListener("playing", onPlaying);
+    signal.addEventListener("abort", () => this.audio.removeEventListener("playing", onPlaying), { once: true });
   }
 
   private cacheAudioInBackground(

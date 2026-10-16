@@ -20,6 +20,7 @@ describe("buildOfflineDump", () => {
       endpoints: { api: "https://api.tryliner.fun", covers: "https://covers.tryliner.fun", link: "https://link.tryliner.fun" },
     });
     expect(dump.summary).toEqual({ ok: 2, fail: 0, total: 2 });
+    expect(dump.app.version).toMatch(/^\d+\.\d+\.\d+/);
     expect(dump.failures).toHaveLength(1);
     expect(dump.machine?.trace?.hops).toHaveLength(1);
     expect(JSON.stringify(dump)).not.toMatch(/bearer|token|authorization|proxy/i);

@@ -141,6 +141,9 @@ export const useAuthStore = create<AuthState>((set) => ({
 
 export function getAuthErrorCode(error: unknown): string {
   if (!(error instanceof ApiError)) return "server_unavailable";
+  if (error.status === 0) return "server_unavailable";
+  // 5xx and cloudflare 52x: the server is down, not the user's input or connection
+  if (error.status >= 500) return "server_error";
   if (error.code === "INVALID_CREDENTIALS") return "invalid_credentials";
   if (error.code === "EMAIL_ALREADY_USED") return "email_already_used";
   if (error.code === "USERNAME_TAKEN") return "username_taken";

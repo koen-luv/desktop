@@ -24,12 +24,11 @@ import {
   CustomizationTab,
   AudioTab,
   StorageTab,
-  PrivacyTab,
   AboutTab,
   OverlayTab,
 } from "./tabs";
 
-type TabId = "Playback" | "Overlay" | "Appearance" | "Customization" | "Audio" | "Storage" | "Privacy" | "About";
+type TabId = "Playback" | "Overlay" | "Appearance" | "Customization" | "Audio" | "Storage" | "About";
 
 const TAB_ICONS: Record<TabId, typeof Play> = {
   Playback: Play,
@@ -38,13 +37,12 @@ const TAB_ICONS: Record<TabId, typeof Play> = {
   Customization: Gallery,
   Audio: HeadphonesRound,
   Storage: Database,
-  Privacy: ShieldCheck,
   About: InfoCircle,
 };
 
 const TAB_GROUPS: { labelKey: "preferences" | "application"; ids: TabId[] }[] = [
   { labelKey: "preferences", ids: ["Playback", "Overlay", "Audio", "Appearance", "Customization"] },
-  { labelKey: "application", ids: ["Storage", "Privacy", "About"] },
+  { labelKey: "application", ids: ["Storage", "About"] },
 ];
 
 
@@ -80,9 +78,6 @@ const SETTING_ITEMS: { tabId: TabId; titleKey: string; descKey?: string }[] = [
   { tabId: "Storage", titleKey: "settings.storage.usage_title" },
   { tabId: "Storage", titleKey: "settings.storage.open_folder", descKey: "settings.storage.open_folder_description" },
 
-  // Privacy
-  { tabId: "Privacy", titleKey: "settings.telemetry.title", descKey: "settings.telemetry.description" },
-
   // About
   { tabId: "About", titleKey: "settings.about.liner", descKey: "common.app.version" },
   { tabId: "About", titleKey: "settings.notifications.test_button" },
@@ -110,7 +105,6 @@ export default function SettingsModal() {
     Customization: t("settings.tabs.customization") || "Customization",
     Audio: t("settings.tabs.audio"),
     Storage: t("settings.tabs.storage"),
-    Privacy: t("settings.tabs.privacy"),
     About: t("settings.tabs.about"),
   };
 
@@ -121,7 +115,6 @@ export default function SettingsModal() {
     Customization: t("settings.customization.description") || "Window background wallpaper, transparency and block blur effects.",
     Audio: t("settings.audio.description"),
     Storage: t("settings.storage.description"),
-    Privacy: t("settings.privacy.description"),
     About: t("settings.about.tagline"),
   };
 
@@ -137,7 +130,6 @@ export default function SettingsModal() {
       Customization: "settings.tabs.customization",
       Audio: "settings.tabs.audio",
       Storage: "settings.tabs.storage",
-      Privacy: "settings.tabs.privacy",
       About: "settings.tabs.about",
     };
 
@@ -148,7 +140,6 @@ export default function SettingsModal() {
       Customization: "settings.customization.description",
       Audio: "settings.audio.description",
       Storage: "settings.storage.description",
-      Privacy: "settings.privacy.description",
       About: "settings.about.tagline",
     };
 
@@ -395,7 +386,6 @@ export default function SettingsModal() {
             {activeTab === "Customization" && <CustomizationTab searchQuery={searchQuery} />}
             {activeTab === "Audio" && <AudioTab searchQuery={searchQuery} />}
             {activeTab === "Storage" && <StorageTab searchQuery={searchQuery} />}
-            {activeTab === "Privacy" && <PrivacyTab searchQuery={searchQuery} />}
             {activeTab === "About" && <AboutTab searchQuery={searchQuery} />}
 
           </motion.div>
