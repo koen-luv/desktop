@@ -49,6 +49,8 @@ export default function LoginPage() {
     const code = getAuthErrorCode(nextError);
     if (code === "server_unavailable")
       return t("login.errors.server_unavailable");
+    if (code === "server_error")
+      return t("login.errors.server_error");
     if (code === "invalid_credentials")
       return t("login.errors.invalid_credentials");
     if (code === "email_already_used")
