@@ -294,7 +294,7 @@ function MiniPlayer({
   const [queueLimit, setQueueLimit] = useState(50);
   const [volumeOpen, setVolumeOpen] = useState(false);
   const [volumePopupStyle, setVolumePopupStyle] = useState<React.CSSProperties>(
-    {},
+    { bottom: 52 },
   );
   const [speedOpen, setSpeedOpen] = useState(false);
   const [speedPopupStyle, setSpeedPopupStyle] = useState<React.CSSProperties>(
@@ -419,10 +419,20 @@ function MiniPlayer({
     if (!toggle || !root) return;
     const toggleRect = toggle.getBoundingClientRect();
     const rootRect = root.getBoundingClientRect();
+    const bar =
+      toggle.closest<HTMLElement>(".bg-bg-toolbox") || toggle.parentElement;
+    const barRect = bar?.getBoundingClientRect();
+
     const popupW = 38;
     const btnW = toggleRect.width;
     const right = rootRect.right - toggleRect.right + (btnW - popupW) / 2;
-    setVolumePopupStyle({ right: Math.max(8, right) });
+    const targetTop = barRect ? barRect.top : toggleRect.top;
+    const bottom = rootRect.bottom - targetTop + 2;
+
+    setVolumePopupStyle({
+      right: Math.max(8, right),
+      bottom: Math.round(bottom),
+    });
   }, []);
 
   const handleVolumeMouseEnter = useCallback(() => {
@@ -563,14 +573,14 @@ function MiniPlayer({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 6, scale: 0.96 }}
             transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute bottom-[56px] z-[99] w-[38px] rounded-xl bg-bg-surface/90 dark:bg-[#161618]/95 backdrop-blur-2xl pt-[6px] pb-[8px] px-[4px] shadow-[0_8px_24px_rgba(0,0,0,0.14)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.5)] prevent-seek"
+            className="absolute bottom-[52px] z-[99] w-[38px] rounded-xl bg-bg-surface/90 dark:bg-[#161618]/95 backdrop-blur-2xl pt-[6px] pb-[8px] px-[4px] shadow-[0_8px_24px_rgba(0,0,0,0.14)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.5)] prevent-seek"
             style={volumePopupStyle}
             onPointerDown={(e) => e.stopPropagation()}
             onMouseEnter={clearVolumeHoverTimer}
             onMouseLeave={handleVolumeMouseLeave}
           >
             {/* Seamless invisible hit zone bridging popup and toggle button */}
-            <div className="absolute -inset-x-3 -bottom-[18px] top-0 pointer-events-auto" />
+            <div className="absolute -inset-x-3 -bottom-[22px] top-0 pointer-events-auto" />
 
             <VolumePicker
               orientation="vertical"

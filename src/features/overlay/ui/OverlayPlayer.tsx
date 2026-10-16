@@ -357,7 +357,7 @@ export function OverlayPlayer() {
                   ? "text-[#ff3b5c]"
                   : "text-white/40 hover:text-white"
               }`}
-              title={state.isLiked ? "Unlike" : "Like"}
+              aria-label={state.isLiked ? "Unlike" : "Like"}
             >
               {state.isLiked ? <HeartFill size={16} /> : <HeartLine size={16} />}
             </button>
@@ -374,7 +374,7 @@ export function OverlayPlayer() {
                 sendAction({ type: "prev" });
               }}
               className="flex h-[26px] w-[26px] items-center justify-center rounded-lg border-0 bg-transparent text-white/60 hover:text-white active:scale-90 transition-all outline-none cursor-pointer"
-              title="Previous"
+              aria-label="Previous"
             >
               <SkipPrevious size={16} weight="Bold" />
             </button>
@@ -391,7 +391,7 @@ export function OverlayPlayer() {
                 sendAction({ type: "togglePlay" });
               }}
               className="inline-flex h-[28px] w-[28px] items-center justify-center rounded-full bg-white text-black shadow transition-all duration-150 ease-out hover:scale-105 active:scale-95 border-none cursor-pointer"
-              title={isPlaying ? "Pause" : "Play"}
+              aria-label={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? (
                 <Pause size={14} weight="Bold" />
@@ -412,7 +412,7 @@ export function OverlayPlayer() {
                 sendAction({ type: "next" });
               }}
               className="flex h-[26px] w-[26px] items-center justify-center rounded-lg border-0 bg-transparent text-white/60 hover:text-white active:scale-90 transition-all outline-none cursor-pointer"
-              title="Next"
+              aria-label="Next"
             >
               <SkipNext size={16} weight="Bold" />
             </button>
