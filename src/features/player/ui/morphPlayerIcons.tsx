@@ -1,18 +1,17 @@
-// Morphing icon data for the player controls (play/pause, volume, like).
+// Morphing icon data for the player controls (play/pause, volume).
 // Shapes are the exact path data from the icon package the player already
 // renders, so the morph endpoints are pixel-identical to the static icons
 // they replace:
 //   @solar-icons/react (Apache-2.0) — def files under dist/esm/defs/video/:
 //     Play, Pause (Bold), VolumeCross/VolumeSmall/VolumeLoud (Bold trio —
 //     VolumePicker)
-//   @mingcute/react (Apache-2.0): heart line/fill
 // Lucide-style IconNode ([tag, attrs][]); morphicons only resamples geometry,
 // per-entry paint attrs are not applied (see PlayerMorphIcon note). Only
 // uniformly fill-drawn pairs can morph: solar linear weights include stroked
 // primitives (volume waves, the repeat-one digit) which cannot share the
-// single-<path> paint contract, and high-contrast weight pairs (shuffle
-// Outline⇄Bold, whose thin ribbons unravvel mid-flight) keep their static
-// icons too — those surfaces render the original solar components.
+// single-<path> paint contract — those surfaces (and pairs whose morph
+// degrades, like shuffle's Outline⇄Bold ribbon weights) keep the original
+// static icons.
 import { MorphIcon } from "morphicons/react";
 import type { IconNode } from "morphicons/react";
 
@@ -79,20 +78,6 @@ export const ICON_VOLUME_HIGH: IconNode = [
   ],
 ];
 
-export const ICON_HEART_LINE: IconNode = [
-  [
-    "path",
-    { d: "M18.494 3.801c2.095 1.221 3.569 3.7 3.504 6.592-.081 3.61-2.89 6.794-7.679 9.638-.71.422-1.458.969-2.319.969-.845 0-1.625-.557-2.32-.97-4.787-2.843-7.597-6.028-7.678-9.637-.065-2.892 1.409-5.37 3.504-6.592C7.466 2.66 9.928 2.653 12 4.338c2.072-1.685 4.534-1.679 6.494-.537M17.487 5.53c-1.394-.812-3.136-.783-4.644.743a1.19 1.19 0 0 1-1.686 0c-1.508-1.526-3.25-1.555-4.644-.743-1.444.842-2.56 2.628-2.511 4.82.056 2.511 2.04 5.194 6.7 7.962.408.243.834.554 1.298.683.464-.129.89-.44 1.298-.683 4.66-2.768 6.644-5.45 6.7-7.963.05-2.19-1.067-3.977-2.511-4.819", fill: "currentColor", fillRule: "evenodd" },
-  ],
-];
-
-export const ICON_HEART_FILL: IconNode = [
-  [
-    "path",
-    { d: "M18.494 3.801c2.095 1.221 3.569 3.7 3.504 6.592C21.86 16.5 13.5 21 12 21s-9.861-4.5-9.998-10.607c-.065-2.892 1.409-5.37 3.504-6.592C7.466 2.66 9.928 2.653 12 4.338c2.072-1.685 4.534-1.679 6.494-.537", fill: "currentColor" },
-  ],
-];
-
 /** Player spring/motion policy for morphing icons in one place: snappy spring
  *  (the library default, what morphicons.com previews at 1x) and honoring the
  *  OS reduced-motion preference (degrades to an instant swap). Without a
@@ -101,16 +86,15 @@ export const ICON_HEART_FILL: IconNode = [
  *
  *  Painting contract: MorphIcon renders one attribute-less <path> and paints
  *  from svg-level presentation attributes only, with lucide defaults that
- *  would stretch every fill shape with an inherited stroke — solar/ mingcute
- *  icons are fill-drawn, so we set fill/stroke/fill-rule at the root, keeping
- *  the endpoints pixel-identical to the static icons they replace.
+ *  would stretch every fill shape with an inherited stroke — solar icons are
+ *  fill-drawn, so we set fill/stroke/fill-rule at the root, keeping the
+ *  endpoints pixel-identical to the static icons they replace.
  *
- *  Fill rule is per icon: volume/hearts need evenodd at rest (the mute slash
- *  crosses the speaker body; the heart has a ribbon hole) while play/pause
- *  must use nonzero — their morph overlaps the source and target subpaths
- *  mid-flight, and under evenodd the overlap becomes a hole, so the paused
- *  bars flash transparent while filling. Only uniformly fill-drawn pairs can
- *  morph this way. */
+ *  Fill rule is per icon: the volume trio needs evenodd at rest (the mute
+ *  slash crosses the speaker body) while play/pause must use nonzero — their
+ *  morph overlaps the source and target subpaths mid-flight, and under
+ *  evenodd the overlap becomes a hole, so the paused bars flash transparent
+ *  while filling. Only uniformly fill-drawn pairs can morph this way. */
 const NONZERO_FILL_RULE = new WeakSet<IconNode>([ICON_PLAY, ICON_PAUSE]);
 
 export function PlayerMorphIcon({ icon, size }: { icon: IconNode; size: number }) {

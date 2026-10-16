@@ -8,9 +8,8 @@ import {
   PlayerMorphIcon,
   ICON_PLAY,
   ICON_PAUSE,
-  ICON_HEART_LINE,
-  ICON_HEART_FILL,
 } from "@/features/player/ui/morphPlayerIcons";
+import { HeartFill, HeartLine } from "@mingcute/react";
 import CoverImage from "@/features/covers/ui/CoverImage";
 import { ScrollableText } from "@/shared/ui/ScrollableText";
 import { useDisableButtonFocus } from "@/features/navigation/hooks/useDisableButtonFocus";
@@ -370,10 +369,7 @@ export function OverlayPlayer() {
               }`}
               title={state.isLiked ? "Unlike" : "Like"}
             >
-              <PlayerMorphIcon
-                icon={state.isLiked ? ICON_HEART_FILL : ICON_HEART_LINE}
-                size={16}
-              />
+              {state.isLiked ? <HeartFill size={16} /> : <HeartLine size={16} />}
             </button>
 
             <button

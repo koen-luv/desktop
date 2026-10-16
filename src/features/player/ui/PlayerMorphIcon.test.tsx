@@ -5,7 +5,6 @@ import {
   PlayerMorphIcon,
   ICON_PLAY,
   ICON_PAUSE,
-  ICON_HEART_LINE,
   ICON_VOLUME_MUTE,
 } from "./morphPlayerIcons";
 
@@ -61,16 +60,14 @@ describe("PlayerMorphIcon rendered markup", () => {
   });
 
   it("keeps evenodd fill rule for icons whose geometry needs it", () => {
-    for (const icon of [ICON_VOLUME_MUTE, ICON_HEART_LINE]) {
-      act(() => {
-        root?.render(<PlayerMorphIcon icon={icon} size={16} />);
-      });
+    act(() => {
+      root?.render(<PlayerMorphIcon icon={ICON_VOLUME_MUTE} size={16} />);
+    });
 
-      const svg = container?.querySelector("svg");
-      // the mute slash crosses the speaker body; the heart line is an evenodd
-      // ribbon — nonzero would fill their holes/silhouette like solar
-      expect(svg?.getAttribute("fill-rule")).toBe("evenodd");
-    }
+    const svg = container?.querySelector("svg");
+    // the mute slash crosses the speaker body — nonzero would fill the
+    // silhouette hole like solar's evenodd def avoids
+    expect(svg?.getAttribute("fill-rule")).toBe("evenodd");
   });
 
   it("keeps the VolumePicker mute geometry verbatim (solar VolumeCross Bold)", () => {

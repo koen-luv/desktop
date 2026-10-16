@@ -17,13 +17,12 @@ import {
   RepeatOne,
   Shuffle,
 } from "@solar-icons/react";
+import { HeartFill, HeartLine } from "@mingcute/react";
 
 import {
   PlayerMorphIcon,
   ICON_PLAY,
   ICON_PAUSE,
-  ICON_HEART_LINE,
-  ICON_HEART_FILL,
 } from "./morphPlayerIcons";
 
 import { usePlayerState } from "../hooks/usePlayerState";
@@ -743,10 +742,7 @@ function MiniPlayer({
               onClick={handleLikeToggle}
               style={{ cursor: "pointer" }}
             >
-              <PlayerMorphIcon
-                icon={isLiked ? ICON_HEART_FILL : ICON_HEART_LINE}
-                size={20}
-              />
+              {isLiked ? <HeartFill size={20} /> : <HeartLine size={20} />}
             </button>
           </div>
 
