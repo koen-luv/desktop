@@ -452,7 +452,10 @@
       },
       "position": {
         "title": "Position",
-        "description": "Choose where the overlay appears on your desktop."
+        "description": "Choose where the overlay appears on your desktop.",
+        "top_left": "Top Left",
+        "top_center": "Top Middle",
+        "top_right": "Top Right"
       },
       "shortcut": {
         "title": "Global shortcut",
