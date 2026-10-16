@@ -7,6 +7,7 @@ import { useConnectivityStore } from "../store/connectivityStore";
 import type { DiagCheck } from "../lib/diagnostics";
 import { DIAG_ENDPOINTS } from "../lib/diagnostics";
 import { buildOfflineDump, copyDump, downloadDump } from "../lib/dump";
+import { isServerOutage } from "../lib/failureKind";
 
 const SUPPORT_MAIL = "dev@tryliner.fun";
 
@@ -48,6 +49,7 @@ export default function ConnectivityWall() {
   if (!visible) return null;
 
   const okCount = checks.filter((c) => c.status === "ok").length;
+  const serverOutage = isServerOutage(checks);
   const steps = [
     t("connectivity.step_net"),
     t("connectivity.step_vpn"),
@@ -88,13 +90,13 @@ export default function ConnectivityWall() {
               className="m-0 text-[18px] font-[600] tracking-[-0.01em] text-text-primary"
               style={{ fontFamily: "var(--font-inter), sans-serif" }}
             >
-              {t("connectivity.wall_title")}
+              {t(serverOutage ? "connectivity.wall_title_server" : "connectivity.wall_title")}
             </h1>
             <p
               className="m-0 mt-[2px] text-[13px] text-text-secondary"
               style={{ fontFamily: "var(--font-inter), sans-serif" }}
             >
-              {t("connectivity.wall_subtitle")}
+              {t(serverOutage ? "connectivity.wall_subtitle_server" : "connectivity.wall_subtitle")}
             </p>
           </div>
         </div>

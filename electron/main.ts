@@ -27,6 +27,7 @@ import {
   MAIN_NET_HOST_RE,
   MAIN_NET_MAX_HOSTS,
   MAIN_NET_TRACE_MAX_HOPS,
+  maskIp,
   parseTraceOutput,
   type MainNetResult,
 } from "./netdiag.js";
@@ -840,10 +841,10 @@ if (!gotTheLock) {
       const controls = await Promise.all([
         fetchControl("google", "https://www.google.com/generate_204"),
         fetchControl("cloudflare", "https://cloudflare.com/cdn-cgi/trace", (body) => {
-          // egress fingerprint for support: exit ip + colo, nothing else
+          // egress fingerprint for support: masked exit ip + colo, nothing else
           const ip = /^ip=(.+)$/m.exec(body)?.[1]?.trim();
           const loc = /^loc=(.+)$/m.exec(body)?.[1]?.trim();
-          return ip ? `ip ${ip}${loc ? ` · ${loc}` : ""}` : loc ? loc : undefined;
+          return ip ? `ip ${maskIp(ip)}${loc ? ` · ${loc}` : ""}` : loc ? loc : undefined;
         }),
       ]);
 
