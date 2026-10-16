@@ -862,8 +862,8 @@ function MiniPlayer({
               />
               <button
                 type="button"
-                aria-label="Queue"
-                title="Queue"
+                aria-label={t("player.queue")}
+                title={t("player.queue")}
                 className={iconButtonClass}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => {
