@@ -164,12 +164,49 @@ describe("PlayerRuntime audio caching", () => {
     await playerRuntime!.loadAndPlay(freshTrack);
 
     expect(sessionSpy).toHaveBeenCalledTimes(1);
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(playSpy).toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(await linerDb.getAudio("fresh-track-2")).toBeNull();
 
-    const storedAudio = await linerDb.getAudio("fresh-track-2");
-    expect(storedAudio).not.toBeNull();
-    expect(storedAudio?.byteSize).toBe(4);
+    (playerRuntime as any).audio.dispatchEvent(new Event("playing"));
+
+    await vi.waitFor(async () => {
+      const storedAudio = await linerDb.getAudio("fresh-track-2");
+      expect(storedAudio?.byteSize).toBe(4);
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops a cached file that fails to decode and retries once from the network instead of looping", async () => {
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+    const sessionSpy = vi.spyOn(api, "createPlaybackSession").mockResolvedValue({
+      sessionId: "pb_bad",
+      trackId: "bad-cache-track",
+      transport: "proxy",
+      playbackId: "pb_bad",
+      streamUrl: "/v1/playback/pb_bad/media",
+      mimeType: "audio/mpeg",
+      codec: "aac",
+      bitrate: 128000,
+      expiresAt: new Date(Date.now() + 600_000).toISOString(),
+    });
+    const badTrack: Track = { ...track, id: "bad-cache-track", title: "Bad Cache" };
+    await linerDb.putAudio(badTrack.id, new Blob([new Uint8Array([9, 9, 9])], { type: "audio/webm" }), "audio/webm");
+    usePlayerStore.setState({ currentTrack: badTrack });
+
+    await playerRuntime!.loadAndPlay(badTrack);
+    expect(sessionSpy).not.toHaveBeenCalled();
+
+    (playerRuntime as any).audio.dispatchEvent(new Event("error"));
+
+    await vi.waitFor(() => expect(sessionSpy).toHaveBeenCalledTimes(1));
+    expect(await linerDb.getAudio(badTrack.id)).toBeNull();
+
+    const errors: unknown[] = [];
+    (playerRuntime as any).onError = (e: unknown) => errors.push(e);
+    (playerRuntime as any).audio.dispatchEvent(new Event("error"));
+    expect(errors).toHaveLength(1);
+    expect(sessionSpy).toHaveBeenCalledTimes(1);
   });
 
   it("preloads audio in the background and enables instant cache-hit play on skip", async () => {

@@ -346,8 +346,10 @@ export class PlayerRuntime {
       ) {
         this.recoveryAttempts++;
         const posMs = store.positionMs;
-        log("yellow", "playback", `audio error encountered — recovering via cache/stream at ${posMs}ms`);
-        void this.loadAndPlay(currentTrack, posMs);
+        const failedFromCache = Boolean(this.activeBlobUrl) && this.audio.src === this.activeBlobUrl;
+        log("yellow", "playback", `audio error encountered — recovering via ${failedFromCache ? "fresh stream (dropping bad cache)" : "cache/stream"} at ${posMs}ms`);
+        const evict = failedFromCache ? linerDb.deleteAudio(currentTrack.id) : Promise.resolve();
+        void evict.finally(() => this.loadAndPlay(currentTrack, posMs));
         return;
       }
 
@@ -628,7 +630,6 @@ export class PlayerRuntime {
 
       if (cachedAudio) {
         this.currentSessionExpiresAt = null;
-        this.recoveryAttempts = 0;
         void linerDb.putTrack(track);
         const blobUrl = URL.createObjectURL(cachedAudio.blob);
         this.activeBlobUrl = blobUrl;
@@ -743,7 +744,7 @@ export class PlayerRuntime {
         `stream attached: ${streamCodec} ${streamBitrate} bps (${track.title})`,
       );
 
-      this.cacheAudioInBackground(track, url, streamMimeType, bgCacheController.signal);
+      this.cacheOncePlaying(track, url, streamMimeType, bgCacheController.signal);
 
       if (this.audio.readyState < 3) {
         await new Promise<void>((resolve) => {
@@ -939,6 +940,21 @@ export class PlayerRuntime {
     } catch {
       // Ignore seek error if media not yet ready
     }
+  }
+
+  private cacheOncePlaying(
+    track: Track,
+    url: string,
+    preferredMimeType: string | undefined,
+    signal: AbortSignal,
+  ) {
+    const onPlaying = () => {
+      this.audio.removeEventListener("playing", onPlaying);
+      if (signal.aborted || this.currentTrackId !== track.id || this.audio.error) return;
+      this.cacheAudioInBackground(track, url, preferredMimeType, signal);
+    };
+    this.audio.addEventListener("playing", onPlaying);
+    signal.addEventListener("abort", () => this.audio.removeEventListener("playing", onPlaying), { once: true });
   }
 
   private cacheAudioInBackground(
