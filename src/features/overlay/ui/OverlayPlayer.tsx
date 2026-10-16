@@ -403,10 +403,16 @@ export function OverlayPlayer() {
               className="inline-flex h-[28px] w-[28px] items-center justify-center rounded-full bg-white text-black shadow transition-all duration-150 ease-out hover:scale-105 active:scale-95 border-none cursor-pointer"
               title={isPlaying ? "Pause" : "Play"}
             >
-              <PlayerMorphIcon
-                icon={isPlaying ? ICON_PAUSE : ICON_PLAY}
-                size={14}
-              />
+              <span
+                className={`flex items-center justify-center ${
+                  isPlaying ? "" : "translate-x-[0.5px] transition-transform"
+                }`}
+              >
+                <PlayerMorphIcon
+                  icon={isPlaying ? ICON_PAUSE : ICON_PLAY}
+                  size={14}
+                />
+              </span>
             </button>
 
             <button
