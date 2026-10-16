@@ -548,26 +548,10 @@ if (!gotTheLock) {
       }
     });
 
-    // native os window move + system cursor fallback to stop wayland jitter feedback loop
+    // manual window move for windows/macos, anchored on the system cursor.
+    // linux uses css app-region instead (see useWindowDrag): wayland ignores setPosition
     let dragStartCursor: { x: number; y: number } | null = null;
     let dragStartWinPos: { x: number; y: number } | null = null;
-
-    ipcMain.on("window:start-drag", () => {
-      if (!mainWindow || mainWindow.isFullScreen()) return;
-      try {
-        if (typeof (mainWindow as any).startWindowMove === "function") {
-          (mainWindow as any).startWindowMove();
-        }
-      } catch {
-        // fallback to manual cursor drag if startWindowMove is unsupported
-      }
-      if (mainWindow.isMaximized()) {
-        mainWindow.unmaximize();
-      }
-      const [wx, wy] = mainWindow.getPosition();
-      dragStartCursor = screen.getCursorScreenPoint();
-      dragStartWinPos = { x: wx, y: wy };
-    });
 
     ipcMain.on("window:drag-start", () => {
       if (!mainWindow || mainWindow.isFullScreen()) return;
