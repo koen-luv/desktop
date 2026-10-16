@@ -4,6 +4,8 @@ import {
   SkipNext,
   SkipPrevious,
   MusicNote,
+  Repeat,
+  RepeatOne,
 } from "@solar-icons/react";
 import { AddLine, CheckFill } from "@mingcute/react";
 import {
@@ -12,8 +14,6 @@ import {
   ICON_PAUSE,
   ICON_SHUFFLE_ON,
   ICON_SHUFFLE_OFF,
-  ICON_REPEAT,
-  ICON_REPEAT_ONE,
 } from "./morphPlayerIcons";
 import { usePlayerState } from "../hooks/usePlayerState";
 import { playerEngine } from "../engine/playerEngine";
@@ -41,7 +41,7 @@ function PlayPauseIcon({ status }: { status: string }) {
     <span className="relative flex h-[22px] w-[22px] items-center justify-center">
       <span
         className={`absolute inset-0 flex items-center justify-center ${
-          loading ? "opacity-30" : ""
+          loading ? "opacity-0" : ""
         }`}
       >
         <PlayerMorphIcon
@@ -275,10 +275,11 @@ export function PlayerUiElements({
             player.repeat !== "off" ? "!text-white !opacity-100" : "!text-white/40"
           }`}
         >
-          <PlayerMorphIcon
-            icon={player.repeat === "one" ? ICON_REPEAT_ONE : ICON_REPEAT}
-            size={18}
-          />
+          {player.repeat === "one" ? (
+            <RepeatOne size={18} />
+          ) : (
+            <Repeat size={18} />
+          )}
         </button>
       </div>
 

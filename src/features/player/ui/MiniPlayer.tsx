@@ -10,6 +10,9 @@ import {
   TrashBin2,
   Bookmark,
   PlaybackSpeed,
+  VolumeCross,
+  VolumeSmall,
+  VolumeLoud,
 } from "@solar-icons/react";
 
 import {
@@ -22,9 +25,6 @@ import {
   ICON_SHUFFLE_OFF,
   ICON_REPEAT_OUTLINE,
   ICON_REPEAT_ONE_OUTLINE,
-  ICON_VOLUME_MUTE_LINEAR,
-  ICON_VOLUME_LOW_LINEAR,
-  ICON_VOLUME_HIGH_LINEAR,
 } from "./morphPlayerIcons";
 
 import { usePlayerState } from "../hooks/usePlayerState";
@@ -848,16 +848,13 @@ function MiniPlayer({
                 }}
                 style={{ cursor: "pointer" }}
               >
-                <PlayerMorphIcon
-                  icon={
-                    volumeLevel === 0
-                      ? ICON_VOLUME_MUTE_LINEAR
-                      : volumeLevel < 0.33
-                        ? ICON_VOLUME_LOW_LINEAR
-                        : ICON_VOLUME_HIGH_LINEAR
-                  }
-                  size={20}
-                />
+                {volumeLevel === 0 ? (
+                  <VolumeCross size={20} />
+                ) : volumeLevel < 0.33 ? (
+                  <VolumeSmall size={20} />
+                ) : (
+                  <VolumeLoud size={20} />
+                )}
               </button>
               <button
                 type="button"
@@ -931,7 +928,7 @@ function MiniPlayer({
               <span className="relative flex h-[16px] w-[16px] items-center justify-center">
                 <span
                   className={`absolute inset-0 flex items-center justify-center ${
-                    isLoading ? "opacity-30" : ""
+                    isLoading ? "opacity-0" : ""
                   }`}
                 >
                   <PlayerMorphIcon
