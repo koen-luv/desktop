@@ -1,16 +1,20 @@
 import { useState, useRef, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import {
-  Play,
-  Pause,
   SkipNext,
   SkipPrevious,
-  Repeat,
-  RepeatOne,
-  Shuffle,
   MusicNote,
 } from "@solar-icons/react";
 import { AddLine, CheckFill } from "@mingcute/react";
+import {
+  PlayerMorphIcon,
+  ICON_PLAY,
+  ICON_PAUSE,
+  ICON_SHUFFLE_ON,
+  ICON_SHUFFLE_OFF,
+  ICON_REPEAT,
+  ICON_REPEAT_ONE,
+} from "./morphPlayerIcons";
 import { usePlayerState } from "../hooks/usePlayerState";
 import { playerEngine } from "../engine/playerEngine";
 import { useIsTrackLiked, useLikeTrack, useUnlikeTrack } from "@/features/library/hooks";
@@ -36,10 +40,11 @@ function PlayPauseIcon({ status }: { status: string }) {
       />
     );
   }
-  return status === "playing" ? (
-    <Pause weight="Bold" size={22} />
-  ) : (
-    <Play weight="Bold" size={22} className="translate-x-[1px]" />
+  return (
+    <PlayerMorphIcon
+      icon={status === "playing" ? ICON_PAUSE : ICON_PLAY}
+      size={22}
+    />
   );
 }
 
@@ -210,7 +215,10 @@ export function PlayerUiElements({
             player.shuffle ? "!text-white !opacity-100" : "!text-white/40"
           }`}
         >
-          <Shuffle size={18} weight={player.shuffle ? "Bold" : "Outline"} />
+          <PlayerMorphIcon
+            icon={player.shuffle ? ICON_SHUFFLE_ON : ICON_SHUFFLE_OFF}
+            size={18}
+          />
         </button>
 
         <button
@@ -256,11 +264,10 @@ export function PlayerUiElements({
             player.repeat !== "off" ? "!text-white !opacity-100" : "!text-white/40"
           }`}
         >
-          {player.repeat === "one" ? (
-            <RepeatOne size={18} />
-          ) : (
-            <Repeat size={18} />
-          )}
+          <PlayerMorphIcon
+            icon={player.repeat === "one" ? ICON_REPEAT_ONE : ICON_REPEAT}
+            size={18}
+          />
         </button>
       </div>
 

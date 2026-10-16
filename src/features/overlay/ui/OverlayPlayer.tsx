@@ -1,12 +1,16 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
-  Play,
-  Pause,
   SkipNext,
   SkipPrevious,
 } from "@solar-icons/react";
-import { HeartFill, HeartLine } from "@mingcute/react";
+import {
+  PlayerMorphIcon,
+  ICON_PLAY,
+  ICON_PAUSE,
+  ICON_HEART_LINE,
+  ICON_HEART_FILL,
+} from "@/features/player/ui/morphPlayerIcons";
 import CoverImage from "@/features/covers/ui/CoverImage";
 import { ScrollableText } from "@/shared/ui/ScrollableText";
 import { useDisableButtonFocus } from "@/features/navigation/hooks/useDisableButtonFocus";
@@ -366,7 +370,10 @@ export function OverlayPlayer() {
               }`}
               title={state.isLiked ? "Unlike" : "Like"}
             >
-              {state.isLiked ? <HeartFill size={16} /> : <HeartLine size={16} />}
+              <PlayerMorphIcon
+                icon={state.isLiked ? ICON_HEART_FILL : ICON_HEART_LINE}
+                size={16}
+              />
             </button>
 
             <button
@@ -400,11 +407,10 @@ export function OverlayPlayer() {
               className="inline-flex h-[28px] w-[28px] items-center justify-center rounded-full bg-white text-black shadow transition-all duration-150 ease-out hover:scale-105 active:scale-95 border-none cursor-pointer"
               title={isPlaying ? "Pause" : "Play"}
             >
-              {isPlaying ? (
-                <Pause size={14} weight="Bold" />
-              ) : (
-                <Play size={14} weight="Bold" className="translate-x-[0.5px]" />
-              )}
+              <PlayerMorphIcon
+                icon={isPlaying ? ICON_PAUSE : ICON_PLAY}
+                size={14}
+              />
             </button>
 
             <button

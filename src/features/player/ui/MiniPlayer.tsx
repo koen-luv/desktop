@@ -4,22 +4,28 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Radio,
   Sidebar,
-  Play,
-  Pause,
-  Repeat,
-  RepeatOne,
-  Shuffle,
   SkipNext,
   SkipPrevious,
-  VolumeCross,
-  VolumeSmall,
-  VolumeLoud,
   MaximizeSquare3,
   TrashBin2,
   Bookmark,
   PlaybackSpeed,
 } from "@solar-icons/react";
-import { HeartFill, HeartLine } from "@mingcute/react";
+
+import {
+  PlayerMorphIcon,
+  ICON_PLAY,
+  ICON_PAUSE,
+  ICON_HEART_LINE,
+  ICON_HEART_FILL,
+  ICON_SHUFFLE_ON,
+  ICON_SHUFFLE_OFF,
+  ICON_REPEAT_OUTLINE,
+  ICON_REPEAT_ONE_OUTLINE,
+  ICON_VOLUME_MUTE_LINEAR,
+  ICON_VOLUME_LOW_LINEAR,
+  ICON_VOLUME_HIGH_LINEAR,
+} from "./morphPlayerIcons";
 
 import { usePlayerState } from "../hooks/usePlayerState";
 import { playerEngine } from "../engine/playerEngine";
@@ -395,10 +401,12 @@ function MiniPlayer({
   ]);
 
   const repeatIcon = useMemo(() => {
-    if (player.repeat === "one") {
-      return <RepeatOne size={18} weight="Outline" />;
-    }
-    return <Repeat size={18} weight="Outline" />;
+    return (
+      <PlayerMorphIcon
+        icon={player.repeat === "one" ? ICON_REPEAT_ONE_OUTLINE : ICON_REPEAT_OUTLINE}
+        size={18}
+      />
+    );
   }, [player.repeat]);
 
   const iconButtonClass =
@@ -738,7 +746,10 @@ function MiniPlayer({
               onClick={handleLikeToggle}
               style={{ cursor: "pointer" }}
             >
-              {isLiked ? <HeartFill size={20} /> : <HeartLine size={20} />}
+              <PlayerMorphIcon
+                icon={isLiked ? ICON_HEART_FILL : ICON_HEART_LINE}
+                size={20}
+              />
             </button>
           </div>
 
@@ -761,7 +772,10 @@ function MiniPlayer({
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => playerEngine.setShuffle(!player.shuffle)}
               >
-                <Shuffle size={18} weight={player.shuffle ? "Bold" : "Outline"} />
+                <PlayerMorphIcon
+                  icon={player.shuffle ? ICON_SHUFFLE_ON : ICON_SHUFFLE_OFF}
+                  size={18}
+                />
               </button>
               <button
                 type="button"
@@ -834,13 +848,16 @@ function MiniPlayer({
                 }}
                 style={{ cursor: "pointer" }}
               >
-                {volumeLevel === 0 ? (
-                  <VolumeCross size={20} />
-                ) : volumeLevel < 0.33 ? (
-                  <VolumeSmall size={20} />
-                ) : (
-                  <VolumeLoud size={20} />
-                )}
+                <PlayerMorphIcon
+                  icon={
+                    volumeLevel === 0
+                      ? ICON_VOLUME_MUTE_LINEAR
+                      : volumeLevel < 0.33
+                        ? ICON_VOLUME_LOW_LINEAR
+                        : ICON_VOLUME_HIGH_LINEAR
+                  }
+                  size={20}
+                />
               </button>
               <button
                 type="button"
@@ -912,10 +929,11 @@ function MiniPlayer({
                   className="h-[16px] w-[16px] animate-spin rounded-full border-[2px] border-current border-t-transparent"
                   aria-label="Loading playback"
                 />
-              ) : isPlaying ? (
-                <Pause size={16} weight="Bold" />
               ) : (
-                <Play size={16} weight="Bold" className="translate-x-[0.5px]" />
+                <PlayerMorphIcon
+                  icon={isPlaying ? ICON_PAUSE : ICON_PLAY}
+                  size={16}
+                />
               )}
             </button>
             <button
