@@ -924,17 +924,28 @@ function MiniPlayer({
               }}
               style={{ cursor: "pointer" }}
             >
-              {isLoading ? (
+              {/* keep the morph icon mounted through the loading state
+                  (spinner overlays it) — swapping it out on "loading" would
+                  remount MorphIcon when the track starts, which skips the
+                  play -> pause morph animation. */}
+              <span className="relative flex h-[16px] w-[16px] items-center justify-center">
                 <span
-                  className="h-[16px] w-[16px] animate-spin rounded-full border-[2px] border-current border-t-transparent"
-                  aria-label="Loading playback"
-                />
-              ) : (
-                <PlayerMorphIcon
-                  icon={isPlaying ? ICON_PAUSE : ICON_PLAY}
-                  size={16}
-                />
-              )}
+                  className={`absolute inset-0 flex items-center justify-center ${
+                    isLoading ? "opacity-30" : ""
+                  }`}
+                >
+                  <PlayerMorphIcon
+                    icon={isPlaying ? ICON_PAUSE : ICON_PLAY}
+                    size={16}
+                  />
+                </span>
+                {isLoading && (
+                  <span
+                    className="absolute h-[16px] w-[16px] animate-spin rounded-full border-[2px] border-current border-t-transparent"
+                    aria-label="Loading playback"
+                  />
+                )}
+              </span>
             </button>
             <button
               type="button"

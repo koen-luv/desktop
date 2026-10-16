@@ -32,19 +32,30 @@ const iconButtonClass =
   "inline-flex h-[28px] w-[28px] items-center justify-center text-white opacity-70 transition-all duration-150 ease-out hover:opacity-100 active:scale-[0.94] shrink-0 border-none bg-transparent cursor-pointer";
 
 function PlayPauseIcon({ status }: { status: string }) {
-  if (status === "loading") {
-    return (
-      <span
-        className="h-[18px] w-[18px] animate-spin rounded-full border-[2px] border-current border-t-transparent"
-        aria-label="Loading playback"
-      />
-    );
-  }
+  const loading = status === "loading";
+  const playing = status === "playing";
+  // keep the morph icon mounted through the loading state (spinner overlays
+  // it) — unmounting the icon on "loading" would remount MorphIcon when the
+  // track starts, which skips the play -> pause morph animation.
   return (
-    <PlayerMorphIcon
-      icon={status === "playing" ? ICON_PAUSE : ICON_PLAY}
-      size={22}
-    />
+    <span className="relative flex h-[22px] w-[22px] items-center justify-center">
+      <span
+        className={`absolute inset-0 flex items-center justify-center ${
+          loading ? "opacity-30" : ""
+        }`}
+      >
+        <PlayerMorphIcon
+          icon={playing ? ICON_PAUSE : ICON_PLAY}
+          size={22}
+        />
+      </span>
+      {loading && (
+        <span
+          className="absolute h-[18px] w-[18px] animate-spin rounded-full border-[2px] border-current border-t-transparent"
+          aria-label="Loading playback"
+        />
+      )}
+    </span>
   );
 }
 
