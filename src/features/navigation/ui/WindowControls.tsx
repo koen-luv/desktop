@@ -19,7 +19,7 @@ export default function WindowControls({
   const { t } = useTranslation();
   const [isWindowFullScreen, setIsWindowFullScreen] = useState(false);
   const [isWindowMaximized, setIsWindowMaximized] = useState(false);
-  
+
   useEffect(() => {
     if (!window.linerElectron) return;
 
@@ -97,7 +97,7 @@ export default function WindowControls({
                     : "text-text-primary hover:bg-border-alpha-14 active:scale-95 cursor-pointer"
           }`}
           aria-label={t("common.minimize")}
-        title={isMinimizeDisabled ? undefined : t("common.minimize")}
+          title={isMinimizeDisabled ? undefined : t("common.minimize")}
         >
           <LuMinus size={13} />
         </button>

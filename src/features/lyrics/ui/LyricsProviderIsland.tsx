@@ -249,8 +249,8 @@ export function LyricsProviderIsland() {
                 e.stopPropagation();
                 adjustOffset(100);
               }}
-              aria-label={`${t("player.later")} (-0.1s)`}
-              title={`${t("player.later")} (-0.1s)`}
+              aria-label={`${t("player.later")} (+0.1s)`}
+              title={`${t("player.later")} (+0.1s)`}
               className="w-[26px] h-[26px] min-w-[26px] min-h-[26px] max-h-[26px] rounded-md flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 active:scale-95 transition-all border-none bg-transparent cursor-pointer"
             >
               <AddLine size={12} />
