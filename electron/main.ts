@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, screen, dialog, session, nativeImag
 import { autoUpdater } from "electron-updater";
 import path from "node:path";
 import fs from "node:fs";
+import os from "node:os";
 import dns from "node:dns";
 import net from "node:net";
 import tls from "node:tls";
@@ -307,6 +308,37 @@ if (!gotTheLock) {
       return app.getVersion();
     });
 
+    let lastIconBytes: Buffer | null = null;
+
+    // linux dash/taskbar/launcher icons come from the freedesktop icon theme,
+    // not from the window (wayland has no window-icon protocol at all, and
+    // gnome ignores _NET_WM_ICON), so persist the rendered branding icon into
+    // the user-level hicolor theme and refresh caches best-effort.
+    const refreshLinuxIconCaches = (hicolorDir: string, applicationsDir: string) => {
+      const tryOnce = (cmd: string, args: string[]) => {
+        try {
+          // missing binaries (and their output) are ignored quietly
+          execFile(cmd, args, { timeout: 5000 }, () => {});
+        } catch {}
+      };
+      tryOnce("gtk-update-icon-cache", ["-f", "-t", hicolorDir]);
+      tryOnce("update-desktop-database", [applicationsDir]);
+    };
+
+    const installLinuxAppIcon = async (iconName: string, png: Buffer) => {
+      const dataHome =
+        process.env.XDG_DATA_HOME && path.isAbsolute(process.env.XDG_DATA_HOME)
+          ? process.env.XDG_DATA_HOME
+          : path.join(os.homedir(), ".local", "share");
+      const iconDir = path.join(dataHome, "icons", "hicolor", "512x512", "apps");
+      await fs.promises.mkdir(iconDir, { recursive: true });
+      await fs.promises.writeFile(path.join(iconDir, `${iconName}.png`), png);
+      refreshLinuxIconCaches(
+        path.join(dataHome, "icons", "hicolor"),
+        path.join(dataHome, "applications"),
+      );
+    };
+
     ipcMain.handle("app:set-icon", async (_event, dataUrl: string) => {
       if (!mainWindow || !dataUrl) return;
       try {
@@ -315,6 +347,23 @@ if (!gotTheLock) {
           mainWindow.setIcon(icon);
           if (process.platform === "darwin" && app.dock) {
             app.dock.setIcon(icon);
+          }
+          // linux: apply to the icon dash/taskbar actually shows. only in the
+          // packaged app so dev runs do not pollute the user's icon theme.
+          if (process.platform === "linux" && app.isPackaged) {
+            const png = /^data:image\/png;base64,(.+)$/.exec(dataUrl)?.[1];
+            if (png) {
+              const bytes = Buffer.from(png, "base64");
+              if (!lastIconBytes || !lastIconBytes.equals(bytes)) {
+                lastIconBytes = bytes;
+                const raw = (app as any).getDesktopFileName?.();
+                const iconName =
+                  (typeof raw === "string" && raw.trim()
+                    ? path.basename(raw).replace(/\.desktop$/i, "")
+                    : "") || "liner";
+                await installLinuxAppIcon(iconName, bytes);
+              }
+            }
           }
         }
       } catch (err) {
