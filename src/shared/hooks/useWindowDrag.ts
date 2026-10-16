@@ -51,11 +51,7 @@ export function resetWindowDragTimeForTests(): void {
 export const NATIVE_WINDOW_DRAG_CLASS = "native-window-drag";
 const WINDOW_DRAG_STRIP_ID = "window-drag-strip";
 
-/**
- * Linux moves the window through css app-region instead of setPosition:
- * wayland compositors ignore client-side window positioning, so the drag has
- * to be handed to the compositor (works on x11 too).
- */
+// wayland ignores client-side setPosition, so linux hands the drag to the compositor via css app-region
 function usesNativeWindowDrag(): boolean {
   return window.linerElectron?.platform === "linux";
 }
