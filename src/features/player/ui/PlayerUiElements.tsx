@@ -41,7 +41,7 @@ function PlayPauseIcon({ status }: { status: string }) {
       <span
         className={`absolute inset-0 flex items-center justify-center ${
           loading ? "opacity-0" : ""
-        } ${playing ? "" : "translate-x-[1px] transition-transform"}`}
+        } transition-transform ${playing ? "" : "translate-x-[1px]"}`}
       >
         <PlayerMorphIcon
           icon={playing ? ICON_PAUSE : ICON_PLAY}

@@ -919,7 +919,9 @@ function MiniPlayer({
                 <span
                   className={`absolute inset-0 flex items-center justify-center ${
                     isLoading ? "opacity-0" : ""
-                  } ${isPlaying ? "" : "translate-x-[0.5px] transition-transform"}`}
+                  } transition-transform ${
+                    isPlaying ? "" : "translate-x-[0.5px]"
+                  }`}
                 >
                   <PlayerMorphIcon
                     icon={isPlaying ? ICON_PAUSE : ICON_PLAY}

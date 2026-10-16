@@ -404,8 +404,8 @@ export function OverlayPlayer() {
               title={isPlaying ? "Pause" : "Play"}
             >
               <span
-                className={`flex items-center justify-center ${
-                  isPlaying ? "" : "translate-x-[0.5px] transition-transform"
+                className={`flex items-center justify-center transition-transform ${
+                  isPlaying ? "" : "translate-x-[0.5px]"
                 }`}
               >
                 <PlayerMorphIcon
