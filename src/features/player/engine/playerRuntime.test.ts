@@ -149,7 +149,7 @@ describe("PlayerRuntime audio caching", () => {
       expiresAt: new Date().toISOString(),
     });
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(new Uint8Array([1, 2, 3, 4]), {
+      new Response(new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0]), {
         status: 206,
         headers: { "content-type": "audio/webm" },
       }),
@@ -172,7 +172,7 @@ describe("PlayerRuntime audio caching", () => {
 
     await vi.waitFor(async () => {
       const storedAudio = await linerDb.getAudio("fresh-track-2");
-      expect(storedAudio?.byteSize).toBe(4);
+      expect(storedAudio?.byteSize).toBe(16);
     });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
@@ -222,7 +222,7 @@ describe("PlayerRuntime audio caching", () => {
       expiresAt: new Date().toISOString(),
     });
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(new Uint8Array([5, 6, 7, 8]), {
+      new Response(new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0]), {
         status: 206,
         headers: { "content-type": "audio/webm" },
       }),
@@ -241,7 +241,7 @@ describe("PlayerRuntime audio caching", () => {
 
     const storedAudio = await linerDb.getAudio("next-track-3");
     expect(storedAudio).not.toBeNull();
-    expect(storedAudio?.byteSize).toBe(4);
+    expect(storedAudio?.byteSize).toBe(16);
 
     sessionSpy.mockClear();
     fetchSpy.mockClear();
@@ -253,5 +253,44 @@ describe("PlayerRuntime audio caching", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(playSpy).toHaveBeenCalled();
     expect(usePlayerStore.getState().status).toBe("playing");
+  });
+
+  it("drops an unreadable cached file and recovers from the network once instead of looping", async () => {
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+    const sessionSpy = vi.spyOn(api, "createPlaybackSession").mockResolvedValue({
+      sessionId: "pb_c",
+      trackId: "corrupt-track",
+      transport: "proxy",
+      playbackId: "pb_c",
+      streamUrl: "/v1/playback/pb_c/media",
+      mimeType: "audio/webm",
+      codec: "opus",
+      bitrate: 128000,
+      expiresAt: new Date().toISOString(),
+    });
+    // background re-cache gets a dash segment again, which must not be stored
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      new Response(new Uint8Array([0, 0, 0, 0x18, 0x73, 0x74, 0x79, 0x70, 0, 0, 0, 0, 0, 0, 0, 0]), { status: 206 }),
+    );
+
+    const corruptTrack: Track = { ...track, id: "corrupt-track", title: "Corrupt" };
+    await linerDb.putAudio("corrupt-track", new Blob(["styp-segment"]), "audio/webm");
+    usePlayerStore.setState({ currentTrack: corruptTrack, positionMs: 0 });
+    await playerRuntime!.loadAndPlay(corruptTrack);
+
+    const audio = (playerRuntime as any).audio as HTMLAudioElement;
+    Object.defineProperty(audio, "error", { value: { code: 4, message: "DEMUXER_ERROR_COULD_NOT_OPEN" }, configurable: true });
+    try {
+      audio.dispatchEvent(new Event("error"));
+      await vi.waitFor(() => expect(sessionSpy).toHaveBeenCalledTimes(1));
+      expect(await linerDb.getAudio("corrupt-track")).toBeNull();
+
+      // a second failure on the same track gives up instead of retrying forever
+      audio.dispatchEvent(new Event("error"));
+      await vi.waitFor(() => expect(usePlayerStore.getState().status).toBe("error"));
+      expect(sessionSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      delete (audio as any).error;
+    }
   });
 });

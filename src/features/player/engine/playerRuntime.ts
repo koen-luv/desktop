@@ -4,6 +4,7 @@ import { getClientVisitorData } from "@/shared/api/visitorSession";
 import { log } from "@/shared/utils/logger";
 import { telemetry } from "@/shared/telemetry";
 import { linerDb } from "@/shared/storage";
+import { isStandaloneAudioFile } from "@/shared/storage/audioFormat";
 import type { Track } from "@/shared/types";
 import { pitchShifter } from "./pitchShifter";
 
@@ -532,6 +533,7 @@ export class PlayerRuntime {
 
         const arrayBuffer = await response.arrayBuffer();
         if (controller.signal.aborted) return;
+        if (!isStandaloneAudioFile(new Uint8Array(arrayBuffer, 0, Math.min(16, arrayBuffer.byteLength)))) return;
 
         const mimeType =
           streamMimeType ||
@@ -969,6 +971,10 @@ export class PlayerRuntime {
         if (!res.ok && res.status !== 206) return;
         const arrayBuffer = await res.arrayBuffer();
         if (signal?.aborted) return;
+        if (!isStandaloneAudioFile(new Uint8Array(arrayBuffer, 0, Math.min(16, arrayBuffer.byteLength)))) {
+          log("yellow", "playback", `not caching ${track.title}: stream is not a standalone audio file`);
+          return;
+        }
         const mimeType = preferredMimeType || res.headers.get("content-type") || "audio/webm";
         const blob = new Blob([arrayBuffer], { type: mimeType });
         await linerDb.putAudio(track.id, blob, mimeType);

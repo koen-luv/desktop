@@ -70,6 +70,14 @@ export const useAuthStore = create<AuthState>((set) => ({
             // refresh failed
           }
         }
+        // refreshAuthSession already drops the session when the server rejects the refresh token (401/403).
+        // still here = the refresh failed for a transient reason (network, 5xx), so keep the user signed in.
+        // shortcut: a server answering 400/422 for a dead refresh token keeps a broken session, use logout then
+        const remaining = getAuthSession();
+        if (remaining?.refreshToken) {
+          set({ status: "authenticated", user: remaining.user ?? stored.user });
+          return;
+        }
         setAuthSession(null);
         set({ status: "anonymous", user: null });
       } else {
