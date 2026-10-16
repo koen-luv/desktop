@@ -443,6 +443,7 @@
       "about": "Про додаток",
       "playback": "Відтворення",
       "overlay": "Оверлей",
+      "discord": "Discord RPC",
       "privacy": "Конфіденційність"
     },
     "playback": {
@@ -476,6 +477,42 @@
       "always_on_top": {
         "title": "Поверх усіх вікон",
         "description": "Тримати оверлей поверх інших вікон."
+      }
+    },
+    "discord": {
+      "description": "Відображення поточного треку в Discord з обкладинкою, фото артиста та шкалою часу.",
+      "enable": {
+        "title": "Discord Rich Presence",
+        "description": "Транслювати активне відтворення музики у ваш профіль Discord."
+      },
+      "show_timeline": {
+        "title": "Шкала часу треку",
+        "description": "Відображати інтерактивний прогрес-бар з часом, що минув та залишився."
+      },
+      "show_artwork": {
+        "title": "Обкладинка треку",
+        "description": "Показувати обкладинку альбому або пісні в картці Discord."
+      },
+      "show_artist_image": {
+        "title": "Міні-фото артиста",
+        "description": "Відображати фото виконавця у невеликому круглому значку на обкладинці."
+      },
+      "show_paused": {
+        "title": "Показувати при паузі",
+        "description": "Зберігати статус у Discord з індикатором паузи при зупинці музики."
+      },
+      "show_button": {
+        "title": "Кнопка «Слухати в Liner»",
+        "description": "Додавати інтерактивну кнопку з посиланням на трек у Liner."
+      },
+      "client_id": {
+        "title": "ID додатку Discord",
+        "description": "Користувацький Application ID з Discord Developer Portal для власної назви.",
+        "reset": "За замовчуванням"
+      },
+      "status": {
+        "connected": "Підключено до Discord ({user})",
+        "disconnected": "Discord не підключено"
       }
     },
     "miniplayer": {
