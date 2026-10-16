@@ -23,6 +23,7 @@ import { VolumePicker } from "./VolumePicker";
 import { TimelineSlider } from "./TimelineSlider";
 
 import { useTranslation } from "@/languages";
+import { useCustomizationStore, FULLSCREEN_ARTWORK_SIZE_PX } from "@/features/settings/store/customizationStore";
 
 const iconButtonClass =
   "inline-flex h-[28px] w-[28px] items-center justify-center text-white opacity-70 transition-all duration-150 ease-out hover:opacity-100 active:scale-[0.94] shrink-0 border-none bg-transparent cursor-pointer";
@@ -78,6 +79,10 @@ export function PlayerUiElements({
   }, [track, isLiked, likeMutation, unlikeMutation]);
 
   const isCoverLoaded = useCoverReady(coverUrl);
+  const fullscreenArtworkSize = useCustomizationStore(
+    (state) => state.fullscreenArtworkSize,
+  );
+  const artworkPx = FULLSCREEN_ARTWORK_SIZE_PX[fullscreenArtworkSize];
 
   const { t } = useTranslation();
 
@@ -85,9 +90,10 @@ export function PlayerUiElements({
     <>
       {/* Artwork (Compact, flat, no drop shadows) */}
       <div
-        className={`relative shrink-0 overflow-hidden rounded-xl w-[280px] h-[280px] bg-black/20 ${
+        className={`relative shrink-0 overflow-hidden rounded-xl bg-black/20 transition-[width,height] duration-200 ease-out ${
           coverUrl && !isCoverLoaded ? "animate-pulse" : ""
         }`}
+        style={{ width: artworkPx, height: artworkPx }}
       >
         <AnimatePresence>
           <motion.div
