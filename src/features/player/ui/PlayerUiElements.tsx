@@ -6,14 +6,13 @@ import {
   MusicNote,
   Repeat,
   RepeatOne,
+  Shuffle,
 } from "@solar-icons/react";
 import { AddLine, CheckFill } from "@mingcute/react";
 import {
   PlayerMorphIcon,
   ICON_PLAY,
   ICON_PAUSE,
-  ICON_SHUFFLE_ON,
-  ICON_SHUFFLE_OFF,
 } from "./morphPlayerIcons";
 import { usePlayerState } from "../hooks/usePlayerState";
 import { playerEngine } from "../engine/playerEngine";
@@ -226,10 +225,7 @@ export function PlayerUiElements({
             player.shuffle ? "!text-white !opacity-100" : "!text-white/40"
           }`}
         >
-          <PlayerMorphIcon
-            icon={player.shuffle ? ICON_SHUFFLE_ON : ICON_SHUFFLE_OFF}
-            size={18}
-          />
+          <Shuffle size={18} weight={player.shuffle ? "Bold" : "Outline"} />
         </button>
 
         <button

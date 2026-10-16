@@ -13,6 +13,9 @@ import {
   VolumeCross,
   VolumeSmall,
   VolumeLoud,
+  Repeat,
+  RepeatOne,
+  Shuffle,
 } from "@solar-icons/react";
 
 import {
@@ -21,10 +24,6 @@ import {
   ICON_PAUSE,
   ICON_HEART_LINE,
   ICON_HEART_FILL,
-  ICON_SHUFFLE_ON,
-  ICON_SHUFFLE_OFF,
-  ICON_REPEAT_OUTLINE,
-  ICON_REPEAT_ONE_OUTLINE,
 } from "./morphPlayerIcons";
 
 import { usePlayerState } from "../hooks/usePlayerState";
@@ -401,12 +400,10 @@ function MiniPlayer({
   ]);
 
   const repeatIcon = useMemo(() => {
-    return (
-      <PlayerMorphIcon
-        icon={player.repeat === "one" ? ICON_REPEAT_ONE_OUTLINE : ICON_REPEAT_OUTLINE}
-        size={18}
-      />
-    );
+    if (player.repeat === "one") {
+      return <RepeatOne size={18} weight="Outline" />;
+    }
+    return <Repeat size={18} weight="Outline" />;
   }, [player.repeat]);
 
   const iconButtonClass =
@@ -772,10 +769,7 @@ function MiniPlayer({
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => playerEngine.setShuffle(!player.shuffle)}
               >
-                <PlayerMorphIcon
-                  icon={player.shuffle ? ICON_SHUFFLE_ON : ICON_SHUFFLE_OFF}
-                  size={18}
-                />
+                <Shuffle size={18} weight={player.shuffle ? "Bold" : "Outline"} />
               </button>
               <button
                 type="button"

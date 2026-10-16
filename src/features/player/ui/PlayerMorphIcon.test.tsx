@@ -5,7 +5,7 @@ import {
   PlayerMorphIcon,
   ICON_PLAY,
   ICON_PAUSE,
-  ICON_SHUFFLE_OFF,
+  ICON_HEART_LINE,
   ICON_VOLUME_MUTE,
 } from "./morphPlayerIcons";
 
@@ -38,7 +38,9 @@ describe("PlayerMorphIcon rendered markup", () => {
 
     const svg = container?.querySelector("svg");
     expect(svg?.getAttribute("fill")).toBe("currentColor");
-    expect(svg?.getAttribute("fill-rule")).toBe("evenodd");
+    // play/pause: nonzero — their morph overlaps source/target subpaths
+    // mid-flight and evenodd would hole out the overlap (transparency flash)
+    expect(svg?.getAttribute("fill-rule")).toBe("nonzero");
     // MorphIcon defaults to stroke=currentColor stroke-width=2 (lucide style),
     // which fattens every fill shape — must be off at the root
     expect(svg?.getAttribute("stroke")).toBe("none");
@@ -58,16 +60,17 @@ describe("PlayerMorphIcon rendered markup", () => {
     expect(path?.getAttribute("d")?.startsWith("M2 6C2 4.1144")).toBe(true);
   });
 
-  it("uses the solar Outline geometry for the shuffle-off endpoint", () => {
-    // the bars flip shuffle with a Bold(on) / Outline(off) static pair; the
-    // morph data must mirror that exact weight pair (guards against an
-    // accidental weight-swap regressions like fat/inked borders)
-    act(() => {
-      root?.render(<PlayerMorphIcon icon={ICON_SHUFFLE_OFF} size={18} />);
-    });
+  it("keeps evenodd fill rule for icons whose geometry needs it", () => {
+    for (const icon of [ICON_VOLUME_MUTE, ICON_HEART_LINE]) {
+      act(() => {
+        root?.render(<PlayerMorphIcon icon={icon} size={16} />);
+      });
 
-    const path = container?.querySelector("path");
-    expect(path?.getAttribute("d")?.startsWith("M19.4697 4.4697")).toBe(true);
+      const svg = container?.querySelector("svg");
+      // the mute slash crosses the speaker body; the heart line is an evenodd
+      // ribbon — nonzero would fill their holes/silhouette like solar
+      expect(svg?.getAttribute("fill-rule")).toBe("evenodd");
+    }
   });
 
   it("keeps the VolumePicker mute geometry verbatim (solar VolumeCross Bold)", () => {
