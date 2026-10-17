@@ -26,11 +26,13 @@ export function useDiscordSync() {
     window.linerElectron?.discordUpdateSettings?.({
       enabled: s.enabled,
       applicationId: s.applicationId,
+      statusDisplayType: s.statusDisplayType,
       showArtwork: s.showArtwork,
       showArtistSmallImage: s.showArtistSmallImage,
       showTime: s.showTime,
       showPaused: s.showPaused,
       showButton: s.showButton,
+      showDownloadButton: s.showDownloadButton,
     });
   }, []);
 
