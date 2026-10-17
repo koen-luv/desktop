@@ -1,5 +1,5 @@
-import { findFirst, getText } from "@/shared/media/innertube/innertubeJson";
-import { stringValue } from "../../shared/fields";
+import { findFirst, stringValue } from "@/shared/utils/json";
+import { getText } from "@/shared/media/innertube/innertubeJson";
 
 export interface YoutubePlaylistHeader {
   title: string;

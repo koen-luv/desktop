@@ -1,6 +1,5 @@
-import { asArray, asRecord, type JsonRecord } from "@/shared/media/innertube/innertubeJson";
+import { asArray, asRecord, type JsonRecord, numberValue, stringValue } from "@/shared/utils/json";
 import type { ClientImportedPlaylist, ClientImportedTrack } from "../importTypes";
-import { numberValue, stringValue } from "../shared/fields";
 import { requireOk, tryFetchJson } from "../shared/http";
 
 const DEEZER_API = "https://api.deezer.com";

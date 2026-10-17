@@ -1,4 +1,4 @@
-import { asArray, asRecord } from "./innertubeJson";
+import { asArray, asRecord } from "@/shared/utils/json";
 
 export interface AudioFormat {
   itag: number;

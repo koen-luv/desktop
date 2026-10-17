@@ -1,15 +1,6 @@
 import type { SearchResult } from "@/shared/contracts";
-import {
-  asArray,
-  asRecord,
-  getPageType,
-  getRuns,
-  getText,
-  runsToAlbum,
-  runsToArtists,
-  yearFromRuns,
-  type JsonRecord,
-} from "./innertubeJson";
+import { asArray, asRecord, type JsonRecord } from "@/shared/utils/json";
+import { getPageType, getRuns, getText, runsToAlbum, runsToArtists, yearFromRuns } from "./innertubeJson";
 import { coverFromThumbnail } from "./innertubeThumbnail";
 import { durationFromRuns, hasExplicitBadge, parseDurationMs } from "./innertubeTrackMapper";
 

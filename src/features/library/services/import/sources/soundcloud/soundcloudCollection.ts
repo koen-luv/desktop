@@ -1,4 +1,4 @@
-import type { JsonRecord } from "@/shared/media/innertube/innertubeJson";
+import type { JsonRecord } from "@/shared/utils/json";
 
 export interface SoundCloudCollection {
   title: string;

@@ -1,14 +1,6 @@
 import type { SearchResult } from "@/shared/contracts";
-import {
-  asArray,
-  asRecord,
-  getBrowseEndpoint,
-  getPageType,
-  getRuns,
-  getText,
-  runsToArtists,
-  type JsonRecord,
-} from "./innertubeJson";
+import { asArray, asRecord, type JsonRecord } from "@/shared/utils/json";
+import { getBrowseEndpoint, getPageType, getRuns, getText, runsToArtists } from "./innertubeJson";
 import { mapCardShelf } from "./innertubeCardMapper";
 import { coverFromThumbnail } from "./innertubeThumbnail";
 import { mapInnertubeTrack } from "./innertubeTrackMapper";

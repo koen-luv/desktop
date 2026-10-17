@@ -1,5 +1,6 @@
 import type { Track, TrackArtist } from "@/shared/contracts";
-import { asArray, asRecord, getRuns, getText, runsToAlbum, runsToArtists, type JsonRecord } from "./innertubeJson";
+import { asArray, asRecord, type JsonRecord } from "@/shared/utils/json";
+import { getRuns, getText, runsToAlbum, runsToArtists } from "./innertubeJson";
 import { coverFromThumbnail, videoThumbnailCover } from "./innertubeThumbnail";
 
 export function hasExplicitBadge(value: unknown): boolean {

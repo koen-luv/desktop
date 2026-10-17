@@ -1,5 +1,6 @@
 import type { ArtistAlbum, ArtistDetails, ArtistRelease } from "@/shared/contracts";
-import { asArray, asRecord, findFirst, getPageType, getRuns, getText, walkRecords, yearFromRuns } from "./innertubeJson";
+import { asArray, asRecord, findFirst, walkRecords } from "@/shared/utils/json";
+import { getPageType, getRuns, getText, yearFromRuns } from "./innertubeJson";
 import { coverFromThumbnail } from "./innertubeThumbnail";
 import { hasExplicitBadge } from "./innertubeTrackMapper";
 import { mapInnertubeBrowseTracks, microformatCover } from "./innertubeCollectionMapper";

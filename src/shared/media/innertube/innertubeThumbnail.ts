@@ -1,5 +1,5 @@
 import type { Cover } from "@/shared/contracts";
-import { asArray, asRecord } from "./innertubeJson";
+import { asArray, asRecord } from "@/shared/utils/json";
 
 export const artworkHost = /(?:[a-zA-Z0-9_-]+\.googleusercontent\.com|yt3\.ggpht\.com)/i;
 

@@ -1,6 +1,5 @@
-import { asRecord, type JsonRecord } from "@/shared/media/innertube/innertubeJson";
+import { asRecord, type JsonRecord, numberValue, stringValue } from "@/shared/utils/json";
 import type { ClientImportedTrack } from "../../importTypes";
-import { numberValue, stringValue } from "../../shared/fields";
 
 export function mapAppleMusicTrack(raw: unknown): ClientImportedTrack | undefined {
   const item = asRecord(raw);

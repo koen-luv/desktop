@@ -1,6 +1,5 @@
-import { asArray, asRecord, type JsonRecord } from "@/shared/media/innertube/innertubeJson";
+import { asArray, asRecord, isRecord, type JsonRecord, numberValue, recordAt, stringValue } from "@/shared/utils/json";
 import type { ClientImportedTrack } from "../../importTypes";
-import { isRecord, numberValue, recordAt, stringValue } from "../../shared/fields";
 import { delay } from "../../shared/http";
 import { getSpotifyGuestSession, SPOTIFY_CLIENT_VERSION, type SpotifySession } from "./spotifyAuth";
 
@@ -77,7 +76,7 @@ export async function fetchSpotifyPlaylistTracks(playlistId: string, signal?: Ab
     if (!content) break;
     const count = numberValue(content.totalCount);
     if (count !== undefined) total = count;
-    const items = asArray(content.items).map(asRecord).filter(isRecord);
+    const items = asArray(content.items).filter(isRecord);
     if (!items.length) break;
 
     for (const item of items) {

@@ -1,6 +1,5 @@
-import { asRecord, findFirst } from "@/shared/media/innertube/innertubeJson";
+import { asRecord, findFirst, trimmedString } from "@/shared/utils/json";
 import { postInnertube } from "@/shared/media/innertube/innertubeClient";
-import { trimmedString } from "../../shared/fields";
 import { rethrowIfAborted } from "../../shared/http";
 
 function commandToken(endpoint: unknown): string | undefined {

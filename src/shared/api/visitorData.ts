@@ -1,4 +1,4 @@
-import { asArray } from "@/shared/media/innertube/innertubeJson";
+import { asArray } from "@/shared/utils/json";
 
 const VISITOR_DATA_PATTERN = /Cg[s-v][A-Za-z0-9_-]{20,}(?:%3D|=){0,2}/;
 

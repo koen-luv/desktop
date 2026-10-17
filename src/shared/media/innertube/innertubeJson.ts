@@ -1,14 +1,6 @@
-export type JsonRecord = Record<string, unknown>;
+import { asArray, asRecord, type JsonRecord } from "@/shared/utils/json";
 
-export function asRecord(value: unknown): JsonRecord | undefined {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as JsonRecord)
-    : undefined;
-}
-
-export function asArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
-}
+export { asRecord } from "@/shared/utils/json";
 
 export function getRuns(value: unknown): JsonRecord[] {
   return asArray(asRecord(value)?.runs)
@@ -67,35 +59,6 @@ export function runsToAlbum(runs: JsonRecord[]): { id: string; title: string } |
   return typeof endpoint?.browseId === "string" && typeof albumRun?.text === "string"
     ? { id: endpoint.browseId, title: albumRun.text }
     : undefined;
-}
-
-export function findFirst(value: unknown, key: string): JsonRecord | undefined {
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const found = findFirst(item, key);
-      if (found) return found;
-    }
-    return undefined;
-  }
-  const record = asRecord(value);
-  if (!record) return undefined;
-  const direct = asRecord(record[key]);
-  if (direct) return direct;
-  for (const child of Object.values(record)) {
-    const found = findFirst(child, key);
-    if (found) return found;
-  }
-  return undefined;
-}
-
-export function walkRecords(value: unknown, visit: (record: JsonRecord) => boolean): void {
-  if (Array.isArray(value)) {
-    value.forEach((item) => walkRecords(item, visit));
-    return;
-  }
-  const record = asRecord(value);
-  if (!record || visit(record)) return;
-  for (const child of Object.values(record)) walkRecords(child, visit);
 }
 
 export function yearFromRuns(value: unknown): number | undefined {

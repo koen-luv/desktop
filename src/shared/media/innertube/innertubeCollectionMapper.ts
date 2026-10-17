@@ -1,14 +1,6 @@
 import type { AlbumDetails, CatalogPlaylistDetails, Track, TrackArtist } from "@/shared/contracts";
-import {
-  findFirst,
-  getRuns,
-  getText,
-  runPageType,
-  runsToArtists,
-  walkRecords,
-  yearFromRuns,
-  type JsonRecord,
-} from "./innertubeJson";
+import { findFirst, type JsonRecord, walkRecords } from "@/shared/utils/json";
+import { getRuns, getText, runPageType, runsToArtists, yearFromRuns } from "./innertubeJson";
 import { coverFromThumbnail } from "./innertubeThumbnail";
 import { mapInnertubeTrack } from "./innertubeTrackMapper";
 

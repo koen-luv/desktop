@@ -1,5 +1,6 @@
 import type { Track, TrackArtist, TrackDetails } from "@/shared/contracts";
-import { asArray, asRecord, getRuns, getText, runsToAlbum, runsToArtists, type JsonRecord } from "./innertubeJson";
+import { asArray, asRecord, type JsonRecord } from "@/shared/utils/json";
+import { getRuns, getText, runsToAlbum, runsToArtists } from "./innertubeJson";
 import { coverFromThumbnail } from "./innertubeThumbnail";
 import { hasExplicitBadge, parseDurationMs } from "./innertubeTrackMapper";
 

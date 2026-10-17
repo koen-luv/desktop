@@ -1,13 +1,6 @@
-import {
-  asArray,
-  asRecord,
-  findFirst,
-  getRuns,
-  getText,
-  type JsonRecord,
-} from "@/shared/media/innertube/innertubeJson";
+import { asArray, asRecord, findFirst, type JsonRecord, recordAt, stringValue } from "@/shared/utils/json";
+import { getRuns, getText } from "@/shared/media/innertube/innertubeJson";
 import type { ClientImportedTrack } from "../../importTypes";
-import { recordAt, stringValue } from "../../shared/fields";
 import { youtubeThumbnailUrl } from "./youtubeUrl";
 
 function columnText(renderer: JsonRecord, index: number): JsonRecord | undefined {

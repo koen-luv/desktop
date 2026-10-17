@@ -1,6 +1,6 @@
 import { mapInnertubeTrack } from "@/shared/media/innertube/innertubeTrackMapper";
 import type { ClientImportedTrack } from "../../importTypes";
-import { collectByKey } from "../../shared/fields";
+import { collectByKey } from "@/shared/utils/json";
 import { parseFallbackTrack } from "./youtubeFallbackTrack";
 import { youtubeThumbnailUrl } from "./youtubeUrl";
 

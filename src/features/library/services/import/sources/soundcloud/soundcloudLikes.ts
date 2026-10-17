@@ -1,5 +1,4 @@
-import { asArray, asRecord, type JsonRecord } from "@/shared/media/innertube/innertubeJson";
-import { stringValue } from "../../shared/fields";
+import { asArray, asRecord, type JsonRecord, stringValue } from "@/shared/utils/json";
 import { SOUNDCLOUD_API } from "@/shared/media/soundcloud";
 import type { SoundCloudCollection } from "./soundcloudCollection";
 

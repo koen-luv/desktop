@@ -1,5 +1,4 @@
-import { asRecord } from "@/shared/media/innertube/innertubeJson";
-import { numberValue, recordAt, stringValue } from "../../shared/fields";
+import { asRecord, numberValue, recordAt, stringValue } from "@/shared/utils/json";
 import { fetchSpotifySecret, fetchSpotifyServerTime } from "./spotifySecret";
 import { generateTotp, spotifySecretBytes } from "./spotifyTotp";
 

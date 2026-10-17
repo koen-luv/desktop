@@ -1,6 +1,5 @@
-import { asArray, asRecord, type JsonRecord } from "@/shared/media/innertube/innertubeJson";
+import { asArray, asRecord, type JsonRecord, recordAt, stringValue } from "@/shared/utils/json";
 import type { ClientImportedPlaylist, ClientImportedTrack } from "../../importTypes";
-import { recordAt, stringValue } from "../../shared/fields";
 import { tryFetchJson } from "../../shared/http";
 import { getAppleMusicWebToken } from "./appleMusicToken";
 import { appendAppleMusicTracks, appleMusicPlaylistMeta } from "./appleMusicTracks";

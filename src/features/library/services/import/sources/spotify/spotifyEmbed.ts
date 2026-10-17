@@ -1,6 +1,14 @@
-import { asArray, asRecord, findFirst, type JsonRecord } from "@/shared/media/innertube/innertubeJson";
+import {
+  asArray,
+  asRecord,
+  findFirst,
+  type JsonRecord,
+  numberValue,
+  parseJsonSafe,
+  recordAt,
+  trimmedString,
+} from "@/shared/utils/json";
 import type { ClientImportedTrack } from "../../importTypes";
-import { numberValue, parseJsonSafe, recordAt, trimmedString } from "../../shared/fields";
 import { tryFetchText } from "../../shared/http";
 import type { SpotifyEntityType } from "./spotifyUrl";
 

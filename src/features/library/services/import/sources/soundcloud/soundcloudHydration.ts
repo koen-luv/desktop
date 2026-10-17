@@ -1,5 +1,4 @@
-import { asArray, asRecord } from "@/shared/media/innertube/innertubeJson";
-import { isRecord, parseJsonSafe, trimmedString } from "../../shared/fields";
+import { asArray, asRecord, isRecord, parseJsonSafe, trimmedString } from "@/shared/utils/json";
 import { tryFetchText } from "../../shared/http";
 import type { SoundCloudCollection } from "./soundcloudCollection";
 
@@ -16,7 +15,7 @@ export function applySoundCloudHydration(html: string, collection: SoundCloudCol
   const description = trimmedString(data.description);
   if (title) collection.title = title;
   if (description) collection.description = description;
-  collection.rawTracks.push(...asArray(data.tracks).map(asRecord).filter(isRecord));
+  collection.rawTracks.push(...asArray(data.tracks).filter(isRecord));
 }
 
 export async function scrapeSoundCloudHydration(

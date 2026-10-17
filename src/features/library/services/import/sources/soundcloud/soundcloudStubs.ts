@@ -1,4 +1,4 @@
-import { asArray, asRecord, type JsonRecord } from "@/shared/media/innertube/innertubeJson";
+import { asArray, asRecord, type JsonRecord } from "@/shared/utils/json";
 import { rethrowIfAborted } from "../../shared/http";
 import { rememberSoundCloudClientId, SOUNDCLOUD_API } from "@/shared/media/soundcloud";
 

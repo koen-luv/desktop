@@ -1,5 +1,4 @@
-import { asArray, asRecord } from "@/shared/media/innertube/innertubeJson";
-import { isRecord, trimmedString } from "../../shared/fields";
+import { asArray, asRecord, isRecord, trimmedString } from "@/shared/utils/json";
 import { rethrowIfAborted } from "../../shared/http";
 import { rememberSoundCloudClientId, SOUNDCLOUD_API } from "@/shared/media/soundcloud";
 import type { SoundCloudCollection } from "./soundcloudCollection";
@@ -28,7 +27,7 @@ async function resolveWithClientId(
   const description = trimmedString(body?.description);
   if (title) collection.title = title;
   if (description) collection.description = description;
-  collection.rawTracks.push(...asArray(body?.tracks).map(asRecord).filter(isRecord));
+  collection.rawTracks.push(...asArray(body?.tracks).filter(isRecord));
   return collection.rawTracks.length > 0;
 }
 
