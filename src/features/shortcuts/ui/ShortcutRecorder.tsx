@@ -10,6 +10,7 @@ import {
   isMacPlatform,
 } from "../utils/shortcutMatching";
 import { useShortcutsStore } from "../store/shortcutsStore";
+import { acquireEscapeGuard } from "@/shared/utils/escapeGuard";
 
 export interface ShortcutRecorderProps {
   value: string;
@@ -56,7 +57,10 @@ export function ShortcutRecorder({
   // Sync global shortcut suspension in Electron and main player engine
   useEffect(() => {
     useShortcutsStore.getState().setIsRecording(isRecording);
+    // Esc cancels recording instead of closing the surrounding dialog
+    const releaseEscape = isRecording ? acquireEscapeGuard() : null;
     return () => {
+      releaseEscape?.();
       useShortcutsStore.getState().setIsRecording(false);
     };
   }, [isRecording]);

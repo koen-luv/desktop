@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { isWindowDraggingActive } from "@/shared/hooks";
+import { isEscapeGuarded } from "@/shared/utils/escapeGuard";
 
 export interface DialogProps {
   open: boolean;
@@ -41,6 +42,8 @@ export default function Dialog({
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        // A recorder (or similar) is waiting for keys: let it cancel itself first
+        if (isEscapeGuarded()) return;
         // Only the top-most open dialog closes on Escape; parent dialogs stay open
         if (activeDialogs[activeDialogs.length - 1] !== closeHandler) {
           return;
