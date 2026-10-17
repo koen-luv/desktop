@@ -19,9 +19,6 @@ import type {
   UserProfile,
   LeaderboardResponse,
   DailyMixesResponse,
-  WaveRecommendationRequest,
-  WaveRecommendationResponse,
-  UserTasteProfile,
 } from "@/shared/contracts";
 
 import { usePlayerStore } from "@/features/player/store/playerStore";
@@ -1005,19 +1002,5 @@ export const api = {
 
   getDailyMixes(): Promise<DailyMixesResponse> {
     return request<DailyMixesResponse>("/v1/me/recommendations/daily-mixes");
-  },
-
-  getWave(payload: WaveRecommendationRequest = {}): Promise<WaveRecommendationResponse> {
-    const params = new URLSearchParams();
-    if (payload.k) params.set("k", String(payload.k));
-    if (payload.waveId) params.set("waveId", payload.waveId);
-    if (payload.driftRate) params.set("driftRate", String(payload.driftRate));
-    if (payload.temperature) params.set("temperature", String(payload.temperature));
-    const qs = params.toString();
-    return request<WaveRecommendationResponse>(`/v1/me/recommendations/wave${qs ? `?${qs}` : ""}`);
-  },
-
-  getUserTasteProfile(): Promise<UserTasteProfile> {
-    return request<UserTasteProfile>("/v1/me/recommendations/taste");
   },
 };

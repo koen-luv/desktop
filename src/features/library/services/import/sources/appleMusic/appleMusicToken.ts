@@ -2,10 +2,6 @@ const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 
 let cachedAppleMusicToken: { token: string; expiresAt: number } | null = null;
 
-export function resetAppleMusicTokenCache(): void {
-  cachedAppleMusicToken = null;
-}
-
 function pickIndexScript(html: string): string | undefined {
   const scripts = [...html.matchAll(/src="([^"]+\.js)"/g)].map((match) => match[1]);
   return (
