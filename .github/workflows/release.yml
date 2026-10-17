@@ -161,8 +161,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # The action's default `packages` value is the legacy `tools` package,
+      # which no longer exists on the runner's cmdline-tools 16.0 (sdkmanager
+      # fails with "Failed to find package 'tools'"). Override it with a real
+      # package; this step mainly sets up ANDROID_HOME, PATH and licenses.
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
 
       - name: Install Android SDK packages
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
