@@ -79,6 +79,24 @@ interface WasmSignerExports {
 }
 
 let wasmExportsInstance: WasmSignerExports | null = null;
+let devSigningSecret: string | undefined;
+
+export function setDevSigningSecret(secret: string | undefined): void {
+  devSigningSecret = secret?.trim() || undefined;
+}
+
+export function signWithSecret(
+  secret: string,
+  method: string,
+  path: string,
+  body: string,
+  timestamp: number,
+  nonce: string,
+): string {
+  const bodySha256 = crypto.createHash("sha256").update(body).digest("hex");
+  const canonical = `${method.toUpperCase().trim()}\n${path.split("?")[0].trim()}\n${timestamp}\n${nonce}\n${bodySha256}`;
+  return crypto.createHmac("sha256", secret).update(canonical).digest("base64url");
+}
 
 function getWasmExports(): WasmSignerExports {
   if (wasmExportsInstance) return wasmExportsInstance;
@@ -130,9 +148,18 @@ export function signCoverUrl(payload: string): string {
 
 // signs api request with canonical string and hmac-sha256 using server-adjusted timestamp
 export function signRequest(input: SignRequestInput): SignedRequestHeaders {
-  const wasm = getWasmExports();
   const timestamp = input.timestamp ?? getAdjustedTimestamp();
   const nonce = crypto.randomBytes(8).toString("hex");
+
+  if (devSigningSecret) {
+    return {
+      signature: signWithSecret(devSigningSecret, input.method, input.path, input.body ?? "", timestamp, nonce),
+      timestamp,
+      nonce,
+    };
+  }
+
+  const wasm = getWasmExports();
 
   const methodBuf = passStringToWasm(wasm, input.method);
   const pathBuf = passStringToWasm(wasm, input.path);

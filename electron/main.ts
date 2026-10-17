@@ -13,6 +13,7 @@ import {
   signRequest,
   signMonitorRequest,
   signRawPayload,
+  setDevSigningSecret,
   syncServerTime,
   getServerTimeOffset,
   type SignRequestInput,
@@ -135,8 +136,16 @@ function createWindow() {
   mainWindow.on("unmaximize", broadcastWindowState);
   mainWindow.on("enter-full-screen", broadcastWindowState);
   mainWindow.on("leave-full-screen", broadcastWindowState);
-  mainWindow.on("minimize", broadcastWindowState);
-  mainWindow.on("restore", broadcastWindowState);
+  mainWindow.on("minimize", () => {
+    broadcastWindowState();
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.send("window:minimized");
+  });
+  mainWindow.on("restore", () => {
+    broadcastWindowState();
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.send("window:restored");
+  });
   mainWindow.on("hide", broadcastWindowState);
   mainWindow.on("show", broadcastWindowState);
 
@@ -217,6 +226,9 @@ function createWindow() {
 // Single instance lock
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
+  console.warn(
+    "\n\x1b[33m[Liner]\x1b[0m Another instance of Liner is already running in the background. Exiting development instance.\nTo run in development mode, please close the running Liner application first.\n"
+  );
   app.quit();
 } else {
   app.on("second-instance", (_event, argv) => {
@@ -238,6 +250,11 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
+    if (!app.isPackaged && process.env.LINER_DEV_SIGNING_SECRET) {
+      setDevSigningSecret(process.env.LINER_DEV_SIGNING_SECRET);
+      console.log("\x1b[43;30m signer \x1b[0m dev signing secret active (unpackaged build only)");
+    }
+
     // register liner:// so browsers / xdg-open route share links to us
     // (on linux the packaged .desktop carries the mime handler too)
     if (process.defaultApp && process.argv.length >= 2) {

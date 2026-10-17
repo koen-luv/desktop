@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import nodeCrypto from "node:crypto";
 import {
   signCoverUrl,
   signRequest,
@@ -8,6 +9,7 @@ import {
   getServerTimeOffset,
   setServerTimeOffset,
   getAdjustedTimestamp,
+  setDevSigningSecret,
 } from "./crypto";
 
 describe("Electron Crypto Signer", () => {
@@ -81,5 +83,31 @@ describe("Electron Crypto Signer", () => {
     });
 
     expect(signed.timestamp - local).toBeGreaterThanOrEqual(3590);
+  });
+});
+
+describe("dev signing secret", () => {
+  const secret = "dev-test-secret";
+
+  function serverExpected(method: string, path: string, body: string, timestamp: number, nonce: string): string {
+    const bodySha256 = nodeCrypto.createHash("sha256").update(body).digest("hex");
+    const canonical = `${method}\n${path.split("?")[0]}\n${timestamp}\n${nonce}\n${bodySha256}`;
+    return nodeCrypto.createHmac("sha256", secret).update(canonical).digest("base64url");
+  }
+
+  it("signs with the configured secret in the format the api verifies", () => {
+    setDevSigningSecret(secret);
+    try {
+      const signed = signRequest({ method: "post", path: "/v1/tracks/abc?x=1", body: '{"a":1}', timestamp: 1_800_000_000 });
+      expect(signed.signature).toBe(serverExpected("POST", "/v1/tracks/abc", '{"a":1}', 1_800_000_000, signed.nonce));
+    } finally {
+      setDevSigningSecret(undefined);
+    }
+  });
+
+  it("falls back to the embedded signer when no dev secret is set", () => {
+    setDevSigningSecret(undefined);
+    const signed = signRequest({ method: "GET", path: "/v1/me", timestamp: 1_800_000_000 });
+    expect(signed.signature).not.toBe(serverExpected("GET", "/v1/me", "", 1_800_000_000, signed.nonce));
   });
 });
