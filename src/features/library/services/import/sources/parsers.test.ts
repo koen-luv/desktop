@@ -20,6 +20,10 @@ describe("spotify parsers", () => {
   it("extracts the totp secret from the web player bundle", () => {
     expect(extractSpotifySecret('x=[{secret:"abc",version:12}]')).toEqual({ secret: "abc", version: 12 });
     expect(extractSpotifySecret("nothing")).toBeUndefined();
+    expect(
+      extractSpotifySecret(`ej=[{secret:',7/*F("rLJ2oxaKL^f+E1xvP@N',version:61},{secret:'OmE{ZA.J^":0FG\\Uz?[@WW',version:60}]`),
+    ).toEqual({ secret: ',7/*F("rLJ2oxaKL^f+E1xvP@N', version: 61 });
+    expect(extractSpotifySecret(String.raw`[{secret:'a\'b',version:3}]`)).toEqual({ secret: "a'b", version: 3 });
   });
 
   it("parses embed __NEXT_DATA__ track lists", () => {

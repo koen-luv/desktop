@@ -5,7 +5,7 @@ const postInnertube = vi.hoisted(() => vi.fn<(endpoint: string, body: Record<str
 vi.mock("@/shared/media/innertube/innertubeClient", () => ({ postInnertube }));
 
 import { parseImportSource } from "../parseImportSource";
-import { resetSoundCloudClientIdCache } from "@/shared/media/soundcloud";
+import { rememberSoundCloudClientId, resetSoundCloudClientIdCache } from "@/shared/media/soundcloud";
 
 type Route = (url: string) => unknown;
 
@@ -84,6 +84,7 @@ describe("parseImportSource with mocked network", () => {
   });
 
   it("imports soundcloud playlists from html hydration", async () => {
+    rememberSoundCloudClientId("test-client-id-0000000000000000");
     const hydration = [
       {
         hydratable: "playlist",

@@ -6,24 +6,25 @@ export interface SpotifyTotpSecret {
   version: number;
 }
 
-export const FALLBACK_SPOTIFY_SECRET: SpotifyTotpSecret = {
-  secret: ',7/*F("rLJ2oxaKL^f+E1xvP@N',
-  version: 61,
-};
+const WEB_PLAYER_SCRIPT = /src="(https:\/\/open\.spotifycdn\.com\/cdn\/build\/web-player\/web-player\.[a-f0-9]+\.js)"/;
+const SECRET_ENTRY = /\{secret:(['"])((?:\\.|(?!\1)[^\\])*)\1,version:(\d+)\}/g;
 
 export function extractSpotifySecret(js: string): SpotifyTotpSecret | undefined {
-  const match = js.match(/\[\{secret:['"]([^'"]+)['"],version:(\d+)\}/);
-  return match ? { secret: match[1], version: Number(match[2]) } : undefined;
+  let newest: SpotifyTotpSecret | undefined;
+  for (const match of js.matchAll(SECRET_ENTRY)) {
+    const candidate = { secret: match[2].replace(/\\(.)/g, "$1"), version: Number(match[3]) };
+    if (!newest || candidate.version > newest.version) newest = candidate;
+  }
+  return newest;
 }
 
 export async function fetchSpotifySecret(signal?: AbortSignal): Promise<SpotifyTotpSecret> {
   const html = await tryFetchText("https://open.spotify.com/", { signal });
-  const scriptMatch = html?.match(
-    /src="(https:\/\/open\.spotifycdn\.com\/cdn\/build\/web-player\/web-player\.[a-f0-9]+\.js)"/,
-  );
-  if (!scriptMatch?.[1]) return FALLBACK_SPOTIFY_SECRET;
-  const js = await tryFetchText(scriptMatch[1], { signal });
-  return (js && extractSpotifySecret(js)) || FALLBACK_SPOTIFY_SECRET;
+  const scriptUrl = html?.match(WEB_PLAYER_SCRIPT)?.[1];
+  const js = scriptUrl ? await tryFetchText(scriptUrl, { signal }) : undefined;
+  const secret = js ? extractSpotifySecret(js) : undefined;
+  if (!secret) throw new Error("Spotify is unavailable right now, try again later.");
+  return secret;
 }
 
 export async function fetchSpotifyServerTime(signal?: AbortSignal): Promise<number | null> {
