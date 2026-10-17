@@ -246,33 +246,39 @@ export class DiscordRpcManager {
 
       const dur = Math.max(0, payload.durationMs || track.durationMs || 0);
 
+      let activityName = "Liner";
       let detailsText = title;
       let stateText = isPaused ? `${artist} (Paused)` : artist;
       let rpcStatusDisplayType = StatusDisplayType.STATE; // 1 -> "Listening to [Artist]"
 
       switch (this.settings.statusDisplayType) {
         case "title":
+          activityName = title;
           rpcStatusDisplayType = StatusDisplayType.DETAILS; // 2 -> "Listening to [Title]"
           detailsText = isPaused ? `${title} (Paused)` : title;
           stateText = artist;
           break;
         case "app":
+          activityName = "Liner";
           rpcStatusDisplayType = StatusDisplayType.NAME; // 0 -> "Listening to Liner"
           detailsText = title;
           stateText = isPaused ? `${artist} (Paused)` : artist;
           break;
         case "artist_title":
+          activityName = `${artist} - ${title}`;
           rpcStatusDisplayType = StatusDisplayType.STATE; // 1 -> "Listening to [Artist - Title]"
           detailsText = title;
           stateText = isPaused ? `${artist} - ${title} (Paused)` : `${artist} - ${title}`;
           break;
         case "title_artist":
+          activityName = `${title} - ${artist}`;
           rpcStatusDisplayType = StatusDisplayType.DETAILS; // 2 -> "Listening to [Title - Artist]"
           detailsText = isPaused ? `${title} - ${artist} (Paused)` : `${title} - ${artist}`;
           stateText = artist;
           break;
         case "artist":
         default:
+          activityName = artist;
           rpcStatusDisplayType = StatusDisplayType.STATE; // 1 -> "Listening to [Artist]"
           detailsText = title;
           stateText = isPaused ? `${artist} (Paused)` : artist;
@@ -280,7 +286,7 @@ export class DiscordRpcManager {
       }
 
       const activity: SetActivity = {
-        name: "Liner",
+        name: sanitizeText(activityName) || "Liner",
         type: 2, // 2 = ActivityType.Listening -> renders "Listening to" + live progress bar
         details: sanitizeText(detailsText),
         state: sanitizeText(stateText),
