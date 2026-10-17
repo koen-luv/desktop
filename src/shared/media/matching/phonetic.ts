@@ -57,12 +57,14 @@ export function toPhoneticLatin(value: string): string {
     .replace(/\s+/g, " ");
 }
 
-export function normalizeTrackString(value: string): string {
+export function normalizeWords(value: string): string {
   return value
-    .replace(/ё/gi, "е")
-    .replace(/\.(?:mp3|wav|flac|m4a|aac|ogg)\b/gi, "")
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim()
     .replace(/\s+/g, " ");
+}
+
+export function normalizeTrackString(value: string): string {
+  return normalizeWords(value.replace(/ё/gi, "е").replace(/\.(?:mp3|wav|flac|m4a|aac|ogg)\b/gi, ""));
 }
