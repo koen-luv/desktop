@@ -8,6 +8,13 @@ import type { Track } from "@/shared/types";
 import { pitchShifter } from "./pitchShifter";
 import { resolvePlayback, invalidateCachedStream } from "./playbackSource";
 
+/**
+ * When false, playback streams directly and never writes audio to disk; files
+ * are saved only when the user presses the Download action. Flip to true to
+ * restore the old background-caching behaviour.
+ */
+const AUTO_CACHE_AUDIO = false;
+
 export class PlayerRuntime {
   private audio: HTMLAudioElement;
   private currentTrackId: string | null = null;
@@ -429,6 +436,9 @@ export class PlayerRuntime {
           signal: controller.signal,
         });
         if (controller.signal.aborted) return;
+        // Warm the in-memory stream cache only; never download/write audio to
+        // disk during preload (files are saved only via the Download action).
+        if (!AUTO_CACHE_AUDIO) return;
 
         const stream = resolution.stream;
         const response = await fetch(stream.url, {
@@ -860,6 +870,7 @@ export class PlayerRuntime {
     preferredMimeType?: string,
     signal?: AbortSignal,
   ) {
+    if (!AUTO_CACHE_AUDIO) return;
     if (track.durationMs && track.durationMs > 20 * 60 * 1000) return;
     fetch(url, { headers: { Range: "bytes=0-" }, signal })
       .then(async (res) => {

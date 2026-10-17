@@ -14,7 +14,7 @@ import { platformFetch } from "@/platform/http";
 const PLAN_TIMEOUT_MS = 12_000;
 
 /** Hosts a signed plan is allowed to target. Defense-in-depth against abuse. */
-const ALLOWED_PLAN_HOSTS = /(^|\.)youtube\.com$|(^|\.)youtube-nocookie\.com$|(^|\.)googlevideo\.com$/;
+const ALLOWED_PLAN_HOSTS = /(^|\.)youtube\.com$|(^|\.)youtube-nocookie\.com$|(^|\.)googlevideo\.com$|(^|\.)youtubei\.googleapis\.com$/;
 
 export interface InnertubePlan {
   endpoint: string;
@@ -23,6 +23,8 @@ export interface InnertubePlan {
   body?: Record<string, unknown>;
   /** Optional visitorData override; the client normally uses its own. */
   visitorData?: string;
+  /** Prefer a specific audio container when several are available. */
+  preferredCodec?: "aac" | "opus";
 }
 
 export interface ExecutedInnertubeStream {
@@ -205,7 +207,7 @@ export async function executePlaybackEndpoint(
   }
 
   const formats = data.streamingData?.adaptiveFormats ?? [];
-  const best = pickBestAudioFormat(formats);
+  const best = pickBestAudioFormat(formats, plan.preferredCodec);
   if (!best?.url) {
     throw new InnertubePlanError("No playable audio formats in response", 410);
   }

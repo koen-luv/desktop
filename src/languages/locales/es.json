@@ -650,7 +650,7 @@
       },
       "download_current_song": {
         "title": "Descargar canción actual",
-        "description": "Descarga la canción en reproducción como un archivo MP3."
+        "description": "Descarga la canción en reproducción como un archivo de audio."
       },
       "low": "Calidad baja (Ahorro de datos)",
       "standard": "Calidad estándar (Opus 64kbps / MP3 128kbps)",

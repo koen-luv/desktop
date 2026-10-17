@@ -287,16 +287,84 @@ class LinerBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun saveDump(filename: String, content: String): String {
-        val safeName = filename
+        val safeName = safeFileName(filename) { "liner-dump-${System.currentTimeMillis()}.json" }
+        return saveBytesToDownloads(safeName, "application/json", content.toByteArray(Charsets.UTF_8))
+    }
+
+    /**
+     * Downloads an audio stream into the device's public Downloads/Liner folder.
+     * Playback never writes song files by itself (streaming only), so this is
+     * the one path that persists audio — triggered by the user's explicit
+     * Download action for the current song.
+     */
+    @JavascriptInterface
+    fun downloadAudio(requestId: String, url: String, filename: String, mimeType: String) {
+        httpExecutor.execute {
+            NativeEvents.emit(
+                "audioDownload",
+                executeAudioDownload(requestId, url, filename, mimeType),
+            )
+        }
+    }
+
+    private fun executeAudioDownload(
+        requestId: String,
+        url: String,
+        filename: String,
+        mimeType: String,
+    ): String {
+        return try {
+            val uri = Uri.parse(url)
+            val host = uri.host?.lowercase(Locale.ROOT) ?: ""
+            if (uri.scheme != "https" || !isAllowedHost(host)) {
+                return downloadError(requestId, "Blocked host: $host")
+            }
+            Http.client
+                .newCall(
+                    Request.Builder()
+                        .url(url)
+                        .header("User-Agent", Http.userAgent)
+                        .build(),
+                )
+                .execute()
+                .use { response ->
+                    if (!response.isSuccessful) {
+                        return downloadError(requestId, "Download failed (HTTP ${response.code})")
+                    }
+                    val bytes = response.body?.bytes()
+                    if (bytes == null || bytes.isEmpty()) {
+                        return downloadError(requestId, "Download returned no data")
+                    }
+                    val safeName = safeFileName(filename) {
+                        "liner-audio-${System.currentTimeMillis()}.m4a"
+                    }
+                    val saved = saveBytesToDownloads(safeName, mimeType.ifBlank { "audio/mp4" }, bytes)
+                    JSONObject(saved).put("id", requestId).toString()
+                }
+        } catch (error: Exception) {
+            downloadError(requestId, error.message ?: "Could not download file")
+        }
+    }
+
+    private fun downloadError(requestId: String, message: String): String =
+        JSONObject()
+            .put("id", requestId)
+            .put("success", false)
+            .put("error", message)
+            .toString()
+
+    private fun safeFileName(filename: String, fallback: () -> String): String =
+        filename
             .replace(Regex("[^A-Za-z0-9._-]"), "_")
             .take(120)
-            .ifBlank { "liner-dump-${System.currentTimeMillis()}.json" }
-        val bytes = content.toByteArray(Charsets.UTF_8)
+            .ifBlank { fallback() }
+
+    private fun saveBytesToDownloads(name: String, mimeType: String, bytes: ByteArray): String {
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val values = ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME, safeName)
-                    put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                    put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
                     put(
                         MediaStore.MediaColumns.RELATIVE_PATH,
                         Environment.DIRECTORY_DOWNLOADS + "/Liner",
@@ -313,10 +381,10 @@ class LinerBridge(private val activity: MainActivity) {
                         .put("filePath", uri.toString())
                         .toString()
                 } else {
-                    writeToAppDownloads(safeName, bytes)
+                    writeToAppDownloads(name, bytes)
                 }
             } else {
-                writeToAppDownloads(safeName, bytes)
+                writeToAppDownloads(name, bytes)
             }
         } catch (error: Exception) {
             JSONObject()

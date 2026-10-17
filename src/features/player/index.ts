@@ -1,5 +1,6 @@
 export { playerRuntime } from "./engine/runtime";
 export { playerEngine, type PlayerStatus, type PlayerStatus as PlaybackStatus } from "./engine/playerEngine";
+export { downloadTrack, type DownloadResult } from "./engine/downloadTrack";
 export { toVolumeGain, toVolumeLevel } from "./engine/volume";
 export {
   usePlayerStore,

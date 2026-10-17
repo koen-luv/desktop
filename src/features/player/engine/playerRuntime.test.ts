@@ -137,7 +137,7 @@ describe("PlayerRuntime audio caching", () => {
     expect(usePlayerStore.getState().status).toBe("playing");
   });
 
-  it("fetches, plays, and saves to linerDb on cache miss", async () => {
+  it("fetches and plays without writing to linerDb (files are saved only via Download)", async () => {
     const playSpy = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
     const sessionSpy = vi.spyOn(api, "createPlaybackSession").mockResolvedValue({
       sessionId: "pb_123",
@@ -172,11 +172,11 @@ describe("PlayerRuntime audio caching", () => {
 
     (playerRuntime as any).audio.dispatchEvent(new Event("playing"));
 
-    await vi.waitFor(async () => {
-      const storedAudio = await linerDb.getAudio("fresh-track-2");
-      expect(storedAudio?.byteSize).toBe(16);
-    });
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    // Give the (now disabled) background cache a chance to run, then assert
+    // nothing was downloaded or stored to disk.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(await linerDb.getAudio("fresh-track-2")).toBeNull();
   });
 
   it("drops a cached file that fails to decode and retries once from the network instead of looping", async () => {
@@ -211,7 +211,7 @@ describe("PlayerRuntime audio caching", () => {
     expect(sessionSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("preloads audio in the background and enables instant cache-hit play on skip", async () => {
+  it("preloads the stream URL without downloading, and plays without storing", async () => {
     const sessionSpy = vi.spyOn(api, "createPlaybackSession").mockResolvedValue({
       sessionId: "pb_preload_1",
       trackId: "next-track-3",
@@ -238,23 +238,21 @@ describe("PlayerRuntime audio caching", () => {
 
     await playerRuntime!.preloadTrack(nextTrack);
 
+    // The stream URL is resolved (warmed), but nothing is downloaded or stored.
     expect(sessionSpy).toHaveBeenCalledTimes(1);
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-
-    const storedAudio = await linerDb.getAudio("next-track-3");
-    expect(storedAudio).not.toBeNull();
-    expect(storedAudio?.byteSize).toBe(16);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(await linerDb.getAudio("next-track-3")).toBeNull();
 
     sessionSpy.mockClear();
-    fetchSpy.mockClear();
 
     const playSpy = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
     await playerRuntime!.loadAndPlay(nextTrack);
 
-    expect(sessionSpy).not.toHaveBeenCalled();
-    expect(fetchSpy).not.toHaveBeenCalled();
+    // Playback resolves its own session and still never writes to disk.
     expect(playSpy).toHaveBeenCalled();
     expect(usePlayerStore.getState().status).toBe("playing");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(await linerDb.getAudio("next-track-3")).toBeNull();
   });
 
   it("drops an unreadable cached file and recovers from the network once instead of looping", async () => {

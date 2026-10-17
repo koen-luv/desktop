@@ -6,6 +6,9 @@ import { getAndroidBridge, registerMediaCommandHandler } from "@/platform";
 import type { Track } from "@/shared/types";
 import { resolvePlaybackStream, type ResolvedPlaybackStream } from "./playbackSource";
 
+/** When false, native playback never caches audio to disk (only Download saves). */
+const AUTO_CACHE_AUDIO = false;
+
 interface NativeAudioState {
   ok?: boolean;
   trackId?: string | null;
@@ -364,6 +367,7 @@ export class AndroidPlayerRuntime {
   }
 
   private maybeCacheAudio(): void {
+    if (!AUTO_CACHE_AUDIO) return;
     if (!this.activeStream || !this.currentTrackId) return;
     if (this.cacheRequested.has(this.currentTrackId)) return;
     this.cacheRequested.add(this.currentTrackId);

@@ -647,7 +647,7 @@
       },
       "download_current_song": {
         "title": "Download current song",
-        "description": "Download the currently playing track as an MP3 file."
+        "description": "Download the currently playing track as an audio file."
       },
       "low": "Low Quality (Data Saver)",
       "standard": "Standard Quality (Opus 64kbps / MP3 128kbps)",

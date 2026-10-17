@@ -1,11 +1,13 @@
 import type { Track } from "@/shared/types";
 import { api } from "@/shared/api";
+import { extractAudioStream } from "@/shared/api/innertubeClient";
 import { isCodecSupported, canExecuteDirectInnertubePlans } from "./codecSupport";
 import {
   classifySourceError,
   resolveDirectInnertubeStream,
   resolveProxyInnertubeStream,
   resolveSessionStream,
+  streamExpiryMs,
 } from "../engine/streamResolver";
 import type { ResolveContext, ResolvedStream, SourceProvider } from "./types";
 
@@ -134,8 +136,54 @@ export const linerProxyAacProvider = createLinerProvider({
   codec: "mp4a.40.2",
 });
 
+/**
+ * Client-side Innertube extraction (the yt-dlp technique). Runs the Innertube
+ * `player` request directly from the renderer, so it needs no Liner backend and
+ * keeps working when `api.tryliner.fun` is down. Highest priority: it resolves
+ * from the exact videoId (track.id), so the recording is always the one asked
+ * for. The Liner providers below remain as fallbacks.
+ */
+export const innertubeClientProvider: SourceProvider = {
+  id: "innertube-client",
+  priority: 110,
+  label: "YouTube (client extraction)",
+
+  supports(track: Track): boolean {
+    if (!track?.id) return false;
+    // Only where the renderer may call Innertube directly (Electron / Android
+    // native bridge); a plain browser would be blocked by CORS.
+    return canExecuteDirectInnertubePlans();
+  },
+
+  matchConfidence(): number {
+    // Resolved by the exact videoId, so it is the same recording.
+    return 1;
+  },
+
+  async resolve(ctx: ResolveContext): Promise<ResolvedStream> {
+    // Prefer Opus where the platform can decode it, otherwise AAC/MP4.
+    const preferredCodec = isCodecSupported("audio/webm", "opus") ? "opus" : "aac";
+    try {
+      const result = await extractAudioStream(ctx.track.id, preferredCodec, ctx.signal);
+      return {
+        url: result.url,
+        mimeType: result.mimeType,
+        codec: result.codec,
+        bitrate: result.bitrate,
+        expiresAtMs: streamExpiryMs(result.url),
+        providerId: "innertube-client",
+        providerTrackId: ctx.track.id,
+        resolvedAt: Date.now(),
+      };
+    } catch (err) {
+      throw classifySourceError(err, "innertube-client");
+    }
+  },
+};
+
 /** Default ordered provider list. Ordering is by priority (descending). */
 export const defaultSourceProviders: SourceProvider[] = [
+  innertubeClientProvider,
   linerAutoProvider,
   linerDirectAacProvider,
   linerDirectOpusProvider,

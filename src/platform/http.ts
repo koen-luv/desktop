@@ -8,7 +8,7 @@ import { getAndroidBridge, onNativeEvent } from "./index";
  * by the WebView layer with corrected CORS headers.
  */
 const NATIVE_ONLY_HOST =
-  /(^|\.)youtube\.com$|(^|\.)googlevideo\.com$|(^|\.)ytimg\.com$|(^|\.)googleusercontent\.com$|(^|\.)ggpht\.com$/i;
+  /(^|\.)youtube\.com$|(^|\.)googlevideo\.com$|(^|\.)ytimg\.com$|(^|\.)googleusercontent\.com$|(^|\.)ggpht\.com$|(^|\.)youtubei\.googleapis\.com$/i;
 const LINER_API_HOST = /(^|\.)tryliner\.fun$/i;
 
 interface NativeHttpResponse {

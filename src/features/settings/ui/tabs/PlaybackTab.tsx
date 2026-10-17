@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/languages";
-import { usePlayerStore } from "@/features/player";
-import { ToggleSwitch } from "@/shared/ui";
+import { usePlayerStore, downloadTrack } from "@/features/player";
+import { ToggleSwitch, useToast } from "@/shared/ui";
+import Button from "@/shared/ui/Button";
 import { SettingRow, SettingSection, SegmentedControl } from "../controls";
 
 export function PlaybackTab({ searchQuery }: { searchQuery?: string }) {
   const { t } = useTranslation();
   const [mounted, setMounted] = useState(false);
+  const { toast } = useToast();
   const autoplaySimilar = usePlayerStore((state) => state.autoplaySimilar);
   const setAutoplaySimilar = usePlayerStore(
     (state) => state.setAutoplaySimilar,
@@ -29,6 +31,8 @@ export function PlaybackTab({ searchQuery }: { searchQuery?: string }) {
   const setPauseOnDeviceChange = usePlayerStore(
     (state) => state.setPauseOnDeviceChange,
   );
+  const currentTrack = usePlayerStore((state) => state.currentTrack);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -120,6 +124,43 @@ export function PlaybackTab({ searchQuery }: { searchQuery?: string }) {
             checked={pauseOnDeviceChange}
             onChange={setPauseOnDeviceChange}
           />
+        }
+      />
+
+      <SettingRow
+        title={t("settings.audio.download_current_song.title")}
+        description={t("settings.audio.download_current_song.description")}
+        titleKey="settings.audio.download_current_song.title"
+        descKey="settings.audio.download_current_song.description"
+        searchQuery={searchQuery}
+        control={
+          <Button
+            variant="secondary"
+            size="sm"
+            type="button"
+            disabled={!currentTrack || downloading}
+            title={t("common.download")}
+            aria-label={t("common.download")}
+            onClick={async () => {
+              if (!currentTrack || downloading) return;
+              setDownloading(true);
+              try {
+                const result = await downloadTrack(currentTrack);
+                if (result.success) {
+                  const name = `${currentTrack.title}${
+                    currentTrack.artists ? ` — ${currentTrack.artists}` : ""
+                  }`;
+                  toast(`Saved: ${name}`, "success");
+                } else {
+                  toast(`Download failed: ${result.error}`, "error");
+                }
+              } finally {
+                setDownloading(false);
+              }
+            }}
+          >
+            {t("common.download")}
+          </Button>
         }
       />
     </SettingSection>

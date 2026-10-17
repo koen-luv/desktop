@@ -35,6 +35,12 @@ export interface LinerAndroidBridge {
     headersJson: string,
     body: string | null,
   ): void;
+  /**
+   * Downloads an audio stream to the device's public Downloads folder. The
+   * result is delivered asynchronously as an `audioDownload` event carrying
+   * { id, success, filePath?, error? }.
+   */
+  downloadAudio(requestId: string, url: string, filename: string, mimeType: string): void;
   openAppStorageSettings(): void;
   openDownloads(): void;
   clearCoversCache(): boolean;
