@@ -8,7 +8,6 @@ vi.mock("@/shared/media/soundcloud", async (importOriginal) => {
   return { ...actual, resolveSoundCloudStream: mocks.resolveSoundCloudStream };
 });
 
-import { api } from "@/shared/api";
 import { linerDb } from "@/shared/storage";
 import { playerRuntime } from "./playerRuntime";
 
@@ -38,7 +37,6 @@ describe("PlayerRuntime with soundcloud streams", () => {
   it("plays a buffered hls blob through an object url and caches it without downloading again", async () => {
     mocks.resolveSoundCloudStream.mockResolvedValue(bufferedStream([1, 2, 3]));
     const fetchSpy = vi.spyOn(globalThis, "fetch");
-    const sessionSpy = vi.spyOn(api, "createPlaybackSession");
     const track = soundCloudTrack("sc:101");
 
     await playerRuntime!.loadAndPlay(track);
@@ -47,7 +45,6 @@ describe("PlayerRuntime with soundcloud streams", () => {
     expect(playerRuntime!.hasLoadedSourceFor(track.id)).toBe(true);
     await vi.waitFor(async () => expect((await linerDb.getAudio(track.id))?.byteSize).toBe(3));
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(sessionSpy).not.toHaveBeenCalled();
   });
 
   it("preloads a buffered soundcloud stream straight into the audio cache", async () => {

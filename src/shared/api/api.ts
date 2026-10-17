@@ -473,10 +473,6 @@ export type {
   UserPlaylist as ApiUserPlaylist,
   UserPlaylistItem as ApiUserPlaylistItem,
   LikedTracksPage as ApiLikedTracksPage,
-  PlaybackSessionResponse as PlaybackSession,
-  PlaybackSessionResponse as ApiPlaybackSession,
-  Codec,
-  CodecPreference,
   LyricsFormat,
   LyricsContentKind,
   LyricsSyncLevel,
@@ -525,7 +521,6 @@ import type {
   ApiLikedTracksPage,
   ApiUserPlaylist,
   ApiUserPlaylistItem,
-  PlaybackSessionResponse as PlaybackSession,
   LyricsStreamEvent,
   ImportJob,
   ImportReview,
@@ -918,25 +913,6 @@ export const api = {
           ...(tracks?.length ? { tracks } : {}),
           ...(title ? { title } : {}),
           ...(description ? { description } : {}),
-        }),
-      },
-    );
-  },
-
-  createPlaybackSession(
-    id: string,
-    preferredCodec?: "opus" | "aac",
-    signal?: AbortSignal,
-    transport?: "proxy" | "direct_innertube",
-  ): Promise<PlaybackSession> {
-    return request<PlaybackSession>(
-      `/v1/tracks/${encodeURIComponent(id)}/playback`,
-      {
-        method: "POST",
-        signal,
-        body: JSON.stringify({
-          ...(transport ? { transport } : {}),
-          ...(preferredCodec ? { preferredCodec } : {}),
         }),
       },
     );

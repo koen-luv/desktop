@@ -6,7 +6,6 @@ interface PlaybackStreamFormat {
   mimeType: string;
   codec: string;
   bitrate: number;
-  transport: "direct" | "proxy";
   contentLength?: number;
 }
 
@@ -26,7 +25,7 @@ export type PlaybackStream = UrlPlaybackStream | BufferedPlaybackStream;
 
 export type PlayableTrack = Pick<Track, "id" | "title" | "artists" | "durationMs">;
 
-export function toTimestamp(value: string | null | undefined): number | null {
+function toTimestamp(value: string | null | undefined): number | null {
   if (!value) return null;
   const time = new Date(value).getTime();
   return Number.isFinite(time) ? time : null;
@@ -43,13 +42,12 @@ export function fromInnertubeStream(direct: ResolvedAudioStream): PlaybackStream
     codec: direct.codec,
     bitrate: direct.bitrate,
     expiresAtMs: toTimestamp(direct.expiresAt),
-    transport: "direct",
     ...(direct.contentLength ? { contentLength: direct.contentLength } : {}),
   };
 }
 
 export function fromSoundCloudStream(stream: ResolvedSoundCloudStream): PlaybackStream {
-  const format = { mimeType: stream.mimeType, codec: stream.codec, bitrate: stream.bitrate, transport: "direct" as const };
+  const format = { mimeType: stream.mimeType, codec: stream.codec, bitrate: stream.bitrate };
   if (stream.blob) {
     return { ...format, blob: stream.blob, expiresAtMs: null, contentLength: stream.contentLength };
   }

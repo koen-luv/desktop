@@ -598,7 +598,7 @@ export class PlayerRuntime {
       const streamCodec = stream.codec;
       const streamBitrate = stream.bitrate;
       this.currentSessionExpiresAt = stream.expiresAtMs;
-      log("cyan", "playback", `resolved ${stream.transport} stream for ${track.title}`);
+      log("cyan", "playback", `resolved stream for ${track.title}`);
       if (this.activeBlobUrl) {
         URL.revokeObjectURL(this.activeBlobUrl);
         this.activeBlobUrl = null;

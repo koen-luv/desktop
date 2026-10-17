@@ -1,7 +1,6 @@
 export * from './cover';
 export * from './track';
 export * from './lyrics';
-export * from './playback';
 export * from './catalog';
 export * from './playlists';
 export * from './imports';

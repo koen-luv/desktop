@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { SearchResult } from "@/shared/contracts";
 import type { Track } from "@/shared/types";
 
 const mocks = vi.hoisted(() => ({
@@ -17,7 +18,6 @@ vi.mock("@/shared/media/soundcloud", async (importOriginal) => {
   return { ...actual, resolveSoundCloudStream: mocks.resolveSoundCloudStream };
 });
 
-import { api, canClientDirectFetch, markDirectFetchFailed } from "@/shared/api";
 import { resolvePlaybackStream } from "./streamResolver";
 import { clearYoutubeStandInCache } from "./youtubeStandIn";
 
@@ -30,16 +30,12 @@ const directStream = {
   expiresAt: "2030-01-01T00:00:00.000Z",
 };
 
-const proxySession = {
-  transport: "proxy" as const,
-  streamUrl: "https://api.tryliner.fun/v1/playback/pb_1/media",
-  mimeType: "audio/mpeg",
-  codec: "aac" as const,
-  bitrate: 128_000,
-};
-
 function track(id: string, title = "Blinding Lights", artists = "The Weeknd", durationMs = 200_000): Track {
   return { id, title, artists, durationMs, coverUrl: "", playCount: 0 };
+}
+
+function searchTrack(id: string, title: string, artist: string, durationMs: number): SearchResult {
+  return { type: "track", id, title, artists: [{ id: `UC_${artist}`, name: artist }], durationMs };
 }
 
 afterEach(() => {
@@ -51,48 +47,36 @@ afterEach(() => {
 });
 
 describe("resolvePlaybackStream for youtube ids", () => {
-  it("plays youtube tracks straight from googlevideo without a server session", async () => {
+  it("plays youtube tracks straight from googlevideo", async () => {
     mocks.resolveDirectAudioStream.mockResolvedValue(directStream);
-    const sessionSpy = vi.spyOn(api, "createPlaybackSession");
 
     const stream = await resolvePlaybackStream(track("dQw4w9WgXcQ"));
 
-    expect(stream).toMatchObject({ url: directStream.url, transport: "direct", expiresAtMs: Date.parse(directStream.expiresAt) });
-    expect(sessionSpy).not.toHaveBeenCalled();
+    expect(stream).toMatchObject({ url: directStream.url, expiresAtMs: Date.parse(directStream.expiresAt) });
     expect(mocks.resolveSoundCloudStream).not.toHaveBeenCalled();
   });
 
-  it("tries the client first even when the connectivity probe cached a blocked result", async () => {
-    markDirectFetchFailed("RESOLVE_FAILED");
-    expect(canClientDirectFetch()).toBe(false);
-    mocks.resolveDirectAudioStream.mockResolvedValue(directStream);
-    const sessionSpy = vi.spyOn(api, "createPlaybackSession");
+  it("surfaces the innertube error when youtube cannot play the track", async () => {
+    mocks.resolveDirectAudioStream.mockRejectedValue(new Error("LOGIN_REQUIRED"));
 
-    await expect(resolvePlaybackStream(track("dQw4w9WgXcQ"))).resolves.toMatchObject({ transport: "direct" });
-    expect(sessionSpy).not.toHaveBeenCalled();
+    await expect(resolvePlaybackStream(track("dQw4w9WgXcQ"))).rejects.toThrow("LOGIN_REQUIRED");
   });
+});
 
-  it("uses the server proxy for ids of unknown sources", async () => {
-    const sessionSpy = vi.spyOn(api, "createPlaybackSession").mockResolvedValue(proxySession);
+describe("resolvePlaybackStream for ids of unknown sources", () => {
+  it("plays the matching youtube track", async () => {
+    mocks.searchRaw.mockResolvedValue([searchTrack("4NRXx6U8ABQ", "Blinding Lights", "The Weeknd", 200_040)]);
+    mocks.resolveDirectAudioStream.mockResolvedValue(directStream);
 
     const stream = await resolvePlaybackStream(track("local-file-1"));
 
-    expect(mocks.resolveDirectAudioStream).not.toHaveBeenCalled();
-    expect(sessionSpy).toHaveBeenCalledWith("local-file-1", undefined, undefined, "proxy");
-    expect(stream).toMatchObject({ url: proxySession.streamUrl, transport: "proxy" });
+    expect(mocks.resolveDirectAudioStream).toHaveBeenCalledWith("4NRXx6U8ABQ", { signal: undefined });
+    expect(stream).toMatchObject({ url: directStream.url });
   });
 
-  it("falls back to the server proxy when client resolution fails", async () => {
-    mocks.resolveDirectAudioStream.mockRejectedValue(new Error("LOGIN_REQUIRED"));
-    vi.spyOn(api, "createPlaybackSession").mockResolvedValue(proxySession);
+  it("fails when youtube has no matching track", async () => {
+    mocks.searchRaw.mockResolvedValue([]);
 
-    await expect(resolvePlaybackStream(track("dQw4w9WgXcQ"))).resolves.toMatchObject({ transport: "proxy" });
-  });
-
-  it("surfaces the client error when the proxy fallback also fails", async () => {
-    mocks.resolveDirectAudioStream.mockRejectedValue(new Error("LOGIN_REQUIRED"));
-    vi.spyOn(api, "createPlaybackSession").mockRejectedValue(new Error("502"));
-
-    await expect(resolvePlaybackStream(track("dQw4w9WgXcQ"))).rejects.toThrow("LOGIN_REQUIRED");
+    await expect(resolvePlaybackStream(track("local-file-2"))).rejects.toThrow("No matching YouTube track found");
   });
 });

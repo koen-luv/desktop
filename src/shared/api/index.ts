@@ -26,7 +26,6 @@ export type {
   ApiUserPlaylist,
   ApiUserPlaylistItem,
   ApiLikedTracksPage,
-  PlaybackSession,
   LyricsSyncLevel,
   LyricsCandidate,
   LyricsStreamEvent,

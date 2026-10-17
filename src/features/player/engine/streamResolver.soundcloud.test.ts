@@ -18,7 +18,6 @@ vi.mock("@/shared/media/soundcloud", async (importOriginal) => {
   return { ...actual, resolveSoundCloudStream: mocks.resolveSoundCloudStream };
 });
 
-import { api } from "@/shared/api";
 import { SoundCloudUnavailableError } from "@/shared/media/soundcloud";
 import { resolvePlaybackStream } from "./streamResolver";
 import { clearYoutubeStandInCache } from "./youtubeStandIn";
@@ -30,14 +29,6 @@ const directStream = {
   bitrate: 135_000,
   itag: 251,
   expiresAt: "2030-01-01T00:00:00.000Z",
-};
-
-const proxySession = {
-  transport: "proxy" as const,
-  streamUrl: "https://api.tryliner.fun/v1/playback/pb_1/media",
-  mimeType: "audio/mpeg",
-  codec: "aac" as const,
-  bitrate: 128_000,
 };
 
 function track(id: string, title = "Blinding Lights", artists = "The Weeknd", durationMs = 200_000): Track {
@@ -57,16 +48,14 @@ afterEach(() => {
 });
 
 describe("resolvePlaybackStream for soundcloud ids", () => {
-  it("plays signed soundcloud urls with their expiry and no server session", async () => {
+  it("plays signed soundcloud urls with their expiry", async () => {
     const expiresAt = "2030-01-01T00:00:00.000Z";
     mocks.resolveSoundCloudStream.mockResolvedValue({ url: "https://cf-media.sndcdn.com/a.mp3", mimeType: "audio/mpeg", codec: "mp3", bitrate: 128_000, expiresAt });
-    const sessionSpy = vi.spyOn(api, "createPlaybackSession");
 
     const stream = await resolvePlaybackStream(track("sc:1099045843"));
 
     expect(mocks.resolveSoundCloudStream).toHaveBeenCalledWith("sc:1099045843", { signal: undefined });
-    expect(stream).toMatchObject({ url: "https://cf-media.sndcdn.com/a.mp3", transport: "direct", expiresAtMs: Date.parse(expiresAt) });
-    expect(sessionSpy).not.toHaveBeenCalled();
+    expect(stream).toMatchObject({ url: "https://cf-media.sndcdn.com/a.mp3", expiresAtMs: Date.parse(expiresAt) });
   });
 
   it("passes buffered hls blobs through without an expiry", async () => {
@@ -75,7 +64,7 @@ describe("resolvePlaybackStream for soundcloud ids", () => {
 
     const stream = await resolvePlaybackStream(track("sc:42"));
 
-    expect(stream).toMatchObject({ blob, expiresAtMs: null, contentLength: 2, transport: "direct" });
+    expect(stream).toMatchObject({ blob, expiresAtMs: null, contentLength: 2 });
     expect(stream.url).toBeUndefined();
   });
 
@@ -86,13 +75,11 @@ describe("resolvePlaybackStream for soundcloud ids", () => {
       searchTrack("4NRXx6U8ABQ", "Blinding Lights", "The Weeknd", 200_040),
     ]);
     mocks.resolveDirectAudioStream.mockResolvedValue(directStream);
-    const sessionSpy = vi.spyOn(api, "createPlaybackSession");
 
     const stream = await resolvePlaybackStream(track("sc:7"));
 
     expect(mocks.resolveDirectAudioStream).toHaveBeenCalledWith("4NRXx6U8ABQ", { signal: undefined });
-    expect(stream).toMatchObject({ url: directStream.url, transport: "direct" });
-    expect(sessionSpy).not.toHaveBeenCalled();
+    expect(stream).toMatchObject({ url: directStream.url });
   });
 
   it("remembers the youtube stand-in so the next resolve skips the search", async () => {
@@ -107,22 +94,9 @@ describe("resolvePlaybackStream for soundcloud ids", () => {
     expect(mocks.searchRaw).toHaveBeenCalledTimes(searches);
   });
 
-  it("uses the server proxy only when soundcloud and youtube both fail", async () => {
-    mocks.resolveSoundCloudStream.mockRejectedValue(new SoundCloudUnavailableError("blocked"));
-    mocks.searchRaw.mockResolvedValue([searchTrack("zzzzzzzzzz1", "Completely Different Song", "Someone Else", 90_000)]);
-    const sessionSpy = vi.spyOn(api, "createPlaybackSession").mockResolvedValue(proxySession);
-
-    const stream = await resolvePlaybackStream(track("sc:9"));
-
-    expect(mocks.resolveDirectAudioStream).not.toHaveBeenCalled();
-    expect(sessionSpy).toHaveBeenCalledWith("sc:9", undefined, undefined, "proxy");
-    expect(stream).toMatchObject({ transport: "proxy" });
-  });
-
   it("surfaces the soundcloud error when every fallback fails", async () => {
     mocks.resolveSoundCloudStream.mockRejectedValue(new SoundCloudUnavailableError("not_found"));
     mocks.searchRaw.mockResolvedValue([]);
-    vi.spyOn(api, "createPlaybackSession").mockRejectedValue(new Error("502"));
 
     await expect(resolvePlaybackStream(track("sc:10"))).rejects.toThrow("not_found");
   });
@@ -131,10 +105,8 @@ describe("resolvePlaybackStream for soundcloud ids", () => {
     const controller = new AbortController();
     controller.abort();
     mocks.resolveSoundCloudStream.mockRejectedValue(new DOMException("aborted", "AbortError"));
-    const sessionSpy = vi.spyOn(api, "createPlaybackSession");
 
     await expect(resolvePlaybackStream(track("sc:11"), controller.signal)).rejects.toThrow("aborted");
     expect(mocks.searchRaw).not.toHaveBeenCalled();
-    expect(sessionSpy).not.toHaveBeenCalled();
   });
 });
