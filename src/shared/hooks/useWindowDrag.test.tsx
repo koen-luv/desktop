@@ -1,7 +1,11 @@
 import React, { act } from "react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createRoot, Root } from "react-dom/client";
-import { useWindowDrag, resetWindowDragTimeForTests } from "./useWindowDrag";
+import {
+  useWindowDrag,
+  resetWindowDragTimeForTests,
+  NATIVE_WINDOW_DRAG_CLASS,
+} from "./useWindowDrag";
 
 function DragTestComponent(props: { topAreaHeight?: number; dragThreshold?: number }) {
   useWindowDrag(props);
@@ -19,7 +23,6 @@ describe("useWindowDrag", () => {
   let root: Root;
   let mockDragMove: any;
   let mockToggleMaximize: any;
-  let mockStartWindowMove: any;
 
   beforeEach(async () => {
     resetWindowDragTimeForTests();
@@ -29,12 +32,10 @@ describe("useWindowDrag", () => {
 
     mockDragMove = vi.fn();
     mockToggleMaximize = vi.fn();
-    mockStartWindowMove = vi.fn();
 
     (window as any).linerElectron = {
       dragMove: mockDragMove,
       toggleMaximize: mockToggleMaximize,
-      startWindowMove: mockStartWindowMove,
     };
   });
 
@@ -291,5 +292,68 @@ describe("useWindowDrag", () => {
     emptyArea.dispatchEvent(dblClick);
 
     expect(mockToggleMaximize).not.toHaveBeenCalled();
+  });
+
+  describe("on linux", () => {
+    beforeEach(() => {
+      (window as any).linerElectron.platform = "linux";
+    });
+
+    it("hands the drag to the compositor instead of moving the window manually", async () => {
+      await act(async () => {
+        root.render(<DragTestComponent topAreaHeight={32} dragThreshold={5} />);
+      });
+
+      const emptyArea = document.getElementById("empty-drag-area")!;
+      emptyArea.dispatchEvent(
+        new PointerEvent("pointerdown", {
+          button: 0,
+          clientX: 50,
+          clientY: 10,
+          screenX: 100,
+          screenY: 100,
+          bubbles: true,
+          cancelable: true,
+          pointerType: "mouse",
+        }),
+      );
+      window.dispatchEvent(
+        new PointerEvent("pointermove", {
+          button: 0,
+          clientX: 60,
+          clientY: 15,
+          screenX: 110,
+          screenY: 105,
+          bubbles: true,
+          cancelable: true,
+          pointerType: "mouse",
+        }),
+      );
+      emptyArea.dispatchEvent(
+        new MouseEvent("dblclick", { button: 0, clientX: 50, clientY: 10, bubbles: true }),
+      );
+
+      expect(mockDragMove).not.toHaveBeenCalled();
+      expect(mockToggleMaximize).not.toHaveBeenCalled();
+    });
+
+    it("adds the app-region drag strip and removes it on unmount", async () => {
+      await act(async () => {
+        root.render(<DragTestComponent topAreaHeight={40} />);
+      });
+
+      const strip = document.getElementById("window-drag-strip");
+      expect(strip).not.toBeNull();
+      expect(strip!.style.height).toBe("40px");
+      expect(document.body.firstElementChild).toBe(strip);
+      expect(document.documentElement.classList.contains(NATIVE_WINDOW_DRAG_CLASS)).toBe(true);
+
+      await act(async () => {
+        root.unmount();
+      });
+
+      expect(document.getElementById("window-drag-strip")).toBeNull();
+      expect(document.documentElement.classList.contains(NATIVE_WINDOW_DRAG_CLASS)).toBe(false);
+    });
   });
 });

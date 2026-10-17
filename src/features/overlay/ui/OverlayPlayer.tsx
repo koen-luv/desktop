@@ -1,21 +1,26 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
-  Play,
-  Pause,
   SkipNext,
   SkipPrevious,
 } from "@solar-icons/react";
+import {
+  PlayerMorphIcon,
+  ICON_PLAY,
+  ICON_PAUSE,
+} from "@/features/player/ui/morphPlayerIcons";
 import { HeartFill, HeartLine } from "@mingcute/react";
 import CoverImage from "@/features/covers/ui/CoverImage";
 import { ScrollableText } from "@/shared/ui/ScrollableText";
 import { useDisableButtonFocus } from "@/features/navigation/hooks/useDisableButtonFocus";
+import { getAuthSession } from "@/shared/api";
 import type { OverlayAction, OverlayStatePayload } from "../contracts";
 import {
   useCustomizationStore,
   loadPersistedWallpaper,
   DEFAULT_GLASS_CONFIG,
 } from "@/features/settings";
+import { useShortcutsStore, matchesShortcut } from "@/features/shortcuts";
 
 const OVERLAY_CARD_TRANSITION = {
   duration: 0.08,
@@ -44,6 +49,11 @@ export function OverlayPlayer() {
 
 
   useEffect(() => {
+    if (!getAuthSession()) {
+      window.linerElectron?.closeOverlay?.();
+      return;
+    }
+
     window.linerElectron?.getOverlayInitialState?.().then((initial) => {
       if (initial) {
         anchorPosRef.current = initial.positionMs;
@@ -156,83 +166,69 @@ export function OverlayPlayer() {
     });
   }, []);
 
-  // Keyboard Shortcuts (Arrow keys for sound & seek, Space, L, J, K, F to switch to main app)
+  // Keyboard Shortcuts (Miniplayer mode)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
 
-      const code = e.code;
-      const keyLower = e.key.toLowerCase();
+      const { miniplayer } = useShortcutsStore.getState();
 
       // Sound up / down shortcuts
-      if (code === "ArrowUp" || e.key === "ArrowUp") {
+      if (matchesShortcut(e, miniplayer.volumeUp)) {
         e.preventDefault();
         sendAction({ type: "volumeUp" });
         return;
       }
 
-      if (code === "ArrowDown" || e.key === "ArrowDown") {
+      if (matchesShortcut(e, miniplayer.volumeDown)) {
         e.preventDefault();
         sendAction({ type: "volumeDown" });
         return;
       }
 
       // Switch to main app
-      if (code === "KeyF" || keyLower === "f" || keyLower === "а") {
+      if (matchesShortcut(e, miniplayer.focusMainWindow)) {
         e.preventDefault();
         sendAction({ type: "focusMainWindow" });
         return;
       }
 
       // Playback toggle
-      if (code === "Space" || keyLower === " ") {
+      if (matchesShortcut(e, miniplayer.playPause)) {
         e.preventDefault();
         sendAction({ type: "togglePlay" });
         return;
       }
 
       // Seek left / right
-      if (code === "ArrowLeft" || e.key === "ArrowLeft") {
+      if (matchesShortcut(e, miniplayer.seekBackward)) {
         e.preventDefault();
         sendAction({ type: "seek", payload: { positionMs: Math.max(0, currentPosMs - 5000) } });
         return;
       }
 
-      if (code === "ArrowRight" || e.key === "ArrowRight") {
+      if (matchesShortcut(e, miniplayer.seekForward)) {
         e.preventDefault();
         sendAction({ type: "seek", payload: { positionMs: Math.min(durationMs, currentPosMs + 5000) } });
         return;
       }
 
       // Like
-      if (code === "KeyL" || keyLower === "l" || keyLower === "д") {
+      if (matchesShortcut(e, miniplayer.likeTrack)) {
         e.preventDefault();
         sendAction({ type: "like" });
         return;
       }
 
       // Previous
-      if (
-        code === "KeyJ" ||
-        code === "BracketLeft" ||
-        keyLower === "j" ||
-        keyLower === "о" ||
-        keyLower === "["
-      ) {
+      if (matchesShortcut(e, miniplayer.prevTrack)) {
         e.preventDefault();
         sendAction({ type: "prev" });
         return;
       }
 
       // Next
-      if (
-        code === "KeyK" ||
-        code === "BracketRight" ||
-        keyLower === "k" ||
-        keyLower === "л" ||
-        keyLower === "]"
-      ) {
+      if (matchesShortcut(e, miniplayer.nextTrack)) {
         e.preventDefault();
         sendAction({ type: "next" });
         return;
@@ -364,7 +360,7 @@ export function OverlayPlayer() {
                   ? "text-[#ff3b5c]"
                   : "text-white/40 hover:text-white"
               }`}
-              title={state.isLiked ? "Unlike" : "Like"}
+              aria-label={state.isLiked ? "Unlike" : "Like"}
             >
               {state.isLiked ? <HeartFill size={16} /> : <HeartLine size={16} />}
             </button>
@@ -381,7 +377,7 @@ export function OverlayPlayer() {
                 sendAction({ type: "prev" });
               }}
               className="flex h-[26px] w-[26px] items-center justify-center rounded-lg border-0 bg-transparent text-white/60 hover:text-white active:scale-90 transition-all outline-none cursor-pointer"
-              title="Previous"
+              aria-label="Previous"
             >
               <SkipPrevious size={16} weight="Bold" />
             </button>
@@ -398,13 +394,18 @@ export function OverlayPlayer() {
                 sendAction({ type: "togglePlay" });
               }}
               className="inline-flex h-[28px] w-[28px] items-center justify-center rounded-full bg-white text-black shadow transition-all duration-150 ease-out hover:scale-105 active:scale-95 border-none cursor-pointer"
-              title={isPlaying ? "Pause" : "Play"}
+              aria-label={isPlaying ? "Pause" : "Play"}
             >
-              {isPlaying ? (
-                <Pause size={14} weight="Bold" />
-              ) : (
-                <Play size={14} weight="Bold" className="translate-x-[0.5px]" />
-              )}
+              <span
+                className={`flex items-center justify-center transition-transform ${
+                  isPlaying ? "" : "translate-x-[0.5px]"
+                }`}
+              >
+                <PlayerMorphIcon
+                  icon={isPlaying ? ICON_PAUSE : ICON_PLAY}
+                  size={14}
+                />
+              </span>
             </button>
 
             <button
@@ -419,7 +420,7 @@ export function OverlayPlayer() {
                 sendAction({ type: "next" });
               }}
               className="flex h-[26px] w-[26px] items-center justify-center rounded-lg border-0 bg-transparent text-white/60 hover:text-white active:scale-90 transition-all outline-none cursor-pointer"
-              title="Next"
+              aria-label="Next"
             >
               <SkipNext size={16} weight="Bold" />
             </button>

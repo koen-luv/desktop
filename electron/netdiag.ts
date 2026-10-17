@@ -58,6 +58,13 @@ export interface MainNetResult {
   platform: string;
 }
 
+// the offline dump gets pasted into public issues: keep the network (isp, region) but not the exact address
+export function maskIp(ip: string): string {
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(ip)) return ip.split(".").slice(0, 2).concat("x", "x").join(".");
+  if (ip.includes(":")) return `${ip.split(":").slice(0, 2).join(":")}:x:x`;
+  return "x";
+}
+
 // first line is a header ("traceroute to …", "Tracing route …"), rest are hops.
 // keeps raw hop lines (capped) since hop formats differ per os and tool.
 export function parseTraceOutput(stdout: string, maxHops = MAIN_NET_TRACE_MAX_HOPS): string[] {

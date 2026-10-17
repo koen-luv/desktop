@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Refresh1Line } from "@mingcute/react";
 import { useTranslation } from "@/languages";
@@ -8,13 +8,15 @@ import {
   getEnglishKeyFromEvent,
   normalizeShortcutToEnglish,
 } from "@/features/overlay";
-import { ToggleSwitch } from "@/shared/ui";
+import { useShortcutsStore } from "@/features/shortcuts";
+import { acquireEscapeGuard } from "@/shared/utils/escapeGuard";
+import { ToggleSwitch, Tooltip } from "@/shared/ui";
 import { SettingRow, SettingSection, SegmentedControl } from "../controls";
 
-const POSITION_OPTIONS = [
-  { value: "top-left" as const, label: "Top Left" },
-  { value: "top-center" as const, label: "Top Middle" },
-  { value: "top-right" as const, label: "Top Right" },
+const POSITION_CONFIG = [
+  { value: "top-left" as const, key: "settings.overlay.position.top_left", fallback: "Top Left" },
+  { value: "top-center" as const, key: "settings.overlay.position.top_center", fallback: "Top Middle" },
+  { value: "top-right" as const, key: "settings.overlay.position.top_right", fallback: "Top Right" },
 ] as const;
 
 const DEFAULT_SHORTCUT = "Alt+Shift+O";
@@ -40,6 +42,15 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
   const position = useOverlaySettingsStore((s) => s.position);
   const setPosition = useOverlaySettingsStore((s) => s.setPosition);
 
+  const positionOptions = useMemo(
+    () =>
+      POSITION_CONFIG.map((opt) => ({
+        value: opt.value,
+        label: t(opt.key) || opt.fallback,
+      })),
+    [t],
+  );
+
   const shortcut = useOverlaySettingsStore((s) => s.shortcut);
   const setShortcut = useOverlaySettingsStore((s) => s.setShortcut);
 
@@ -52,6 +63,19 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
   const [isRecording, setIsRecording] = useState(false);
   const [heldModifiers, setHeldModifiers] = useState<string[]>([]);
   const recordButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Suspend the registered global hotkeys while recording. Otherwise the OS
+  // swallows the key combo that is already bound (e.g. pressing the current
+  // shortcut again) and the recorder never receives it, so it can't be saved.
+  useEffect(() => {
+    useShortcutsStore.getState().setIsRecording(isRecording);
+    // Esc cancels recording instead of closing the settings dialog
+    const releaseEscape = isRecording ? acquireEscapeGuard() : null;
+    return () => {
+      releaseEscape?.();
+      useShortcutsStore.getState().setIsRecording(false);
+    };
+  }, [isRecording]);
 
   useEffect(() => {
     if (!isRecording) {
@@ -106,6 +130,7 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
       const normalized = normalizeShortcutToEnglish(parts.join("+"));
       if (normalized) {
         setShortcut(normalized);
+        useShortcutsStore.getState().setGlobalShortcut("toggleOverlay", normalized);
         setHeldModifiers([]);
         setIsRecording(false);
       }
@@ -179,7 +204,7 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
           searchQuery={searchQuery}
           control={
             <SegmentedControl<OverlayPosition>
-              options={POSITION_OPTIONS}
+              options={positionOptions}
               value={position}
               onChange={setPosition}
               disabled={!enabled}
@@ -201,23 +226,29 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
             <div className="flex items-center gap-1.5">
               <AnimatePresence>
                 {shortcut !== DEFAULT_SHORTCUT && enabled && (
-                  <motion.button
-                    type="button"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ duration: 0.1, ease: "easeOut" }}
-                    title={t("settings.overlay.shortcut.reset") || "Reset to Alt+Shift+O"}
-                    aria-label={t("settings.overlay.shortcut.reset") || "Reset shortcut"}
-                    onClick={() => {
-                      setHeldModifiers([]);
-                      setIsRecording(false);
-                      setShortcut(DEFAULT_SHORTCUT);
-                    }}
-                    className="h-[28px] w-[28px] rounded-lg border-0 outline-none flex items-center justify-center bg-border-alpha-14 hover:bg-border-alpha-20 text-text-secondary hover:text-text-primary transition-colors cursor-pointer select-none active:scale-[0.95]"
+                  <Tooltip
+                    content={t("settings.overlay.shortcut.reset") || "Reset to Alt+Shift+O"}
+                    side="top"
+                    sideOffset={6}
                   >
-                    <Refresh1Line size={15} />
-                  </motion.button>
+                    <motion.button
+                      type="button"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      transition={{ duration: 0.1, ease: "easeOut" }}
+                      aria-label={t("settings.overlay.shortcut.reset") || "Reset shortcut"}
+                      onClick={() => {
+                        setHeldModifiers([]);
+                        setIsRecording(false);
+                        setShortcut(DEFAULT_SHORTCUT);
+                        useShortcutsStore.getState().setGlobalShortcut("toggleOverlay", DEFAULT_SHORTCUT);
+                      }}
+                      className="h-[28px] w-[28px] rounded-lg border-0 outline-none flex items-center justify-center bg-border-alpha-14 hover:bg-border-alpha-20 text-text-secondary hover:text-text-primary transition-colors cursor-pointer select-none active:scale-[0.95]"
+                    >
+                      <Refresh1Line size={15} />
+                    </motion.button>
+                  </Tooltip>
                 )}
               </AnimatePresence>
 

@@ -33,6 +33,7 @@ export interface UpdateDownloadProgress {
 export interface WindowState {
   isMaximized: boolean;
   isFullScreen: boolean;
+  isVisible?: boolean;
 }
 
 export interface LinerElectronApi {
@@ -45,7 +46,8 @@ export interface LinerElectronApi {
   isMaximized: () => Promise<boolean>;
   isFullScreen: () => Promise<boolean>;
   onWindowStateChange: (cb: (state: WindowState) => void) => () => void;
-  startWindowMove: () => void;
+  onWindowRestored?: (cb: () => void) => () => void;
+  onWindowMinimized?: (cb: () => void) => () => void;
   dragStart: () => void;
   dragMove: (deltaX: number, deltaY: number) => void;
   dragEnd: () => void;
@@ -118,8 +120,10 @@ export interface LinerElectronApi {
   onOverlayState: (cb: (state: any) => void) => () => void;
   getOverlayInitialState: () => Promise<any>;
   updateOverlaySettings: (settings: any) => void;
+  pauseOverlayShortcuts: (paused: boolean) => void;
   onOverlaySettingsChanged: (cb: (settings: any) => void) => () => void;
   onOverlayVisibility: (cb: (visible: boolean) => void) => () => void;
+  setOverlayAuthenticated?: (authenticated: boolean) => void;
 }
 
 const isHyprland = Boolean(
@@ -144,8 +148,19 @@ const api: LinerElectronApi = {
       ipcRenderer.removeListener("window:state-changed", listener);
     };
   },
-  startWindowMove: () => {
-    ipcRenderer.send("window:start-drag");
+  onWindowRestored: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on("window:restored", listener);
+    return () => {
+      ipcRenderer.removeListener("window:restored", listener);
+    };
+  },
+  onWindowMinimized: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on("window:minimized", listener);
+    return () => {
+      ipcRenderer.removeListener("window:minimized", listener);
+    };
   },
   dragStart: () => {
     ipcRenderer.send("window:drag-start");
@@ -288,6 +303,9 @@ const api: LinerElectronApi = {
   updateOverlaySettings: (settings) => {
     ipcRenderer.send("overlay:update-settings", settings);
   },
+  pauseOverlayShortcuts: (paused) => {
+    ipcRenderer.send("overlay:pause-shortcuts", paused);
+  },
   onOverlaySettingsChanged: (cb) => {
     const listener = (_event: unknown, settings: any) => cb(settings);
     ipcRenderer.on("overlay:settings-changed", listener);
@@ -301,6 +319,9 @@ const api: LinerElectronApi = {
     return () => {
       ipcRenderer.removeListener("overlay:visibility", listener);
     };
+  },
+  setOverlayAuthenticated: (authenticated) => {
+    ipcRenderer.send("overlay:set-authenticated", authenticated);
   },
 };
 

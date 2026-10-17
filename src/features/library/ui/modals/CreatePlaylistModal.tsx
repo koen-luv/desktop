@@ -260,7 +260,7 @@ export default function CreatePlaylistModal() {
               rightSlot={
                 detectedSource ? (
                   <Tooltip content={detectedSource} side="top">
-                    <span className="inline-flex cursor-default">
+                    <span className="inline-flex cursor-help">
                       <CheckLine size={16} className="text-accent-primary" />
                     </span>
                   </Tooltip>

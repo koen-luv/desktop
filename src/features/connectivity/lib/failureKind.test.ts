@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { isConnectivityFailure, isPlaybackPath, statusOf, stripQuery } from "./failureKind";
+import { isConnectivityFailure, isPlaybackPath, isServerOutage, statusOf, stripQuery } from "./failureKind";
+
+describe("isServerOutage", () => {
+  it("is true only when the api answered with a 5xx", () => {
+    expect(isServerOutage([{ id: "device", detail: "online" }, { id: "api", detail: "HTTP 503" }])).toBe(true);
+    expect(isServerOutage([{ id: "api", detail: "timed out" }])).toBe(false);
+    expect(isServerOutage([{ id: "api", detail: "HTTP 401" }])).toBe(false);
+    expect(isServerOutage([])).toBe(false);
+  });
+});
 
 describe("isConnectivityFailure", () => {
   it("treats unreachable server as connectivity failure", () => {

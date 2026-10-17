@@ -1,6 +1,7 @@
 import type { MainNetResult } from "../../../../electron/netdiag";
 import type { DiagCheck } from "./diagnostics";
 import type { FailureEntry } from "../store/connectivityStore";
+import { APP_VERSION } from "@/shared/config/version";
 
 export interface OfflineDump {
   generatedAt: string;
@@ -31,8 +32,8 @@ export function buildOfflineDump(input: {
   return {
     generatedAt: new Date().toISOString(),
     app: {
-      version:
-        (import.meta.env.VITE_CLIENT_VERSION as string | undefined) || "dev",
+      // VITE_CLIENT_VERSION is never set by the release build, so every dump said "dev"
+      version: APP_VERSION,
       platform: typeof navigator !== "undefined" ? navigator.platform : "unknown",
       userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
       language: typeof navigator !== "undefined" ? navigator.language : "unknown",

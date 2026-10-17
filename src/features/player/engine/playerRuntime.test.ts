@@ -152,7 +152,7 @@ describe("PlayerRuntime audio caching", () => {
     const playSpy = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
     const sessionSpy = mocks.resolvePlaybackStream.mockResolvedValue(urlStream);
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(new Uint8Array([1, 2, 3, 4]), {
+      new Response(new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0]), {
         status: 206,
         headers: { "content-type": "audio/webm" },
       }),
@@ -171,7 +171,7 @@ describe("PlayerRuntime audio caching", () => {
 
     await vi.waitFor(async () => {
       const storedAudio = await linerDb.getAudio("fresh-track-2");
-      expect(storedAudio?.byteSize).toBe(4);
+      expect(storedAudio?.byteSize).toBe(16);
     });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
@@ -179,7 +179,7 @@ describe("PlayerRuntime audio caching", () => {
   it("preloads audio in the background and enables instant cache-hit play on skip", async () => {
     const sessionSpy = mocks.resolvePlaybackStream.mockResolvedValue(urlStream);
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(new Uint8Array([5, 6, 7, 8]), {
+      new Response(new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0]), {
         status: 206,
         headers: { "content-type": "audio/webm" },
       }),
@@ -198,7 +198,7 @@ describe("PlayerRuntime audio caching", () => {
 
     const storedAudio = await linerDb.getAudio("next-track-3");
     expect(storedAudio).not.toBeNull();
-    expect(storedAudio?.byteSize).toBe(4);
+    expect(storedAudio?.byteSize).toBe(16);
 
     sessionSpy.mockClear();
     fetchSpy.mockClear();
@@ -216,7 +216,7 @@ describe("PlayerRuntime audio caching", () => {
     const playSpy = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
     const sessionSpy = mocks.resolvePlaybackStream.mockResolvedValue(urlStream);
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(new Uint8Array([1, 2, 3, 4]), {
+      new Response(new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0]), {
         status: 200,
         headers: { "content-type": "audio/webm" },
       }),
@@ -264,4 +264,33 @@ describe("PlayerRuntime audio caching", () => {
     const stored = await linerDb.getAudio("partial-track-5");
     expect(stored).toBeNull();
   });
+
+  it("drops an unreadable cached file, recovers from the network once and does not cache a dash segment", async () => {
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+    const resolveSpy = mocks.resolvePlaybackStream.mockResolvedValue(urlStream);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      new Response(new Uint8Array([0, 0, 0, 0x18, 0x73, 0x74, 0x79, 0x70, 0, 0, 0, 0, 0, 0, 0, 0]), { status: 206 }),
+    );
+
+    const corruptTrack: Track = { ...track, id: "corrupt-track", title: "Corrupt" };
+    await linerDb.putAudio(corruptTrack.id, new Blob([new Uint8Array([9, 9, 9])], { type: "audio/webm" }), "audio/webm");
+    usePlayerStore.setState({ currentTrack: corruptTrack, positionMs: 0 });
+    await playerRuntime!.loadAndPlay(corruptTrack);
+    expect(resolveSpy).not.toHaveBeenCalled();
+
+    const audio = (playerRuntime as unknown as { audio: HTMLAudioElement }).audio;
+    Object.defineProperty(audio, "error", { value: { code: 4, message: "DEMUXER_ERROR_COULD_NOT_OPEN" }, configurable: true });
+    try {
+      audio.dispatchEvent(new Event("error"));
+      await vi.waitFor(() => expect(resolveSpy).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => expect(usePlayerStore.getState().status).toBe("playing"), { timeout: 5000 });
+      expect(await linerDb.getAudio(corruptTrack.id)).toBeNull();
+
+      audio.dispatchEvent(new Event("error"));
+      await vi.waitFor(() => expect(usePlayerStore.getState().status).toBe("error"));
+      expect(resolveSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      Reflect.deleteProperty(audio, "error");
+    }
+  }, 15_000);
 });

@@ -1,6 +1,12 @@
-import { useState, useRef, useCallback, memo } from "react";
+import { useState, useRef, useCallback, useEffect, memo } from "react";
 import { motion } from "framer-motion";
 import { VolumeCross, VolumeSmall, VolumeLoud } from "@solar-icons/react";
+import {
+  PlayerMorphIcon,
+  ICON_VOLUME_MUTE,
+  ICON_VOLUME_LOW,
+  ICON_VOLUME_HIGH,
+} from "./morphPlayerIcons";
 import { usePlayerState } from "../hooks/usePlayerState";
 import { playerEngine } from "../engine/playerEngine";
 import { toVolumeGain, toVolumeLevel } from "../engine/volume";
@@ -9,6 +15,7 @@ export interface VolumePickerProps {
   className?: string;
   showIcon?: boolean;
   showValue?: boolean;
+  orientation?: "horizontal" | "vertical";
   size?: "sm" | "md" | "lg";
   trackClassName?: string;
   fillClassName?: string;
@@ -18,12 +25,14 @@ export interface VolumePickerProps {
   trackActiveBg?: string;
   fillColor?: string;
   onVolumeChange?: (level: number) => void;
+  onDraggingChange?: (isDragging: boolean) => void;
 }
 
 export const VolumePicker = memo(function VolumePicker({
   className = "",
   showIcon = true,
   showValue = false,
+  orientation = "horizontal",
   size = "md",
   trackClassName = "",
   fillClassName = "",
@@ -33,7 +42,9 @@ export const VolumePicker = memo(function VolumePicker({
   trackActiveBg,
   fillColor,
   onVolumeChange,
+  onDraggingChange,
 }: VolumePickerProps) {
+  const isVertical = orientation === "vertical";
   const player = usePlayerState();
   const volumeLevel = toVolumeLevel(player.volume);
 
@@ -41,6 +52,10 @@ export const VolumePicker = memo(function VolumePicker({
   const [isDragging, setIsDragging] = useState(false);
   const [dragLevel, setDragLevel] = useState<number | null>(null);
   const lastNonZeroVolumeRef = useRef<number>(0.7);
+
+  useEffect(() => {
+    onDraggingChange?.(isDragging);
+  }, [isDragging, onDraggingChange]);
 
   const trackRef = useRef<HTMLDivElement>(null);
 
@@ -61,13 +76,19 @@ export const VolumePicker = memo(function VolumePicker({
   );
 
   const calculateLevelFromPointer = useCallback(
-    (clientX: number): number => {
+    (clientX: number, clientY: number): number => {
       const rect = trackRef.current?.getBoundingClientRect();
-      if (!rect || rect.width === 0) return currentLevel;
+      if (!rect) return currentLevel;
+      if (isVertical) {
+        if (rect.height === 0) return currentLevel;
+        const ratio = (rect.bottom - clientY) / rect.height;
+        return Math.min(1, Math.max(0, ratio));
+      }
+      if (rect.width === 0) return currentLevel;
       const ratio = (clientX - rect.left) / rect.width;
       return Math.min(1, Math.max(0, ratio));
     },
-    [currentLevel],
+    [currentLevel, isVertical],
   );
 
   const handlePointerDown = useCallback(
@@ -77,12 +98,12 @@ export const VolumePicker = memo(function VolumePicker({
       setIsDragging(true);
       (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
 
-      const nextLevel = calculateLevelFromPointer(e.clientX);
+      const nextLevel = calculateLevelFromPointer(e.clientX, e.clientY);
       setDragLevel(nextLevel);
       updateVolume(nextLevel);
 
       const onPointerMove = (ev: PointerEvent) => {
-        const lvl = calculateLevelFromPointer(ev.clientX);
+        const lvl = calculateLevelFromPointer(ev.clientX, ev.clientY);
         setDragLevel(lvl);
         updateVolume(lvl);
       };
@@ -164,6 +185,92 @@ export const VolumePicker = memo(function VolumePicker({
 
   const isActive = isHovered || isDragging;
 
+  if (isVertical) {
+    return (
+      <div
+        className={`group relative flex flex-col items-center gap-[6px] w-full select-none prevent-seek ${className}`}
+        onWheel={handleWheel}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {showValue && (
+          <span
+            className={`w-full text-center text-[10px] font-medium tabular-nums tracking-tight leading-[12px] ${
+              !valueClassName ? "text-text-tertiary" : ""
+            } transition-colors ${valueClassName}`}
+          >
+            {percentage}%
+          </span>
+        )}
+
+        <div
+          role="slider"
+          aria-label="Volume"
+          aria-orientation="vertical"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percentage}
+          tabIndex={0}
+          onKeyDown={handleKeyDown}
+          onPointerDown={handlePointerDown}
+          className="relative flex h-[72px] w-full items-center justify-center cursor-pointer outline-none px-1"
+        >
+          <motion.div
+            ref={trackRef}
+            initial={false}
+            animate={{
+              scaleX: isActive ? 1.25 : 1,
+              ...(trackBg ? { backgroundColor: isActive ? (trackActiveBg || trackBg) : trackBg } : {}),
+            }}
+            transition={{
+              type: "spring",
+              stiffness: 400,
+              damping: 30,
+              mass: 0.8,
+            }}
+            className={`relative w-[6px] h-full rounded-full overflow-hidden origin-center transition-colors duration-150 ${
+              !trackBg
+                ? isActive
+                  ? "bg-black/[0.18] dark:bg-white/[0.22]"
+                  : "bg-black/[0.08] dark:bg-white/[0.12]"
+                : ""
+            } ${trackClassName}`}
+          >
+            <div
+              className={`absolute inset-x-0 bottom-0 rounded-full ${
+                !fillColor && !fillClassName ? "bg-text-primary dark:bg-white" : ""
+              } transition-[height] ease-out ${
+                isDragging ? "duration-0" : "duration-100"
+              } ${fillClassName}`}
+              style={{ height: `${percentage}%`, ...(fillColor ? { backgroundColor: fillColor } : {}) }}
+            />
+          </motion.div>
+        </div>
+
+        {showIcon && (
+          <button
+            type="button"
+            onClick={handleToggleMute}
+            aria-label={volumeLevel === 0 ? "Unmute" : "Mute"}
+            className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center border-none bg-transparent p-0 ${
+              !iconClassName ? "text-text-tertiary hover:text-text-primary" : ""
+            } transition-colors duration-150 ease-out cursor-pointer ${iconClassName}`}
+          >
+            <span className="flex items-center justify-center transition-transform duration-150 ease-out hover:scale-110 active:scale-90">
+              {percentage === 0 ? (
+                <VolumeCross size={15} weight="Outline" />
+              ) : percentage < 40 ? (
+                <VolumeSmall size={15} weight="Outline" />
+              ) : (
+                <VolumeLoud size={15} weight="Outline" />
+              )}
+            </span>
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       className={`group relative flex ${containerHeights} items-center gap-[10px] select-none prevent-seek ${className}`}
@@ -181,13 +288,16 @@ export const VolumePicker = memo(function VolumePicker({
           } transition-colors duration-150 ease-out cursor-pointer ${iconClassName}`}
         >
           <span className="flex items-center justify-center transition-transform duration-150 ease-out hover:scale-110 active:scale-90">
-            {percentage === 0 ? (
-              <VolumeCross size={iconSizes} weight="Bold" />
-            ) : percentage < 40 ? (
-              <VolumeSmall size={iconSizes} weight="Bold" />
-            ) : (
-              <VolumeLoud size={iconSizes} weight="Bold" />
-            )}
+            <PlayerMorphIcon
+              icon={
+                percentage === 0
+                  ? ICON_VOLUME_MUTE
+                  : percentage < 40
+                    ? ICON_VOLUME_LOW
+                    : ICON_VOLUME_HIGH
+              }
+              size={iconSizes}
+            />
           </span>
         </button>
       )}
