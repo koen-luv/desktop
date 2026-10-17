@@ -23,6 +23,7 @@ export class PlayerRuntime {
   private loadAbortController: AbortController | null = null;
   private isResetting = false;
   private fadeTimer: ReturnType<typeof setTimeout> | null = null;
+  private sleepTimerId: ReturnType<typeof setTimeout> | null = null;
   /** Track id whose end-of-song fade-out is already running (once per track). */
   private endFadeTrackId: string | null = null;
   private stallStartTime: number | null = null;
@@ -69,6 +70,9 @@ export class PlayerRuntime {
         if (!this.audio.paused) {
           this.audio.volume = state.volume;
         }
+      }
+      if (state.sleepTimerEndsAtMs !== prevState.sleepTimerEndsAtMs) {
+        this.syncSleepTimer(state.sleepTimerEndsAtMs);
       }
       if (
         state.playbackRate !== prevState.playbackRate ||
@@ -903,6 +907,36 @@ export class PlayerRuntime {
     } else {
       this.fadeVolume(targetVolume, 180);
     }
+  }
+
+  /** (Re)arms the JS-side sleep timer; a null/elapsed deadline cancels it. */
+  private syncSleepTimer(endsAtMs: number | null): void {
+    if (this.sleepTimerId !== null) {
+      clearTimeout(this.sleepTimerId);
+      this.sleepTimerId = null;
+    }
+    if (!endsAtMs) return;
+    const delay = Math.max(0, endsAtMs - Date.now());
+    this.sleepTimerId = setTimeout(() => this.fireSleepTimer(), delay);
+  }
+
+  /** Fades out, pauses, and clears the sleep timer when the deadline hits. */
+  private fireSleepTimer(): void {
+    this.sleepTimerId = null;
+    if (usePlayerStore.getState().status !== "playing") {
+      usePlayerStore.getState().setSleepTimer(null);
+      return;
+    }
+    log("cyan", "audio", "sleep timer ended — fading out and pausing");
+    this.fadeVolume(0, 4_000, () => {
+      this.audio.pause();
+      this.audio.volume = Math.max(
+        0,
+        Math.min(1, usePlayerStore.getState().volume),
+      );
+      usePlayerStore.getState().setStatus("paused");
+      usePlayerStore.getState().setSleepTimer(null);
+    });
   }
 
   public seek(positionMs: number) {

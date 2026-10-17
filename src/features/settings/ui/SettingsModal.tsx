@@ -51,6 +51,7 @@ const SETTING_ITEMS: { tabId: TabId; titleKey: string; descKey?: string }[] = [
   // Playback
   { tabId: "Playback", titleKey: "settings.autoplay_similar.title", descKey: "settings.autoplay_similar.description" },
   { tabId: "Playback", titleKey: "settings.transitions.title", descKey: "settings.transitions.description" },
+  { tabId: "Playback", titleKey: "settings.sleep_timer.title", descKey: "settings.sleep_timer.description" },
   { tabId: "Overlay", titleKey: "settings.discord.enabled.title", descKey: "settings.discord.enabled.description" },
   { tabId: "Overlay", titleKey: "settings.discord.client_id.title", descKey: "settings.discord.client_id.description" },
   { tabId: "Playback", titleKey: "settings.track_double_click.title", descKey: "settings.track_double_click.description" },

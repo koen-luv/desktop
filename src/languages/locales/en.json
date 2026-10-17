@@ -349,6 +349,10 @@
     "clear_queue": "Clear queue",
     "shuffle_on": "Shuffle on",
     "shuffle_off": "Shuffle off",
+    "sleep_timer": {
+      "title": "Sleep timer",
+      "off": "Off"
+    },
     "save": "Save",
     "home": "In development",
     "home_subtitle": "Use search to listen to music",
@@ -560,6 +564,10 @@
         "title": "Application (Client) ID",
         "description": "From the Discord Developer Portal: create an application and paste its Application ID. Leave empty to disable."
       }
+    },
+    "sleep_timer": {
+      "title": "Sleep timer",
+      "description": "Pause playback automatically after the chosen time. Enforced natively on Android, so it also fires with the screen off."
     },
     "track_double_click": {
       "title": "Double-click on track",

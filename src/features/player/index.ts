@@ -1,6 +1,14 @@
 export { playerRuntime } from "./engine/runtime";
 export { playerEngine, type PlayerStatus, type PlayerStatus as PlaybackStatus } from "./engine/playerEngine";
 export { downloadTrack, type DownloadResult } from "./engine/downloadTrack";
+export {
+  SLEEP_TIMER_PRESETS_MINUTES,
+  sleepDeadlineFromMinutes,
+  sleepRemainingMs,
+  formatSleepRemaining,
+} from "./engine/sleepTimer";
+export { useSleepTimerRemainingMs } from "./hooks/useSleepTimer";
+export { SleepTimerControl } from "./ui/SleepTimerControl";
 export { toVolumeGain, toVolumeLevel } from "./engine/volume";
 export {
   usePlayerStore,

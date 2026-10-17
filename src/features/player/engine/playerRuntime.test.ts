@@ -416,3 +416,48 @@ describe("PlayerRuntime — track transition fades", () => {
     expect((playerRuntime as any).audio.volume).toBeCloseTo(1);
   });
 });
+
+describe("PlayerRuntime — sleep timer", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("cancels a pending sleep timer when the deadline is cleared", () => {
+    const clearSpy = vi.spyOn(globalThis, "clearTimeout");
+    (playerRuntime as any).sleepTimerId = setTimeout(() => {}, 60_000);
+    (playerRuntime as any).syncSleepTimer(null);
+    expect((playerRuntime as any).sleepTimerId).toBeNull();
+    expect(clearSpy).toHaveBeenCalled();
+  });
+
+  it("clears the timer without fading when playback is not active", () => {
+    usePlayerStore.setState({
+      status: "paused",
+      sleepTimerEndsAtMs: Date.now() + 10_000,
+    });
+    const fadeSpy = vi.spyOn(PlayerRuntime.prototype as any, "fadeVolume");
+    (playerRuntime as any).fireSleepTimer();
+    expect(fadeSpy).not.toHaveBeenCalled();
+    expect(usePlayerStore.getState().sleepTimerEndsAtMs).toBeNull();
+  });
+
+  it("fades out and pauses when the timer fires during playback", () => {
+    usePlayerStore.setState({
+      status: "playing",
+      volume: 1,
+      sleepTimerEndsAtMs: Date.now() + 10_000,
+    });
+    (playerRuntime as any).audio.src = "blob:mock";
+    setAudioPaused(false);
+    const fadeSpy = vi
+      .spyOn(PlayerRuntime.prototype as any, "fadeVolume")
+      .mockImplementation((...args: unknown[]) => {
+        (args[2] as (() => void) | undefined)?.();
+      });
+
+    (playerRuntime as any).fireSleepTimer();
+
+    expect(fadeSpy).toHaveBeenCalled();
+    expect(usePlayerStore.getState().sleepTimerEndsAtMs).toBeNull();
+    expect(usePlayerStore.getState().status).toBe("paused");
+    expect((playerRuntime as any).audio.volume).toBeCloseTo(1);
+  });
+});

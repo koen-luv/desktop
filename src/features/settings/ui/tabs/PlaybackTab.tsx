@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/languages";
-import { usePlayerStore, downloadTrack } from "@/features/player";
+import { usePlayerStore, downloadTrack, SleepTimerControl } from "@/features/player";
 import { ToggleSwitch, Select, useToast } from "@/shared/ui";
 import Button from "@/shared/ui/Button";
 import { SettingRow, SettingSection, SegmentedControl } from "../controls";
@@ -142,6 +142,15 @@ export function PlaybackTab({ searchQuery }: { searchQuery?: string }) {
             <span />
           )
         }
+      />
+
+      <SettingRow
+        title={t("settings.sleep_timer.title")}
+        description={t("settings.sleep_timer.description")}
+        titleKey="settings.sleep_timer.title"
+        descKey="settings.sleep_timer.description"
+        searchQuery={searchQuery}
+        control={<SleepTimerControl />}
       />
 
       <SettingRow

@@ -65,6 +65,8 @@ export interface SessionState {
   isReverbEnabled: boolean;
   reverbLevel: number;
   transitionPreset: TransitionPreset;
+  /** Absolute epoch-ms when playback should pause; null = off. Session-only (not persisted). */
+  sleepTimerEndsAtMs: number | null;
 }
 
 export type PlayerState = TransportState &
@@ -120,6 +122,7 @@ export interface PlayerStore extends PlayerState {
   setIsReverbEnabled: (enabled: boolean) => void;
   setReverbLevel: (level: number) => void;
   setTransitionPreset: (value: TransitionPreset) => void;
+  setSleepTimer: (endsAtMs: number | null) => void;
   resetSpeedAndPitch: () => void;
   clearQueue: () => void;
 }
@@ -164,6 +167,7 @@ export const usePlayerStore = create<PlayerStore>()(
       isReverbEnabled: false,
       reverbLevel: 0.35,
       transitionPreset: "off",
+      sleepTimerEndsAtMs: null,
 
       dispatch: () => {
         // Implementation injected by PlayerEngine
@@ -216,6 +220,8 @@ export const usePlayerStore = create<PlayerStore>()(
         set({ reverbLevel: Math.max(0, Math.min(1, reverbLevel)) }),
       setTransitionPreset: (transitionPreset: TransitionPreset) =>
         set({ transitionPreset }),
+      setSleepTimer: (sleepTimerEndsAtMs: number | null) =>
+        set({ sleepTimerEndsAtMs }),
       resetSpeedAndPitch: () => set({ playbackRate: 1, pitchSemitones: 0 }),
       clearQueue: () => {
         const state = get();

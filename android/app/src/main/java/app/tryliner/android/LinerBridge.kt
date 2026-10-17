@@ -237,6 +237,9 @@ class LinerBridge(private val activity: MainActivity) {
     fun audioSetReverb(level: Float) = PlaybackHolder.setReverb(level)
 
     @JavascriptInterface
+    fun audioSleepAt(deadlineMs: Double) = PlaybackHolder.setSleepAt(deadlineMs.toLong())
+
+    @JavascriptInterface
     fun audioState(): String = PlaybackHolder.stateJson()
 
     @JavascriptInterface

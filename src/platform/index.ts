@@ -55,6 +55,12 @@ export interface LinerAndroidBridge {
   audioSetSpeed(rate: number): void;
   audioSetPitch(semitones: number): void;
   audioSetReverb(level: number): void;
+  /**
+   * Schedules native playback to pause at an absolute epoch-ms deadline
+   * (0 cancels). Enforced by the Media3 service so it fires even with the
+   * screen off / app backgrounded, then emitted as a `sleepTimerFired` event.
+   */
+  audioSleepAt(deadlineMs: number): void;
   audioState(): string;
   audioCache(url: string, trackId: string, mimeType: string, limitBytes: number): void;
   audioSetCacheLimit(limitBytes: number): void;

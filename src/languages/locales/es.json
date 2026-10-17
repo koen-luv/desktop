@@ -353,6 +353,10 @@
     "clear_queue": "Vaciar cola",
     "shuffle_on": "Aleatorio activado",
     "shuffle_off": "Aleatorio desactivado",
+    "sleep_timer": {
+      "title": "Temporizador de sueño",
+      "off": "Desactivado"
+    },
     "save": "Guardar",
     "home": "En desarrollo",
     "home_subtitle": "Usa la búsqueda para escuchar música",
@@ -563,6 +567,10 @@
         "title": "ID de la aplicación (Client ID)",
         "description": "Del Portal de Desarrolladores de Discord: crea una aplicación y pega su ID. Déjalo vacío para desactivarlo."
       }
+    },
+    "sleep_timer": {
+      "title": "Temporizador de sueño",
+      "description": "Pausa la reproducción automáticamente tras el tiempo elegido. Se aplica de forma nativa en Android, así que también funciona con la pantalla apagada."
     },
     "track_double_click": {
       "title": "Doble clic en una canción",

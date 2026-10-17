@@ -2,7 +2,7 @@ import { usePlayerStore } from "../store/playerStore";
 import { ApiError } from "@/shared/api";
 import { log } from "@/shared/utils/logger";
 import { audioCache } from "@/shared/storage/audioCache";
-import { getAndroidBridge, registerMediaCommandHandler } from "@/platform";
+import { getAndroidBridge, onNativeEvent, registerMediaCommandHandler } from "@/platform";
 import type { Track } from "@/shared/types";
 import { resolvePlaybackStream, type ResolvedPlaybackStream } from "./playbackSource";
 import { transitionSpec } from "./transitions";
@@ -51,6 +51,7 @@ export class AndroidPlayerRuntime {
   private pendingStartPositionMs = 0;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private unsubscribe: (() => void) | null = null;
+  private sleepUnsubscribe: (() => void) | null = null;
   private endedTrackId: string | null = null;
   private erroredTrackId: string | null = null;
   private cacheRequested = new Set<string>();
@@ -92,6 +93,10 @@ export class AndroidPlayerRuntime {
         this.cancelRamp();
         this.setNativeVolume(state.volume);
       }
+      if (state.sleepTimerEndsAtMs !== prev.sleepTimerEndsAtMs) {
+        // Enforce natively so it fires with the screen off / app backgrounded.
+        this.bridge.audioSleepAt(state.sleepTimerEndsAtMs ?? 0);
+      }
       if (
         state.playbackRate !== prev.playbackRate ||
         state.isPitchLinked !== prev.isPitchLinked ||
@@ -101,6 +106,12 @@ export class AndroidPlayerRuntime {
       ) {
         this.applyPlaybackRateAndPitch();
       }
+    });
+
+    // Native pauses at the deadline; mirror that into the store (the poll has
+    // already flipped status to paused, this just clears the countdown).
+    this.sleepUnsubscribe = onNativeEvent("sleepTimerFired", () => {
+      usePlayerStore.getState().setSleepTimer(null);
     });
 
     this.reconcileWithNative();

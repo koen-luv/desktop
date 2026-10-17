@@ -10,8 +10,10 @@ import {
   Shuffle,
   MusicNote,
 } from "@solar-icons/react";
-import { AddLine, CheckFill } from "@mingcute/react";
+import { AddLine, CheckFill, MoonLine } from "@mingcute/react";
 import { usePlayerState } from "../hooks/usePlayerState";
+import { useSleepTimerRemainingMs } from "../hooks/useSleepTimer";
+import { formatSleepRemaining } from "../engine/sleepTimer";
 import { playerEngine } from "../engine/playerEngine";
 import { useIsTrackLiked, useLikeTrack, useUnlikeTrack } from "@/features/library/hooks";
 import { AnimatePresence, motion } from "framer-motion";
@@ -21,6 +23,7 @@ import ExplicitBadge from "@/shared/ui/ExplicitBadge";
 import Tooltip from "@/shared/ui/Tooltip";
 import { VolumePicker } from "./VolumePicker";
 import { TimelineSlider } from "./TimelineSlider";
+import { SleepTimerControl } from "./SleepTimerControl";
 
 import { useTranslation } from "@/languages";
 
@@ -53,6 +56,8 @@ export function PlayerUiElements({
   onClose,
 }: PlayerUiElementsProps) {
   const player = usePlayerState();
+  const [sleepOpen, setSleepOpen] = useState(false);
+  const sleepRemaining = useSleepTimerRemainingMs();
 
   const track = player.currentTrack;
   const coverUrl = track?.coverUrl || "";
@@ -262,6 +267,46 @@ export function PlayerUiElements({
             <Repeat size={18} />
           )}
         </button>
+
+        {/* Sleep timer */}
+        <div className="relative">
+          <button
+            type="button"
+            aria-label={t("player.sleep_timer.title")}
+            title={
+              sleepRemaining > 0
+                ? `${t("player.sleep_timer.title")} — ${formatSleepRemaining(sleepRemaining)}`
+                : t("player.sleep_timer.title")
+            }
+            onClick={() => setSleepOpen((v) => !v)}
+            className={`${iconButtonClass} ${
+              sleepRemaining > 0 ? "!text-white !opacity-100" : "!text-white/40"
+            }`}
+          >
+            <MoonLine size={18} />
+          </button>
+
+          {sleepOpen && (
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setSleepOpen(false)}
+              aria-hidden
+            />
+          )}
+          <AnimatePresence>
+            {sleepOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                transition={{ duration: 0.14, ease: "easeOut" }}
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-50 rounded-xl border border-white/10 bg-bg-panel/95 backdrop-blur px-3 py-2 shadow-lg"
+              >
+                <SleepTimerControl onDone={() => setSleepOpen(false)} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Volume (Compact smooth slider, size sm) */}

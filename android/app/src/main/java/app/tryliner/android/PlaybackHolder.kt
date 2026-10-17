@@ -50,6 +50,9 @@ object PlaybackHolder {
     private var notifiedStatus: String? = null
     private var notifiedTrackId: String? = null
 
+    private var sleepRunnable: Runnable? = null
+    @Volatile private var sleepDeadlineMs: Long = 0L
+
     fun ensureService(context: Context) {
         if (service != null) return
         val app = context.applicationContext
@@ -121,6 +124,7 @@ object PlaybackHolder {
             this.service = null
             ticker?.let { main.removeCallbacks(it) }
             ticker = null
+            cancelSleep()
             releaseReverb()
         }
     }
@@ -224,6 +228,37 @@ object PlaybackHolder {
         usingCache = false
         updateState()
     }
+
+    /**
+     * Pauses playback at an absolute epoch-ms deadline (<= 0 cancels). Runs on
+     * the service's main handler so it fires even with the WebView suspended /
+     * screen off — a renderer-only timer cannot guarantee that while Media3
+     * keeps playing in the background.
+     */
+    fun setSleepAt(deadlineEpochMs: Long) {
+        cancelSleep()
+        if (deadlineEpochMs <= 0L) return
+        sleepDeadlineMs = deadlineEpochMs
+        val delay = (deadlineEpochMs - System.currentTimeMillis()).coerceAtLeast(0L)
+        val runnable = Runnable {
+            sleepRunnable = null
+            sleepDeadlineMs = 0L
+            playWhenReadyIntent = false
+            player?.pause()
+            updateState()
+            NativeEvents.emit("sleepTimerFired", "{}")
+        }
+        sleepRunnable = runnable
+        main.postDelayed(runnable, delay)
+    }
+
+    private fun cancelSleep() {
+        sleepRunnable?.let { main.removeCallbacks(it) }
+        sleepRunnable = null
+        sleepDeadlineMs = 0L
+    }
+
+    fun sleepDeadlineMs(): Long = sleepDeadlineMs
 
     private fun applyLoad(json: String) {
         val p = player ?: run { pendingLoad = json; return }
