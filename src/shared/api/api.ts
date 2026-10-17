@@ -10,7 +10,8 @@ import {
 } from "./auth-session";
 import { signApiRequest, syncServerTime } from "./requestSigner";
 import { clientCatalog } from "./clientCatalog";
-import { getLocalImportHandler, isLocalImportId } from "./localImports";
+import { getLocalImportHandler } from "./localImports";
+import type { Track } from "@/shared/contracts";
 import { telemetry } from "@/shared/telemetry";
 import type {
   PublicUser,
@@ -833,89 +834,44 @@ export const api = {
     );
   },
 
-  createPlaylistImport(
-    url: string,
-  ): Promise<ImportJob> {
-    return request<ImportJob>(
-      "/v1/me/playlist-imports",
-      {
-        method: "POST",
-        body: JSON.stringify({ url }),
-      },
-    );
-  },
-
   getPlaylistImport(
     importId: string,
   ): Promise<ImportJob> {
-    if (isLocalImportId(importId)) {
-      const job = getLocalImportHandler().getJob(importId);
-      return job ? Promise.resolve(job) : Promise.reject(new ApiError(404, "Import was not found."));
-    }
-    return request<ImportJob>(
-      `/v1/me/playlist-imports/${encodeURIComponent(importId)}`,
-    );
+    const job = getLocalImportHandler().getJob(importId);
+    return job ? Promise.resolve(job) : Promise.reject(new ApiError(404, "Import was not found."));
   },
 
   getPlaylistImportReview(
     importId: string,
   ): Promise<{ items: ImportReview[] }> {
-    if (isLocalImportId(importId)) {
-      return Promise.resolve({ items: getLocalImportHandler().getReview(importId) });
-    }
-    return request<{ items: ImportReview[] }>(
-      `/v1/me/playlist-imports/${encodeURIComponent(importId)}/review`,
-    );
+    return Promise.resolve({ items: getLocalImportHandler().getReview(importId) });
   },
 
   decidePlaylistImportReview(
     importId: string,
     decisions: ImportReviewDecision[],
-    tracks?: any[],
+    tracks?: Track[],
     title?: string,
     description?: string,
   ): Promise<{ approved: string[]; denied: string[]; finalized?: boolean }> {
-    if (isLocalImportId(importId)) {
-      return getLocalImportHandler()
-        .finalize(importId, tracks ?? [], title, description)
-        .then(({ finalized }) => ({
-          approved: decisions.filter((d) => d.decision === "approve").map((d) => d.reviewId),
-          denied: decisions.filter((d) => d.decision === "deny").map((d) => d.reviewId),
-          finalized,
-        }));
-    }
-    return request<{ approved: string[]; denied: string[]; finalized?: boolean }>(
-      `/v1/me/playlist-imports/${encodeURIComponent(importId)}/review`,
-      {
-        method: "POST",
-        body: JSON.stringify({ decisions, tracks, title, description }),
-      },
-    );
+    return getLocalImportHandler()
+      .finalize(importId, tracks ?? [], title, description)
+      .then(({ finalized }) => ({
+        approved: decisions.filter((d) => d.decision === "approve").map((d) => d.reviewId),
+        denied: decisions.filter((d) => d.decision === "deny").map((d) => d.reviewId),
+        finalized,
+      }));
   },
 
   skipPlaylistImportReview(
     importId: string,
-    tracks?: any[],
+    tracks?: Track[],
     title?: string,
     description?: string,
   ): Promise<{ denied: "all"; finalized: boolean }> {
-    if (isLocalImportId(importId)) {
-      return getLocalImportHandler()
-        .finalize(importId, tracks ?? [], title, description)
-        .then(({ finalized }) => ({ denied: "all" as const, finalized }));
-    }
-    return request<{ denied: "all"; finalized: boolean }>(
-      `/v1/me/playlist-imports/${encodeURIComponent(importId)}/review`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          action: "skip",
-          ...(tracks?.length ? { tracks } : {}),
-          ...(title ? { title } : {}),
-          ...(description ? { description } : {}),
-        }),
-      },
-    );
+    return getLocalImportHandler()
+      .finalize(importId, tracks ?? [], title, description)
+      .then(({ finalized }) => ({ denied: "all" as const, finalized }));
   },
 
   async *streamLyrics(

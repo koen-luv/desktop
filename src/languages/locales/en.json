@@ -804,8 +804,6 @@
     "applying": "Importing…",
     "status_queued": "Import added to queue",
     "status_queued_sub": "Processing will begin shortly",
-    "status_queued_position": "Queue: #{position}",
-    "status_queued_position_sub": "Your playlist is #{position} in queue",
     "status_searching": "Matching tracks",
     "status_searching_sub": "Analyzing playlist…",
     "status_running": "Matching tracks",
@@ -818,6 +816,7 @@
     "status_completed_sub": "{count} tracks added",
     "status_completed_sub_empty": "Playlist is ready to play",
     "status_failed": "Import failed",
+    "status_failed_sub": "Something went wrong",
     "view_playlist": "Open playlist",
     "no_candidate_found": "No matching track found in catalog",
     "active_import": "Playlist Import"

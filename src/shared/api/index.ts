@@ -60,7 +60,6 @@ export { toClientTrack } from "./track";
 
 export {
   registerLocalImportHandler,
-  isLocalImportId,
   LOCAL_IMPORT_PREFIX,
   type LocalImportHandler,
 } from "./localImports";

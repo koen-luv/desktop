@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { api, type ImportJob, type ImportReview } from "@/shared/api";
+import type { ImportJob, ImportReview } from "@/shared/api";
 import type { ImportSource, Track } from "@/shared/contracts";
 import { notifyLibraryChanged } from "../hooks/usePlaylists";
 import { detectImportSource } from "../services/import";
@@ -21,21 +21,15 @@ export interface ActiveImportState {
   reviewItems: ImportReview[] | null;
   approvedTracks: Track[] | null;
   startImport: (url: string, pendingTrack?: TrackDetail | null) => Promise<ImportJob>;
-  pollJob: (jobId: string) => Promise<void>;
   cancelPolling: () => void;
   reset: () => void;
 }
 
 let activeAbortController: AbortController | null = null;
-let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
 function cleanupActiveImport() {
   activeAbortController?.abort();
   activeAbortController = null;
-  if (pollTimer) {
-    clearTimeout(pollTimer);
-    pollTimer = null;
-  }
 }
 
 function progressPatch(progress: ImportProgress): Partial<ImportJob> {
@@ -118,29 +112,6 @@ export const useImportStore = create<ActiveImportState>((set, get) => ({
     return job;
   },
 
-  pollJob: async (jobId: string) => {
-    if (pollTimer) clearTimeout(pollTimer);
-    try {
-      const current = await api.getPlaylistImport(jobId);
-      set({ job: current });
-      if (current.status === "awaiting_decision") {
-        set({ isPolling: false });
-        return;
-      }
-      if (current.status === "completed") {
-        set({ isPolling: false });
-        notifyLibraryChanged();
-        return;
-      }
-      if (current.status === "failed") {
-        set({ isPolling: false, error: current.error?.message || "Import failed" });
-        return;
-      }
-      pollTimer = setTimeout(() => void get().pollJob(jobId), 1000);
-    } catch {
-      pollTimer = setTimeout(() => void get().pollJob(jobId), 2500);
-    }
-  },
 }));
 
 onLocalImportJobChange((job) => {

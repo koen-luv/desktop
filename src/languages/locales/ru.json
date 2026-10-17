@@ -841,8 +841,6 @@
     "applying": "Импорт…",
     "status_queued": "Импорт добавлен в очередь",
     "status_queued_sub": "Обработка начнется в ближайшее время",
-    "status_queued_position": "Очередь: #{position}",
-    "status_queued_position_sub": "Ваш плейлист #{position} в очереди",
     "status_searching": "Поиск треков",
     "status_searching_sub": "Анализ исходного плейлиста…",
     "status_running": "Поиск треков",
@@ -855,6 +853,7 @@
     "status_completed_sub": "Добавлено треков: {count}",
     "status_completed_sub_empty": "Плейлист готов к прослушиванию",
     "status_failed": "Ошибка импорта",
+    "status_failed_sub": "Что-то пошло не так",
     "view_playlist": "Открыть плейлист",
     "no_candidate_found": "Трек не найден в каталоге",
     "active_import": "Импорт плейлиста"

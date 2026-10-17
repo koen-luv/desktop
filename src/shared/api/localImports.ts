@@ -14,10 +14,6 @@ export function registerLocalImportHandler(handler: LocalImportHandler): void {
   activeHandler = handler;
 }
 
-export function isLocalImportId(jobId: string): boolean {
-  return jobId.startsWith(LOCAL_IMPORT_PREFIX);
-}
-
 export function getLocalImportHandler(): LocalImportHandler {
   if (!activeHandler) throw new Error("Local import handler is not registered");
   return activeHandler;

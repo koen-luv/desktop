@@ -102,7 +102,6 @@ export default function ImportReviewModal() {
   const open = useModalStore((state) => state.importReviewOpen);
   const jobId = useModalStore((state) => state.importReviewJobId);
   const close = useModalStore((state) => state.closeImportReview);
-  const pollJob = useImportStore((state) => state.pollJob);
 
   const { currentTrack, status: playerStatus } = usePlayerState();
   const isPlaying = playerStatus === "playing";
@@ -253,15 +252,9 @@ export default function ImportReviewModal() {
       );
 
       const finalJob = await api.getPlaylistImport(jobId).catch(() => null);
-      if (res.finalized || finalJob?.status === "completed") {
-        useImportStore.setState({ job: finalJob ?? null, isPolling: false, reviewItems: null, approvedTracks: null });
-        notifyLibraryChanged();
-        close();
-      } else {
-        useImportStore.setState({ job: finalJob ?? null, isPolling: true });
-        close();
-        void pollJob(jobId);
-      }
+      useImportStore.setState({ job: finalJob ?? null, isPolling: false, reviewItems: null, approvedTracks: null });
+      if (res.finalized) notifyLibraryChanged();
+      close();
     } catch (err) {
       const msg = resolveApiErrorMessage(err, t, "import.status_failed");
       toast(msg, "error");
@@ -288,15 +281,9 @@ export default function ImportReviewModal() {
       );
 
       const finalJob = await api.getPlaylistImport(jobId).catch(() => null);
-      if (res.finalized || finalJob?.status === "completed") {
-        useImportStore.setState({ job: finalJob ?? null, isPolling: false, reviewItems: null, approvedTracks: null });
-        notifyLibraryChanged();
-        close();
-      } else {
-        useImportStore.setState({ job: finalJob ?? null, isPolling: true });
-        close();
-        void pollJob(jobId);
-      }
+      useImportStore.setState({ job: finalJob ?? null, isPolling: false, reviewItems: null, approvedTracks: null });
+      if (res.finalized) notifyLibraryChanged();
+      close();
     } catch (err) {
       const msg = resolveApiErrorMessage(err, t, "import.status_failed");
       toast(msg, "error");

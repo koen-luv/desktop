@@ -24,9 +24,6 @@ export default function ImportingPlaylistCard({
 
   const getSubtitle = () => {
     if (isQueued) {
-      if (job.queuePosition && job.queuePosition > 0) {
-        return t("import.status_queued_position", { position: job.queuePosition });
-      }
       return t("import.status_queued");
     }
     if (isRunning) {
