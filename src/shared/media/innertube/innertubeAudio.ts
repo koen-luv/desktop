@@ -47,6 +47,25 @@ export const ANDROID_VR_PROFILE: InnertubeProfile = {
 
 export const PLAYBACK_PROFILES: readonly InnertubeProfile[] = [VISIONOS_PROFILE, ANDROID_VR_PROFILE];
 
+let lastWorkingProfile: InnertubeProfile | null = null;
+
+export function resetPlaybackProfilePreference(): void {
+  lastWorkingProfile = null;
+}
+
+function orderedProfiles(profiles: readonly InnertubeProfile[]): readonly InnertubeProfile[] {
+  if (!lastWorkingProfile || !profiles.includes(lastWorkingProfile)) return profiles;
+  return [lastWorkingProfile, ...profiles.filter((profile) => profile !== lastWorkingProfile)];
+}
+
+async function assertStreamReachable(url: string, signal?: AbortSignal): Promise<void> {
+  const probe = new URL(url);
+  probe.searchParams.set("range", "0-0");
+  const response = await fetch(probe.toString(), { signal });
+  await response.body?.cancel().catch(() => undefined);
+  if (!response.ok) throw new InnertubeError(`stream url rejected with ${response.status}`, response.status);
+}
+
 export interface ResolveAudioOptions {
   signal?: AbortSignal;
   preferredCodec?: "opus" | "aac";
@@ -74,7 +93,9 @@ async function resolveWithProfile(
   if (unplayable) throw new InnertubeError(unplayable, 403);
   const best = selectBestAudioFormat(extractAudioFormats(response), options.preferredCodec);
   if (!best) throw new InnertubeError(`${profile.clientName} returned no direct audio formats.`, 502);
-  return toResolvedStream(best);
+  const stream = toResolvedStream(best);
+  await assertStreamReachable(stream.url, options.signal);
+  return stream;
 }
 
 export async function resolveDirectAudioStream(
@@ -84,9 +105,11 @@ export async function resolveDirectAudioStream(
   const videoId = toVideoId(trackId);
   if (!videoId) throw new InnertubeError(`Track ${trackId} is not a YouTube video.`, 400);
   const failures: string[] = [];
-  for (const profile of options.profiles ?? PLAYBACK_PROFILES) {
+  for (const profile of orderedProfiles(options.profiles ?? PLAYBACK_PROFILES)) {
     try {
-      return await resolveWithProfile(videoId, profile, options);
+      const stream = await resolveWithProfile(videoId, profile, options);
+      lastWorkingProfile = profile;
+      return stream;
     } catch (error) {
       if (options.signal?.aborted) throw error;
       failures.push(`${profile.clientName}: ${error instanceof Error ? error.message : String(error)}`);
