@@ -8,7 +8,8 @@ import {
   getEnglishKeyFromEvent,
   normalizeShortcutToEnglish,
 } from "@/features/overlay";
-import { ToggleSwitch } from "@/shared/ui";
+import { useDiscordSettingsStore } from "@/features/discord";
+import { ToggleSwitch, TextInput } from "@/shared/ui";
 import { SettingRow, SettingSection, SegmentedControl } from "../controls";
 
 const POSITION_CONFIG = [
@@ -57,6 +58,15 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
 
   const alwaysOnTop = useOverlaySettingsStore((s) => s.alwaysOnTop);
   const setAlwaysOnTop = useOverlaySettingsStore((s) => s.setAlwaysOnTop);
+
+  // Discord Rich Presence is desktop-only (Electron owns the local IPC client).
+  const isElectron = Boolean(
+    typeof window !== "undefined" && window.linerElectron?.discordRpcConfigure,
+  );
+  const discordEnabled = useDiscordSettingsStore((s) => s.enabled);
+  const setDiscordEnabled = useDiscordSettingsStore((s) => s.setEnabled);
+  const discordClientId = useDiscordSettingsStore((s) => s.clientId);
+  const setDiscordClientId = useDiscordSettingsStore((s) => s.setClientId);
 
   const [isRecording, setIsRecording] = useState(false);
   const [heldModifiers, setHeldModifiers] = useState<string[]>([]);
@@ -152,7 +162,8 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
   }, [isRecording, setShortcut]);
 
   return (
-    <SettingSection>
+    <div className="flex flex-col gap-[16px]">
+      <SettingSection>
       <SettingRow
         title={t("settings.overlay.enabled.title") || "Enable overlay"}
         description={
@@ -320,7 +331,50 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
           }
         />
       </div>
-    </SettingSection>
+      </SettingSection>
+
+      {isElectron && (
+        <SettingSection label={t("settings.discord.section")}>
+          <SettingRow
+            title={t("settings.discord.enabled.title")}
+            description={t("settings.discord.enabled.description")}
+            titleKey="settings.discord.enabled.title"
+            descKey="settings.discord.enabled.description"
+            searchQuery={searchQuery}
+            control={
+              <ToggleSwitch checked={discordEnabled} onChange={setDiscordEnabled} />
+            }
+          />
+          <div
+            className={
+              discordEnabled
+                ? "flex flex-col transition-all duration-200"
+                : "flex flex-col opacity-40 grayscale pointer-events-none select-none transition-all duration-200"
+            }
+          >
+            <SettingRow
+              title={t("settings.discord.client_id.title")}
+              description={t("settings.discord.client_id.description")}
+              titleKey="settings.discord.client_id.title"
+              descKey="settings.discord.client_id.description"
+              searchQuery={searchQuery}
+              control={
+                <TextInput
+                  size="sm"
+                  variant="transparent"
+                  value={discordClientId}
+                  disabled={!discordEnabled}
+                  placeholder="123456789012345678"
+                  aria-label={t("settings.discord.client_id.title")}
+                  onChange={(e) => setDiscordClientId(e.target.value)}
+                  className="w-[210px]"
+                />
+              }
+            />
+          </div>
+        </SettingSection>
+      )}
+    </div>
   );
 }
 

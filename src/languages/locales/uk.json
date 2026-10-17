@@ -587,6 +587,17 @@
       "long": "Довгий перехід",
       "swell": "Крещендо"
     },
+    "discord": {
+      "section": "Discord",
+      "enabled": {
+        "title": "Discord Rich Presence",
+        "description": "Показувати прослуховуваний трек у вашому профілі Discord (лише в настільному застосунку)."
+      },
+      "client_id": {
+        "title": "ID застосунку (Client ID)",
+        "description": "З Порталу розробників Discord: створіть застосунок і вставте його ID. Залиште порожнім, щоб вимкнути."
+      }
+    },
     "track_double_click": {
       "title": "Подвійний клік по треку",
       "description": "Оберіть дію при подвійному кліку по картці треку.",

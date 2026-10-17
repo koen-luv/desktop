@@ -550,6 +550,17 @@
       "long": "Long fade",
       "swell": "Swell"
     },
+    "discord": {
+      "section": "Discord",
+      "enabled": {
+        "title": "Discord Rich Presence",
+        "description": "Show the song you're listening to on your Discord profile (desktop app only)."
+      },
+      "client_id": {
+        "title": "Application (Client) ID",
+        "description": "From the Discord Developer Portal: create an application and paste its Application ID. Leave empty to disable."
+      }
+    },
     "track_double_click": {
       "title": "Double-click on track",
       "description": "Choose what happens when you double-click a song card.",

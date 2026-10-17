@@ -553,6 +553,17 @@
       "long": "Fundido largo",
       "swell": "Creciente"
     },
+    "discord": {
+      "section": "Discord",
+      "enabled": {
+        "title": "Rich Presence de Discord",
+        "description": "Muestra la canción que escuchas en tu perfil de Discord (solo en la app de escritorio)."
+      },
+      "client_id": {
+        "title": "ID de la aplicación (Client ID)",
+        "description": "Del Portal de Desarrolladores de Discord: crea una aplicación y pega su ID. Déjalo vacío para desactivarlo."
+      }
+    },
     "track_double_click": {
       "title": "Doble clic en una canción",
       "description": "Elige qué ocurre al hacer doble clic en la tarjeta de una canción.",

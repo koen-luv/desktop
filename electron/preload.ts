@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { MainNetResult } from "./netdiag";
+import type { DiscordActivity } from "./discordRpc";
 
 export interface DeeplinkTarget {
   type: "artist" | "album" | "playlist" | "track";
@@ -119,6 +120,10 @@ export interface LinerElectronApi {
   updateOverlaySettings: (settings: any) => void;
   onOverlaySettingsChanged: (cb: (settings: any) => void) => () => void;
   onOverlayVisibility: (cb: (visible: boolean) => void) => () => void;
+  // Discord Rich Presence (desktop only)
+  discordRpcConfigure: (clientId: string, enabled: boolean) => void;
+  discordRpcSetPresence: (activity: DiscordActivity | null) => void;
+  discordRpcClear: () => void;
 }
 
 const isHyprland = Boolean(
@@ -297,6 +302,15 @@ const api: LinerElectronApi = {
     return () => {
       ipcRenderer.removeListener("overlay:visibility", listener);
     };
+  },
+  discordRpcConfigure: (clientId, enabled) => {
+    ipcRenderer.send("discord-rpc:configure", { clientId, enabled });
+  },
+  discordRpcSetPresence: (activity) => {
+    ipcRenderer.send("discord-rpc:set-presence", activity);
+  },
+  discordRpcClear: () => {
+    ipcRenderer.send("discord-rpc:clear");
   },
 };
 

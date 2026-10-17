@@ -35,6 +35,7 @@ import { TouchBarManager } from "./touchbar.js";
 import { OverlayManager } from "./overlay.js";
 import { BundleManager } from "./bundle-manager.js";
 import { createSleepBlocker } from "./sleep-blocker.js";
+import { DiscordRpcManager, type DiscordActivity } from "./discordRpc.js";
 
 // root error handling for main process
 process.on("uncaughtException", (error) => {
@@ -68,6 +69,7 @@ let mainWindow: BrowserWindow | null = null;
 let touchBarManager: TouchBarManager | null = null;
 let overlayManager: OverlayManager | null = null;
 let bundleManager: BundleManager | null = null;
+let discordRpc: DiscordRpcManager | null = null;
 
 // liner:// deeplink support (share links bounce here from link.tryliner.fun)
 
@@ -257,6 +259,19 @@ if (!gotTheLock) {
     );
     overlayManager.setMainWindow(mainWindow);
     overlayManager.registerShortcut();
+
+    // Discord Rich Presence (desktop only). Presence is pushed from the
+    // renderer, which owns playback state; the client id comes from Settings.
+    discordRpc = new DiscordRpcManager();
+    ipcMain.on("discord-rpc:configure", (_event, cfg: { clientId?: string; enabled?: boolean }) => {
+      discordRpc?.configure(cfg?.clientId ?? "", Boolean(cfg?.enabled));
+    });
+    ipcMain.on("discord-rpc:set-presence", (_event, activity: DiscordActivity | null) => {
+      discordRpc?.setPresence(activity ?? null);
+    });
+    ipcMain.on("discord-rpc:clear", () => {
+      discordRpc?.clear();
+    });
 
     const isHyprland = Boolean(
       process.env.HYPRLAND_INSTANCE_SIGNATURE ||
@@ -1020,4 +1035,5 @@ app.on("will-quit", () => {
   touchBarManager?.unregisterShortcut();
   overlayManager?.unregisterShortcut();
   overlayManager?.destroy();
+  discordRpc?.dispose();
 });
