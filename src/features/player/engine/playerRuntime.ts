@@ -7,6 +7,7 @@ import { isStandaloneAudioFile } from "@/shared/storage/audioFormat";
 import type { Track } from "@/shared/types";
 import { pitchShifter } from "./pitchShifter";
 import { resolvePlayback, invalidateCachedStream } from "./playbackSource";
+import { transitionSpec } from "./transitions";
 
 /**
  * When false, playback streams directly and never writes audio to disk; files
@@ -22,6 +23,8 @@ export class PlayerRuntime {
   private loadAbortController: AbortController | null = null;
   private isResetting = false;
   private fadeTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Track id whose end-of-song fade-out is already running (once per track). */
+  private endFadeTrackId: string | null = null;
   private stallStartTime: number | null = null;
   private loadStartTime = 0;
   private ttfbMs = 0;
@@ -173,6 +176,7 @@ export class PlayerRuntime {
 
       const posMs = Math.round(audioEl.currentTime * 1000);
       usePlayerStore.getState().setPosition(posMs);
+      this.maybeStartEndFade(audioEl);
     });
 
     audioEl.addEventListener("durationchange", () => {
@@ -382,6 +386,75 @@ export class PlayerRuntime {
     this.fadeTimer = setTimeout(tick, 16);
   }
 
+  /**
+   * Ramps up from silence on a newly started track using the configured
+   * transition's fade-in duration (0 = jump straight to the set volume).
+   * Tracks are always loaded with `volume = 0`, so this is the incoming half
+   * of the transition.
+   */
+  private applyTransitionFadeIn(): void {
+    const { volume, transitionPreset } = usePlayerStore.getState();
+    const fadeInMs = transitionSpec(transitionPreset).fadeInMs;
+    if (fadeInMs <= 0) {
+      this.audio.volume = Math.max(0, Math.min(1, volume));
+      return;
+    }
+    this.fadeVolume(volume, fadeInMs);
+  }
+
+  /**
+   * Fades the outgoing track to silence before switching to another song.
+   * Resolves as soon as the fade completes (or immediately when there is no
+   * configured fade-out, nothing playing, or no source loaded), so a manual
+   * skip stays instant with the "off" preset.
+   */
+  private fadeOutForTransition(): Promise<void> {
+    const fadeOutMs = transitionSpec(
+      usePlayerStore.getState().transitionPreset,
+    ).fadeOutMs;
+    const audio = this.audio;
+    const hasSource = Boolean(audio.src) && audio.src !== window.location.href;
+    if (fadeOutMs <= 0 || !hasSource || audio.paused || audio.ended) {
+      return Promise.resolve();
+    }
+
+    log("cyan", "audio", `transition fade-out (${fadeOutMs}ms)`);
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      this.fadeVolume(0, fadeOutMs, finish);
+      // Safety net: never block the switch if the fade tick stalls.
+      setTimeout(finish, fadeOutMs + 80);
+    });
+  }
+
+  /**
+   * Starts the outgoing fade-out over the final stretch of the current song,
+   * at most once per track. Called from the `timeupdate` handler.
+   */
+  private maybeStartEndFade(audioEl: HTMLAudioElement): void {
+    const fadeOutMs = transitionSpec(
+      usePlayerStore.getState().transitionPreset,
+    ).fadeOutMs;
+    if (fadeOutMs <= 0 || !this.currentTrackId) return;
+    if (this.endFadeTrackId === this.currentTrackId) return;
+    if (audioEl.paused) return;
+
+    const duration = audioEl.duration;
+    if (!Number.isFinite(duration) || duration <= 0) return;
+
+    const remainingMs = (duration - audioEl.currentTime) * 1000;
+    if (remainingMs <= 0 || remainingMs > fadeOutMs) return;
+
+    this.endFadeTrackId = this.currentTrackId;
+    log("cyan", "audio", `end-of-song fade-out (${fadeOutMs}ms)`);
+    this.fadeVolume(0, fadeOutMs);
+  }
+
   private safeResetAudioElement() {
     this.isResetting = true;
     this.currentSessionExpiresAt = null;
@@ -509,6 +582,9 @@ export class PlayerRuntime {
 
     if (this.currentTrackId !== track.id) {
       this.recoveryAttempts = 0;
+      // Fade the outgoing song out before switching (no-op when the preset's
+      // fade-out is 0 or nothing is currently audible).
+      await this.fadeOutForTransition();
     }
 
     if (this.preloadingTrackId === track.id && this.preloadingPromise) {
@@ -533,6 +609,7 @@ export class PlayerRuntime {
       store.resetSpeedAndPitch();
     }
     this.currentTrackId = track.id;
+    this.endFadeTrackId = null;
     this.loadStartTime = performance.now();
     this.updateMediaSessionMetadata(track);
 
@@ -594,7 +671,7 @@ export class PlayerRuntime {
 
         if (epoch === this.loadEpoch) {
           usePlayerStore.getState().setStatus("playing");
-          this.fadeVolume(usePlayerStore.getState().volume, 180);
+          this.applyTransitionFadeIn();
         }
         log(
           "green",
@@ -679,7 +756,7 @@ export class PlayerRuntime {
 
       if (epoch === this.loadEpoch) {
         usePlayerStore.getState().setStatus("playing");
-        this.fadeVolume(usePlayerStore.getState().volume, 180);
+        this.applyTransitionFadeIn();
       }
       log(
         "green",
@@ -830,6 +907,19 @@ export class PlayerRuntime {
 
   public seek(positionMs: number) {
     if (!this.audio.src || this.audio.src === window.location.href) return;
+    // Seeking away from the tail cancels an in-progress end-of-song fade so
+    // the track isn't left muted; timeupdate restarts it if we land back in
+    // the fade-out window.
+    if (this.endFadeTrackId !== null) {
+      this.endFadeTrackId = null;
+      this.cancelFade();
+      if (!this.audio.paused) {
+        this.audio.volume = Math.max(
+          0,
+          Math.min(1, usePlayerStore.getState().volume),
+        );
+      }
+    }
     try {
       if (this.audio.readyState >= 1) {
         this.audio.currentTime = positionMs / 1000;

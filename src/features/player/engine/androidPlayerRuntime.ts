@@ -5,6 +5,7 @@ import { audioCache } from "@/shared/storage/audioCache";
 import { getAndroidBridge, registerMediaCommandHandler } from "@/platform";
 import type { Track } from "@/shared/types";
 import { resolvePlaybackStream, type ResolvedPlaybackStream } from "./playbackSource";
+import { transitionSpec } from "./transitions";
 
 /** When false, native playback never caches audio to disk (only Download saves). */
 const AUTO_CACHE_AUDIO = false;
@@ -55,6 +56,11 @@ export class AndroidPlayerRuntime {
   private cacheRequested = new Set<string>();
   private activeStream: ResolvedPlaybackStream | null = null;
   private preloaded = new Map<string, { stream: ResolvedPlaybackStream; at: number }>();
+  /** Mirrors the last volume pushed to the native player so ramps know where to start. */
+  private nativeVolume = 1;
+  private rampTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Track whose end-of-song fade-out already ran (once per track). */
+  private endFadeTrackId: string | null = null;
   public onEnded?: () => void;
   public onError?: (info: { trackId: string; message: string }) => void;
 
@@ -76,13 +82,15 @@ export class AndroidPlayerRuntime {
       }
     });
 
-    this.bridge.audioSetVolume(usePlayerStore.getState().volume);
+    this.setNativeVolume(usePlayerStore.getState().volume);
     this.bridge.audioSetCacheLimit(audioCache.getLimitBytes());
     this.applyPlaybackRateAndPitch();
 
     this.unsubscribe = usePlayerStore.subscribe((state, prev) => {
       if (state.volume !== prev.volume) {
-        this.bridge.audioSetVolume(state.volume);
+        // A direct user volume change wins over any in-flight transition ramp.
+        this.cancelRamp();
+        this.setNativeVolume(state.volume);
       }
       if (
         state.playbackRate !== prev.playbackRate ||
@@ -117,6 +125,91 @@ export class AndroidPlayerRuntime {
     this.bridge.audioSeek(positionMs);
   }
 
+  private setNativeVolume(next: number): void {
+    this.nativeVolume = Math.max(0, Math.min(1, next));
+    this.bridge.audioSetVolume(this.nativeVolume);
+  }
+
+  private cancelRamp(): void {
+    if (this.rampTimer !== null) {
+      clearTimeout(this.rampTimer);
+      this.rampTimer = null;
+    }
+  }
+
+  /**
+   * Eased volume ramp on the native player, mirroring the web runtime's
+   * fadeVolume so transition presets sound the same on both engines.
+   * Resolves when the ramp completes.
+   */
+  private rampNativeVolume(target: number, durationMs: number): Promise<void> {
+    this.cancelRamp();
+    const clampedTarget = Math.max(0, Math.min(1, target));
+    const startVolume = this.nativeVolume;
+    const diff = clampedTarget - startVolume;
+    if (Math.abs(diff) < 0.001 || durationMs <= 0) {
+      this.setNativeVolume(clampedTarget);
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      const startTime = performance.now();
+      const tick = () => {
+        const progress = Math.min((performance.now() - startTime) / durationMs, 1);
+        const eased = 0.5 - 0.5 * Math.cos(progress * Math.PI);
+        this.setNativeVolume(startVolume + diff * eased);
+        if (progress < 1) {
+          this.rampTimer = setTimeout(tick, 32);
+        } else {
+          this.rampTimer = null;
+          this.setNativeVolume(clampedTarget);
+          resolve();
+        }
+      };
+      this.rampTimer = setTimeout(tick, 32);
+    });
+  }
+
+  /**
+   * Fades the outgoing song to silence before a manual skip switches tracks.
+   * Resolves immediately when no fade-out is configured or nothing is audible.
+   */
+  private fadeOutForTransition(epoch: number): Promise<void> {
+    const fadeOutMs = transitionSpec(
+      usePlayerStore.getState().transitionPreset,
+    ).fadeOutMs;
+    if (fadeOutMs <= 0 || epoch !== this.loadEpoch) return Promise.resolve();
+    const state = this.readState();
+    if (!state?.trackId || state.status !== "playing") return Promise.resolve();
+
+    log("cyan", "audio", `native transition fade-out (${fadeOutMs}ms)`);
+    return Promise.race([
+      this.rampNativeVolume(0, fadeOutMs),
+      new Promise<void>((resolve) => setTimeout(resolve, fadeOutMs + 80)),
+    ]);
+  }
+
+  /** Starts the outgoing fade-out over the final stretch of the current song. */
+  private maybeStartEndFade(state: NativeAudioState): void {
+    const fadeOutMs = transitionSpec(
+      usePlayerStore.getState().transitionPreset,
+    ).fadeOutMs;
+    if (fadeOutMs <= 0 || !this.currentTrackId) return;
+    if (this.endFadeTrackId === this.currentTrackId) return;
+    if (state.status !== "playing") return;
+
+    const duration = state.durationMs ?? 0;
+    const position = state.positionMs ?? 0;
+    if (duration <= 0) return;
+
+    const remainingMs = duration - position;
+    if (remainingMs <= 0 || remainingMs > fadeOutMs) return;
+
+    this.endFadeTrackId = this.currentTrackId;
+    log("cyan", "audio", `native end-of-song fade-out (${fadeOutMs}ms)`);
+    void this.rampNativeVolume(0, remainingMs);
+  }
+
   public async preloadTrack(track: Track): Promise<void> {
     if (this.currentTrackId === track.id) return;
     if (this.preloaded.has(track.id)) return;
@@ -144,6 +237,13 @@ export class AndroidPlayerRuntime {
 
   public async loadAndPlay(track: Track, startPositionMs = 0): Promise<void> {
     const epoch = ++this.loadEpoch;
+
+    if (this.currentTrackId !== track.id) {
+      // Fade the outgoing song before switching (instant when preset is "off").
+      await this.fadeOutForTransition(epoch);
+      if (epoch !== this.loadEpoch) return;
+    }
+
     this.loadAbort?.abort();
     const controller = new AbortController();
     this.loadAbort = controller;
@@ -153,18 +253,23 @@ export class AndroidPlayerRuntime {
     }
     this.currentTrackId = track.id;
     this.endedTrackId = null;
+    this.endFadeTrackId = null;
     this.currentSessionExpiresAt = null;
     this.activeStream = null;
     this.cacheRequested.delete(track.id);
     this.pendingStartPositionMs = startPositionMs;
 
     const store = usePlayerStore.getState();
+    const fadeInMs = transitionSpec(store.transitionPreset).fadeInMs;
     store.setStatus("loading", null);
     store.setPosition(startPositionMs);
     store.setDuration(track.durationMs ?? 0);
     this.bridge.requestNotificationPermission();
     this.bridge.setKeepScreenOn(true);
-    this.bridge.audioSetVolume(store.volume);
+    // Start from silence when a fade-in is configured; the ramp fires once the
+    // native player has the new stream attached below.
+    this.cancelRamp();
+    this.setNativeVolume(fadeInMs > 0 ? 0 : store.volume);
     this.applyPlaybackRateAndPitch();
 
     try {
@@ -198,6 +303,9 @@ export class AndroidPlayerRuntime {
         startMs: startPositionMs,
       };
       this.bridge.audioLoad(JSON.stringify(payload));
+      if (fadeInMs > 0 && epoch === this.loadEpoch) {
+        void this.rampNativeVolume(store.volume, fadeInMs);
+      }
       log(
         "green",
         "playback",
@@ -222,6 +330,8 @@ export class AndroidPlayerRuntime {
     this.loadEpoch += 1;
     this.loadAbort?.abort();
     this.loadAbort = null;
+    this.cancelRamp();
+    this.endFadeTrackId = null;
     this.bridge.audioPause();
     usePlayerStore.getState().setStatus("paused");
     this.bridge.setKeepScreenOn(false);
@@ -241,6 +351,14 @@ export class AndroidPlayerRuntime {
 
   public seek(positionMs: number): void {
     const store = usePlayerStore.getState();
+    // Seeking away from the tail cancels an in-progress end-of-song fade so the
+    // track isn't left muted; the next poll restarts it if we land back in the
+    // fade-out window.
+    if (this.endFadeTrackId !== null) {
+      this.endFadeTrackId = null;
+      this.cancelRamp();
+      if (store.status === "playing") this.setNativeVolume(store.volume);
+    }
     const duration = store.durationMs || store.currentTrack?.durationMs || 0;
     const next = Math.round(Math.max(0, Math.min(duration || positionMs, positionMs)));
     store.setPosition(next);
@@ -256,6 +374,8 @@ export class AndroidPlayerRuntime {
     this.loadEpoch += 1;
     this.loadAbort?.abort();
     this.loadAbort = null;
+    this.cancelRamp();
+    this.endFadeTrackId = null;
     this.currentTrackId = null;
     this.currentSessionExpiresAt = null;
     this.activeStream = null;
@@ -332,6 +452,7 @@ export class AndroidPlayerRuntime {
     switch (state.status) {
       case "playing":
         if (store.status !== "playing") store.setStatus("playing");
+        this.maybeStartEndFade(state);
         this.maybeCacheAudio();
         break;
       case "buffering":

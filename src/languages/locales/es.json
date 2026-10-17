@@ -542,6 +542,17 @@
       "title": "Reproducir canciones similares automáticamente",
       "description": "Añade canciones similares de forma automática cuando finalice la cola."
     },
+    "transitions": {
+      "title": "Transición entre canciones",
+      "description": "Efecto de fundido al empezar la siguiente canción, ya sea sola o al saltar manualmente.",
+      "off": "Ninguna (instantáneo)",
+      "fade-in": "Fundido de entrada",
+      "fade-out": "Fundido de salida",
+      "soft": "Fundido suave",
+      "medium": "Fundido medio",
+      "long": "Fundido largo",
+      "swell": "Creciente"
+    },
     "track_double_click": {
       "title": "Doble clic en una canción",
       "description": "Elige qué ocurre al hacer doble clic en la tarjeta de una canción.",

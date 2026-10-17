@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { Track } from "@/shared/types";
+import { isTransitionPreset, type TransitionPreset } from "../engine/transitions";
 import { debouncedStorage } from "@/shared/utils/storage";
 
 export { debouncedStorage };
@@ -63,6 +64,7 @@ export interface SessionState {
   keepSpeedAcrossTracks: boolean;
   isReverbEnabled: boolean;
   reverbLevel: number;
+  transitionPreset: TransitionPreset;
 }
 
 export type PlayerState = TransportState &
@@ -117,6 +119,7 @@ export interface PlayerStore extends PlayerState {
   setKeepSpeedAcrossTracks: (keep: boolean) => void;
   setIsReverbEnabled: (enabled: boolean) => void;
   setReverbLevel: (level: number) => void;
+  setTransitionPreset: (value: TransitionPreset) => void;
   resetSpeedAndPitch: () => void;
   clearQueue: () => void;
 }
@@ -160,6 +163,7 @@ export const usePlayerStore = create<PlayerStore>()(
       keepSpeedAcrossTracks: true,
       isReverbEnabled: false,
       reverbLevel: 0.35,
+      transitionPreset: "off",
 
       dispatch: () => {
         // Implementation injected by PlayerEngine
@@ -210,6 +214,8 @@ export const usePlayerStore = create<PlayerStore>()(
       setIsReverbEnabled: (isReverbEnabled: boolean) => set({ isReverbEnabled }),
       setReverbLevel: (reverbLevel: number) =>
         set({ reverbLevel: Math.max(0, Math.min(1, reverbLevel)) }),
+      setTransitionPreset: (transitionPreset: TransitionPreset) =>
+        set({ transitionPreset }),
       resetSpeedAndPitch: () => set({ playbackRate: 1, pitchSemitones: 0 }),
       clearQueue: () => {
         const state = get();
@@ -279,6 +285,9 @@ export const usePlayerStore = create<PlayerStore>()(
           if (typeof state.reverbLevel !== "number" || isNaN(state.reverbLevel)) {
             state.reverbLevel = 0.35;
           }
+          if (!isTransitionPreset(state.transitionPreset)) {
+            state.transitionPreset = "off";
+          }
         }
       },
       partialize: (state) => ({
@@ -310,6 +319,7 @@ export const usePlayerStore = create<PlayerStore>()(
         keepSpeedAcrossTracks: state.keepSpeedAcrossTracks,
         isReverbEnabled: state.isReverbEnabled,
         reverbLevel: state.reverbLevel,
+        transitionPreset: state.transitionPreset,
       }),
     },
   ),

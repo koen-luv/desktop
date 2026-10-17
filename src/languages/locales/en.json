@@ -539,6 +539,17 @@
       "title": "Autoplay similar tracks",
       "description": "Automatically add similar songs when your queue ends."
     },
+    "transitions": {
+      "title": "Track transition",
+      "description": "Fade effect applied when the next song starts, whether it begins on its own or you skip manually.",
+      "off": "None (instant)",
+      "fade-in": "Fade in",
+      "fade-out": "Fade out",
+      "soft": "Soft fade",
+      "medium": "Medium fade",
+      "long": "Long fade",
+      "swell": "Swell"
+    },
     "track_double_click": {
       "title": "Double-click on track",
       "description": "Choose what happens when you double-click a song card.",

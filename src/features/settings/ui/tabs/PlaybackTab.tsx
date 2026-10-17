@@ -1,9 +1,13 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/languages";
 import { usePlayerStore, downloadTrack } from "@/features/player";
-import { ToggleSwitch, useToast } from "@/shared/ui";
+import { ToggleSwitch, Select, useToast } from "@/shared/ui";
 import Button from "@/shared/ui/Button";
 import { SettingRow, SettingSection, SegmentedControl } from "../controls";
+import {
+  TRANSITION_PRESET_IDS,
+  type TransitionPreset,
+} from "@/features/player/engine/transitions";
 
 export function PlaybackTab({ searchQuery }: { searchQuery?: string }) {
   const { t } = useTranslation();
@@ -30,6 +34,10 @@ export function PlaybackTab({ searchQuery }: { searchQuery?: string }) {
   );
   const setPauseOnDeviceChange = usePlayerStore(
     (state) => state.setPauseOnDeviceChange,
+  );
+  const transitionPreset = usePlayerStore((state) => state.transitionPreset);
+  const setTransitionPreset = usePlayerStore(
+    (state) => state.setTransitionPreset,
   );
   const currentTrack = usePlayerStore((state) => state.currentTrack);
   const [downloading, setDownloading] = useState(false);
@@ -106,6 +114,29 @@ export function PlaybackTab({ searchQuery }: { searchQuery?: string }) {
                   label: t("settings.default_playback_context.empty"),
                 },
               ]}
+            />
+          ) : (
+            <span />
+          )
+        }
+      />
+
+      <SettingRow
+        title={t("settings.transitions.title")}
+        description={t("settings.transitions.description")}
+        titleKey="settings.transitions.title"
+        descKey="settings.transitions.description"
+        searchQuery={searchQuery}
+        control={
+          mounted ? (
+            <Select<TransitionPreset>
+              aria-label={t("settings.transitions.title")}
+              value={transitionPreset}
+              onChange={setTransitionPreset}
+              options={TRANSITION_PRESET_IDS.map((preset) => ({
+                value: preset,
+                label: t(`settings.transitions.${preset}`),
+              }))}
             />
           ) : (
             <span />

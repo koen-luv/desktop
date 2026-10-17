@@ -294,3 +294,125 @@ describe("PlayerRuntime audio caching", () => {
     }
   });
 });
+
+describe("PlayerRuntime — track transition fades", () => {
+  beforeEach(() => {
+    usePlayerStore.setState({
+      status: "playing",
+      currentTrack: track,
+      queue: [track],
+      currentIndex: 0,
+      positionMs: 0,
+      durationMs: track.durationMs,
+      volume: 1,
+      error: null,
+      transitionPreset: "off",
+    });
+    (playerRuntime as any).audio.src = "blob:mock-stream";
+    (playerRuntime as any).currentTrackId = track.id;
+    (playerRuntime as any).endFadeTrackId = null;
+    setAudioPaused(false);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function setAudioTimeline(positionS: number, durationS: number) {
+    Object.defineProperty((playerRuntime as any).audio, "duration", {
+      value: durationS,
+      configurable: true,
+    });
+    Object.defineProperty((playerRuntime as any).audio, "currentTime", {
+      value: positionS,
+      writable: true,
+      configurable: true,
+    });
+  }
+
+  it("with 'off' the transition never touches volume on track start", () => {
+    usePlayerStore.setState({ transitionPreset: "off", volume: 0.8 });
+    const fadeSpy = vi
+      .spyOn(PlayerRuntime.prototype as any, "fadeVolume")
+      .mockImplementation(() => {});
+    (playerRuntime as any).audio.volume = 0;
+
+    (playerRuntime as any).applyTransitionFadeIn();
+
+    expect(fadeSpy).not.toHaveBeenCalled();
+    expect((playerRuntime as any).audio.volume).toBeCloseTo(0.8);
+  });
+
+  it("fades the outgoing song out over its final stretch, exactly once per track", () => {
+    usePlayerStore.setState({ transitionPreset: "soft" });
+    const fadeSpy = vi
+      .spyOn(PlayerRuntime.prototype as any, "fadeVolume")
+      .mockImplementation(() => {});
+
+    // 100s track, 300ms left — inside the 500ms "soft" fade-out window.
+    setAudioTimeline(99.7, 100);
+    (playerRuntime as any).audio.dispatchEvent(new Event("timeupdate"));
+    expect(fadeSpy).toHaveBeenCalledTimes(1);
+    expect(fadeSpy).toHaveBeenCalledWith(0, 500);
+
+    // Later ticks in the same tail must not restart (and re-cut) the fade.
+    setAudioTimeline(99.9, 100);
+    (playerRuntime as any).audio.dispatchEvent(new Event("timeupdate"));
+    expect(fadeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fade out when still far from the end of the track", () => {
+    usePlayerStore.setState({ transitionPreset: "soft" });
+    const fadeSpy = vi
+      .spyOn(PlayerRuntime.prototype as any, "fadeVolume")
+      .mockImplementation(() => {});
+
+    setAudioTimeline(50, 100);
+    (playerRuntime as any).audio.dispatchEvent(new Event("timeupdate"));
+    expect(fadeSpy).not.toHaveBeenCalled();
+  });
+
+  it("a manual skip fades the outgoing track out before switching", async () => {
+    usePlayerStore.setState({ transitionPreset: "soft" });
+    const fadeSpy = vi
+      .spyOn(PlayerRuntime.prototype as any, "fadeVolume")
+      .mockImplementation((...args: unknown[]) => {
+        (args[2] as (() => void) | undefined)?.();
+      });
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+    vi.spyOn(api, "createPlaybackSession").mockResolvedValue({
+      sessionId: "pb_skip",
+      trackId: "t2",
+      transport: "proxy",
+      playbackId: "pb_skip",
+      streamUrl: "/v1/playback/pb_skip/media",
+      mimeType: "audio/webm",
+      codec: "opus",
+      bitrate: 128000,
+      expiresAt: new Date(Date.now() + 600_000).toISOString(),
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 1, 2, 3, 4]), {
+        status: 206,
+        headers: { "content-type": "audio/webm" },
+      }),
+    );
+    const nextTrack: Track = { ...track, id: "t2", title: "Next" };
+
+    await playerRuntime!.loadAndPlay(nextTrack);
+
+    expect(fadeSpy).toHaveBeenCalledWith(0, 500, expect.any(Function));
+  });
+
+  it("seeking away from the tail restores volume and cancels the end fade", () => {
+    (playerRuntime as any).endFadeTrackId = track.id;
+    (playerRuntime as any).audio.volume = 0;
+    setAudioPaused(false);
+    setAudioTimeline(99.9, 100);
+
+    playerRuntime!.seek(10_000);
+
+    expect((playerRuntime as any).endFadeTrackId).toBeNull();
+    expect((playerRuntime as any).audio.volume).toBeCloseTo(1);
+  });
+});

@@ -50,6 +50,7 @@ const TAB_GROUPS: { labelKey: "preferences" | "application"; ids: TabId[] }[] = 
 const SETTING_ITEMS: { tabId: TabId; titleKey: string; descKey?: string }[] = [
   // Playback
   { tabId: "Playback", titleKey: "settings.autoplay_similar.title", descKey: "settings.autoplay_similar.description" },
+  { tabId: "Playback", titleKey: "settings.transitions.title", descKey: "settings.transitions.description" },
   { tabId: "Playback", titleKey: "settings.track_double_click.title", descKey: "settings.track_double_click.description" },
   { tabId: "Playback", titleKey: "settings.default_playback_context.title", descKey: "settings.default_playback_context.description" },
   { tabId: "Playback", titleKey: "settings.audio.pause_on_device_change.title", descKey: "settings.audio.pause_on_device_change.description" },
