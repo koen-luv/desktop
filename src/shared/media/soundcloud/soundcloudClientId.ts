@@ -1,3 +1,5 @@
+import { tryFetchText } from "@/shared/api/tryFetch";
+
 const SOUNDCLOUD_HOME = "https://soundcloud.com";
 const SCRIPT_URL = /src="((?:https:)?\/\/a-v2\.sndcdn\.com\/assets\/[^"]+\.js)"/g;
 const CLIENT_ID_PATTERN = /client_id\s*[:=]\s*"([a-zA-Z0-9]{32})"/;
@@ -12,24 +14,14 @@ export function resetSoundCloudClientIdCache(): void {
   cachedSoundCloudClientId = undefined;
 }
 
-async function fetchText(url: string, init: RequestInit): Promise<string | undefined> {
-  try {
-    const response = await fetch(url, init);
-    return response.ok ? await response.text() : undefined;
-  } catch (error) {
-    if (init.signal?.aborted) throw error;
-    return undefined;
-  }
-}
-
 function scriptUrlsFromHtml(html: string): string[] {
   return [...html.matchAll(SCRIPT_URL)].map((match) => (match[1].startsWith("//") ? `https:${match[1]}` : match[1]));
 }
 
 async function discoverSoundCloudClientId(signal?: AbortSignal): Promise<string | undefined> {
-  const html = await fetchText(SOUNDCLOUD_HOME, { headers: { accept: "text/html,application/xhtml+xml" }, signal });
+  const html = await tryFetchText(SOUNDCLOUD_HOME, { headers: { accept: "text/html,application/xhtml+xml" }, signal });
   for (const scriptUrl of html ? scriptUrlsFromHtml(html).reverse() : []) {
-    const found = (await fetchText(scriptUrl, { signal }))?.match(CLIENT_ID_PATTERN)?.[1];
+    const found = (await tryFetchText(scriptUrl, { signal }))?.match(CLIENT_ID_PATTERN)?.[1];
     if (found) {
       cachedSoundCloudClientId = found;
       return found;

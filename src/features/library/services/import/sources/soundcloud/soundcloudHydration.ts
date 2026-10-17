@@ -1,5 +1,5 @@
 import { asArray, asRecord, isRecord, parseJsonSafe, trimmedString } from "@/shared/utils/json";
-import { tryFetchText } from "../../shared/http";
+import { tryFetchText } from "@/shared/api/tryFetch";
 import type { SoundCloudCollection } from "./soundcloudCollection";
 
 const PLAYLIST_HYDRATABLES = new Set(["playlist", "system_playlist", "set"]);

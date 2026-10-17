@@ -1,5 +1,5 @@
 import { asRecord } from "@/shared/utils/json";
-import { tryFetchJson, tryFetchText } from "../../shared/http";
+import { tryFetchJson, tryFetchText } from "@/shared/api/tryFetch";
 
 export interface SpotifyTotpSecret {
   secret: string;

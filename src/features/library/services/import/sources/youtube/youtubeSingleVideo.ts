@@ -3,7 +3,7 @@ import { getRuns } from "@/shared/media/innertube/innertubeJson";
 import { postInnertube } from "@/shared/media/innertube/innertubeClient";
 import type { ClientImportedPlaylist } from "../../importTypes";
 import { rethrowIfAborted } from "@/shared/utils/abort";
-import { tryFetchJson } from "../../shared/http";
+import { tryFetchJson } from "@/shared/api/tryFetch";
 import { withoutArtistPrefix } from "../../shared/titles";
 import { youtubeThumbnailUrl } from "./youtubeUrl";
 

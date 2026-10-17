@@ -1,6 +1,6 @@
 import { asArray, asRecord, type JsonRecord, recordAt, stringValue } from "@/shared/utils/json";
 import type { ClientImportedPlaylist, ClientImportedTrack } from "../../importTypes";
-import { tryFetchJson } from "../../shared/http";
+import { tryFetchJson } from "@/shared/api/tryFetch";
 import { getAppleMusicWebToken } from "./appleMusicToken";
 import { appendAppleMusicTracks, appleMusicPlaylistMeta } from "./appleMusicTracks";
 import { parseAppleMusicUrl } from "./appleMusicUrl";

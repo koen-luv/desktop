@@ -9,7 +9,7 @@ import {
   trimmedString,
 } from "@/shared/utils/json";
 import type { ClientImportedTrack } from "../../importTypes";
-import { tryFetchText } from "../../shared/http";
+import { tryFetchText } from "@/shared/api/tryFetch";
 import type { SpotifyEntityType } from "./spotifyUrl";
 
 export interface SpotifyEmbedData {

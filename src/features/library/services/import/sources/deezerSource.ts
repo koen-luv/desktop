@@ -1,6 +1,7 @@
 import { asArray, asRecord, type JsonRecord, numberValue, stringValue } from "@/shared/utils/json";
 import type { ClientImportedPlaylist, ClientImportedTrack } from "../importTypes";
-import { requireOk, tryFetchJson } from "../shared/http";
+import { tryFetchJson } from "@/shared/api/tryFetch";
+import { requireOk } from "../shared/http";
 
 const DEEZER_API = "https://api.deezer.com";
 
