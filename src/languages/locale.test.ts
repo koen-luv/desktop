@@ -34,6 +34,8 @@ describe("locale", () => {
     expect(getStoredLocale()).toBe("uk");
     storeLocale("es");
     expect(getStoredLocale()).toBe("es");
+    storeLocale("fr");
+    expect(getStoredLocale()).toBe("fr");
   });
 
   it("migrates legacy 'ua' stored value to 'uk'", () => {
@@ -73,6 +75,17 @@ describe("getBrowserLocale", () => {
     vi.unstubAllGlobals();
   });
 
+  it("returns fr when navigator.language is fr-FR", () => {
+    vi.stubGlobal("window", { navigator: { language: "fr-FR", languages: ["fr-FR", "en-US"] } });
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      language: "fr-FR",
+      languages: ["fr-FR", "en-US"],
+    });
+    expect(getBrowserLocale()).toBe("fr");
+    vi.unstubAllGlobals();
+  });
+
   it("returns uk when navigator.language is uk-UA or ua-UA", () => {
     vi.stubGlobal("window", { navigator: { language: "uk-UA", languages: ["uk-UA", "ru-RU"] } });
     vi.stubGlobal("navigator", {
@@ -85,11 +98,11 @@ describe("getBrowserLocale", () => {
   });
 
   it("falls back to ru for unknown locales", () => {
-    vi.stubGlobal("window", { navigator: { language: "fr-FR", languages: ["fr-FR"] } });
+    vi.stubGlobal("window", { navigator: { language: "nl-NL", languages: ["nl-NL"] } });
     vi.stubGlobal("navigator", {
       ...navigator,
-      language: "fr-FR",
-      languages: ["fr-FR"],
+      language: "nl-NL",
+      languages: ["nl-NL"],
     });
     expect(getBrowserLocale()).toBe("ru");
   });
