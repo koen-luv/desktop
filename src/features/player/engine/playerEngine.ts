@@ -83,8 +83,16 @@ function newRadioWaveId(): string {
   return `wave-${Date.now().toString(36)}-${Math.floor(Math.random() * 0xffffffff).toString(36)}`;
 }
 
+type LyricsHint = { title: string; artist: string; durationMs?: number };
+
+function lyricsHint(track: Track): LyricsHint {
+  const artist = track.artistList?.[0]?.name || track.artists.split(",")[0] || "";
+  return { title: track.title, artist: artist.trim(), durationMs: track.durationMs };
+}
+
 class PlaybackTelemetryTracker {
   private activeTrackId: string | null = null;
+  private activeTrack: Track | null = null;
   private playbackSessionId: string = "";
   private listeningSessionId: string = "";
   private lastActivityTime: number = 0;
@@ -120,6 +128,7 @@ class PlaybackTelemetryTracker {
 
     this.playbackSessionId = this.generatePlaybackSessionId();
     this.activeTrackId = track.id;
+    this.activeTrack = track;
     this.trackDurationMs = track.durationMs ?? 0;
     this.playedDurationMs = 0;
     this.lastTickTime = null;
@@ -191,10 +200,25 @@ class PlaybackTelemetryTracker {
     const isSkipped = !this.completed && this.playedDurationMs < 30000;
 
     if (this.playedDurationMs >= 3000 || this.completed) {
+      const snap = this.activeTrack;
+      const artistsList = snap?.artistList?.length
+        ? snap.artistList.map((a) => ({ id: a.id || "unknown", name: a.name }))
+        : (snap?.artists
+            ? snap.artists.split(",").map((name) => ({ id: snap?.artistId || "unknown", name: name.trim() }))
+            : [{ id: "unknown", name: "Unknown Artist" }]);
+
       this.sendEvent({
         playbackSessionId: this.playbackSessionId,
         listeningSessionId: this.getOrCreateListeningSession(),
         trackId: this.activeTrackId,
+        trackSnapshot: snap ? {
+          id: snap.id,
+          title: snap.title || "Unknown Track",
+          artists: artistsList,
+          album: snap.album ? { id: snap.album.id || "", title: snap.album.title || "" } : undefined,
+          cover: snap.coverUrl ? { url: snap.coverUrl, width: 512, height: 512 } : undefined,
+          durationMs: snap.durationMs || this.trackDurationMs,
+        } : undefined,
         playedDurationMs: Math.round(this.playedDurationMs),
         trackDurationMs: this.trackDurationMs > 0 ? this.trackDurationMs : undefined,
         completionRate: Number(completionRate.toFixed(4)),
@@ -207,6 +231,7 @@ class PlaybackTelemetryTracker {
     }
 
     this.activeTrackId = null;
+    this.activeTrack = null;
     this.playbackSessionId = "";
     this.lastTickTime = null;
     this.playedDurationMs = 0;
@@ -1037,7 +1062,7 @@ class PlayerEngine {
     }
 
     if (!lyricsCache.has(nextTrack.id)) {
-      void this.prefetchLyrics(nextTrack.id);
+      void this.prefetchLyrics(nextTrack.id, lyricsHint(nextTrack));
     }
 
     void linerDb.putTrack(nextTrack);
@@ -1047,7 +1072,7 @@ class PlayerEngine {
     }
   }
 
-  private async prefetchLyrics(trackId: string): Promise<void> {
+  private async prefetchLyrics(trackId: string, hint?: LyricsHint): Promise<void> {
     if (!trackId) return;
 
     if (lyricsCache.has(trackId)) return;
@@ -1074,7 +1099,7 @@ class PlayerEngine {
         }[] = [];
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
-        for await (const event of api.streamLyrics(trackId, controller.signal)) {
+        for await (const event of api.streamLyrics(trackId, controller.signal, hint)) {
           if (event.type === "provider" && event.status === "found") {
             const candidate = event.candidate;
             if (shouldCacheLyricsCandidate(candidate)) {
@@ -1236,7 +1261,7 @@ class PlayerEngine {
     log("cyan", "lyrics", `fetching for "${track.title}"`);
 
     try {
-      for await (const event of api.streamLyrics(trackId, controller.signal)) {
+      for await (const event of api.streamLyrics(trackId, controller.signal, lyricsHint(track))) {
         if (token !== this.lyricsLoadToken || controller.signal.aborted) break;
 
         if (event.type === "provider" && event.status === "found") {

@@ -322,6 +322,36 @@ if (!gotTheLock) {
       }
     });
 
+    session.defaultSession.webRequest.onBeforeSendHeaders(
+      { urls: ["*://*.youtube.com/*", "*://*.googlevideo.com/*", "*://api.music.apple.com/*", "*://amp-api.music.apple.com/*"] },
+      (details, callback) => {
+        const requestHeaders: Record<string, string> = {};
+        let userAgentOverride: string | undefined;
+        for (const [name, value] of Object.entries(details.requestHeaders)) {
+          const lower = name.toLowerCase();
+          if (lower === "x-liner-user-agent") {
+            userAgentOverride = value;
+          } else if (lower !== "origin" && lower !== "referer") {
+            requestHeaders[name] = value;
+          }
+        }
+        const origin = details.url.includes("music.apple.com/")
+          ? "https://music.apple.com"
+          : details.url.includes("://www.youtube.com/")
+            ? "https://www.youtube.com"
+            : "https://music.youtube.com";
+        requestHeaders["Origin"] = origin;
+        requestHeaders["Referer"] = `${origin}/`;
+        if (userAgentOverride) {
+          for (const name of Object.keys(requestHeaders)) {
+            if (name.toLowerCase() === "user-agent") delete requestHeaders[name];
+          }
+          requestHeaders["User-Agent"] = userAgentOverride;
+        }
+        callback({ requestHeaders });
+      },
+    );
+
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
       const responseHeaders = { ...(details.responseHeaders || {}) };
       responseHeaders["access-control-allow-origin"] = ["*"];

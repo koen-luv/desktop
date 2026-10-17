@@ -164,12 +164,13 @@ describe("PlayerRuntime audio caching", () => {
     await playerRuntime!.loadAndPlay(freshTrack);
 
     expect(sessionSpy).toHaveBeenCalledTimes(1);
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(playSpy).toHaveBeenCalled();
 
-    const storedAudio = await linerDb.getAudio("fresh-track-2");
-    expect(storedAudio).not.toBeNull();
-    expect(storedAudio?.byteSize).toBe(4);
+    await vi.waitFor(async () => {
+      const storedAudio = await linerDb.getAudio("fresh-track-2");
+      expect(storedAudio?.byteSize).toBe(4);
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   it("preloads audio in the background and enables instant cache-hit play on skip", async () => {
@@ -216,5 +217,78 @@ describe("PlayerRuntime audio caching", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(playSpy).toHaveBeenCalled();
     expect(usePlayerStore.getState().status).toBe("playing");
+  });
+
+  it("evicts corrupt 0-byte audio blob from cache and fetches fresh stream", async () => {
+    const playSpy = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+    const sessionSpy = vi.spyOn(api, "createPlaybackSession").mockResolvedValue({
+      sessionId: "pb_corrupt_1",
+      trackId: "corrupt-track-4",
+      transport: "proxy",
+      playbackId: "pb_corrupt_1",
+      streamUrl: "/v1/playback/pb_corrupt_1/media",
+      mimeType: "audio/webm",
+      codec: "opus",
+      bitrate: 128000,
+      expiresAt: new Date().toISOString(),
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(new Uint8Array([1, 2, 3, 4]), {
+        status: 200,
+        headers: { "content-type": "audio/webm" },
+      }),
+    );
+
+    const emptyBlob = new Blob([], { type: "audio/webm" });
+    await linerDb.putAudio("corrupt-track-4", emptyBlob, "audio/webm");
+
+    const corruptTrack: Track = {
+      ...track,
+      id: "corrupt-track-4",
+      title: "Corrupt Track",
+    };
+
+    await playerRuntime!.loadAndPlay(corruptTrack);
+
+    expect(sessionSpy).toHaveBeenCalledTimes(1);
+    expect(playSpy).toHaveBeenCalled();
+    expect(usePlayerStore.getState().status).toBe("playing");
+
+    const cachedAfter = await linerDb.getAudio("corrupt-track-4");
+    expect(cachedAfter?.byteSize).not.toBe(0);
+  });
+
+  it("does not cache partial stream chunks when content-range exceeds downloaded bytes", async () => {
+    vi.spyOn(api, "createPlaybackSession").mockResolvedValue({
+      sessionId: "pb_partial_1",
+      trackId: "partial-track-5",
+      transport: "proxy",
+      playbackId: "pb_partial_1",
+      streamUrl: "/v1/playback/pb_partial_1/media",
+      mimeType: "audio/webm",
+      codec: "opus",
+      bitrate: 128000,
+      expiresAt: new Date().toISOString(),
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(new Uint8Array([1, 2, 3, 4]), {
+        status: 206,
+        headers: {
+          "content-type": "audio/webm",
+          "content-range": "bytes 0-3/1000000",
+        },
+      }),
+    );
+
+    const partialTrack: Track = {
+      ...track,
+      id: "partial-track-5",
+      title: "Partial Track",
+    };
+
+    await playerRuntime!.preloadTrack(partialTrack);
+
+    const stored = await linerDb.getAudio("partial-track-5");
+    expect(stored).toBeNull();
   });
 });
