@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { useTheme } from "next-themes";
 import { debouncedStorage } from "@/shared/utils/storage";
 
 export interface BlockCustomization {
@@ -265,25 +264,10 @@ export const useCustomizationStore = create<CustomizationState>()(
   ),
 );
 
-function getIsDarkTheme(): boolean {
-  if (typeof document === "undefined") return false;
-  const attr = document.documentElement.getAttribute("data-theme");
-  if (attr === "dark") return true;
-  if (attr === "light") return false;
-  try {
-    const saved = localStorage.getItem("theme");
-    if (saved === "dark") return true;
-    if (saved === "light") return false;
-  } catch {}
-  return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
-}
-
 export function useIsContentTransparent(): boolean {
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme ? resolvedTheme === "dark" : getIsDarkTheme();
   const backgroundImage = useCustomizationStore((s) => s.backgroundImage);
   const opacity = useCustomizationStore((s) => s.contentView.opacity);
-  return Boolean(isDark && backgroundImage && opacity < 100);
+  return Boolean(backgroundImage && opacity < 100);
 }
 
 export function getBlockStyle(
@@ -291,20 +275,26 @@ export function getBlockStyle(
   isDark: boolean,
   hasCustomBg: boolean,
 ): React.CSSProperties {
-  if (!hasCustomBg || !isDark) {
+  if (!hasCustomBg) {
     return {};
   }
 
+  // Panel tint follows the active theme so the wallpaper stays visible behind
+  // readable semi-transparent surfaces in both light and dark mode.
+  const baseRgb = isDark ? "10, 10, 10" : "245, 245, 245";
+  const pillRgb = isDark ? "0, 0, 0" : "255, 255, 255";
+
   if (config.opacity === 100) {
     return {
-      background: "var(--color-bg-primary, #0a0a0a)",
+      background: isDark
+        ? "var(--color-bg-primary, #0a0a0a)"
+        : "var(--color-bg-primary, #fafafa)",
       ["--glass-pill-border" as any]: "none",
     };
   }
 
   const alpha = config.opacity / 100;
   const dimAlpha = config.dim / 100;
-  const baseRgb = "10, 10, 10";
 
   let bg: string;
   if (dimAlpha > 0) {
@@ -315,12 +305,14 @@ export function getBlockStyle(
 
   const t = (100 - config.opacity) / 75;
 
-  const glassPillBg = `linear-gradient(135deg, rgba(0, 0, 0, ${(0.55 - 0.35 * t).toFixed(3)}) 0%, rgba(0, 0, 0, ${(0.45 - 0.30 * t).toFixed(3)}) 100%)`;
-  const glassPillBgHover = `linear-gradient(135deg, rgba(0, 0, 0, ${(0.70 - 0.35 * t).toFixed(3)}) 0%, rgba(0, 0, 0, ${(0.58 - 0.32 * t).toFixed(3)}) 100%)`;
+  const glassPillBg = `linear-gradient(135deg, rgba(${pillRgb}, ${(0.55 - 0.35 * t).toFixed(3)}) 0%, rgba(${pillRgb}, ${(0.45 - 0.30 * t).toFixed(3)}) 100%)`;
+  const glassPillBgHover = `linear-gradient(135deg, rgba(${pillRgb}, ${(0.70 - 0.35 * t).toFixed(3)}) 0%, rgba(${pillRgb}, ${(0.58 - 0.32 * t).toFixed(3)}) 100%)`;
   const glassPillBorder = "none";
 
   const glassBlur = `${Math.round(8 + 16 * t)}px`;
-  const glassProminentBg = `rgba(255, 255, 255, ${(1 - 0.18 * t).toFixed(2)})`;
+  const glassProminentBg = isDark
+    ? `rgba(255, 255, 255, ${(1 - 0.18 * t).toFixed(2)})`
+    : `rgba(10, 10, 10, ${(1 - 0.18 * t).toFixed(2)})`;
 
   return {
     background: bg,

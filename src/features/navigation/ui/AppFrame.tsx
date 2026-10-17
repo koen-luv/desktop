@@ -341,6 +341,7 @@ export default function AppFrame({ children }: AppFrameProps) {
     hasLoaded: allHasLoaded,
     runNow: runAllSearchNow,
     partialWarning,
+    error: allError,
   } = useSearchAll(searchQuery, {
     enabled: searchOpen && isAllSearchFilter,
     limit: 20,
@@ -352,6 +353,7 @@ export default function AppFrame({ children }: AppFrameProps) {
     loading: trackLoading,
     hasLoaded: trackHasLoaded,
     runNow: runTrackSearchNow,
+    error: trackError,
   } = useSearchTracks(searchQuery, {
     enabled: searchOpen && isTrackSearchFilter,
     limit: 20,
@@ -363,6 +365,7 @@ export default function AppFrame({ children }: AppFrameProps) {
     loading: artistLoading,
     hasLoaded: artistHasLoaded,
     runNow: runArtistSearchNow,
+    error: artistError,
   } = useSearchArtists(searchQuery, {
     enabled: searchOpen && isArtistSearchFilter,
     limit: 20,
@@ -374,6 +377,7 @@ export default function AppFrame({ children }: AppFrameProps) {
     loading: albumLoading,
     hasLoaded: albumHasLoaded,
     runNow: runAlbumSearchNow,
+    error: albumError,
   } = useSearchAlbums(searchQuery, {
     enabled: searchOpen && isAlbumSearchFilter,
     limit: 20,
@@ -385,6 +389,7 @@ export default function AppFrame({ children }: AppFrameProps) {
     loading: playlistLoading,
     hasLoaded: playlistHasLoaded,
     runNow: runPlaylistSearchNow,
+    error: playlistError,
   } = useSearchPlaylists(searchQuery, {
     enabled: searchOpen && isPlaylistSearchFilter,
     limit: 20,
@@ -524,6 +529,17 @@ export default function AppFrame({ children }: AppFrameProps) {
     !searchLoading &&
     searchHasLoaded &&
     searchResults.length === 0;
+
+  const searchError =
+    (isAllSearchFilter
+      ? allError
+      : isTrackSearchFilter
+        ? trackError
+        : isArtistSearchFilter
+          ? artistError
+          : isAlbumSearchFilter
+            ? albumError
+            : playlistError) ?? null;
 
   const runSearchNow = () => {
     if (isAllSearchFilter) {
@@ -719,7 +735,7 @@ export default function AppFrame({ children }: AppFrameProps) {
   const backgroundDim = useCustomizationStore((s) => s.backgroundDim);
   const contentViewConfig = useCustomizationStore((s) => s.contentView);
 
-  const hasCustomBg = Boolean(backgroundImage && isDark);
+  const hasCustomBg = Boolean(backgroundImage);
 
   const mainStyle = useMemo(
     () => getBlockStyle(contentViewConfig, isDark, hasCustomBg),
@@ -1031,7 +1047,9 @@ export default function AppFrame({ children }: AppFrameProps) {
                               fontFamily: "var(--font-inter), sans-serif",
                             }}
                           >
-                            {t("common.no_results")}
+                            {searchError
+                              ? "Search is unavailable"
+                              : t("common.no_results")}
                           </p>
                           <p
                             className="m-0 text-[12px] text-text-tertiary"
@@ -1039,7 +1057,10 @@ export default function AppFrame({ children }: AppFrameProps) {
                               fontFamily: "var(--font-inter), sans-serif",
                             }}
                           >
-                            {t("common.try_another_search")}
+                            {searchError
+                              ? searchError.message ||
+                                "Please try again shortly."
+                              : t("common.try_another_search")}
                           </p>
                         </motion.div>
                       ) : searchResults.length > 0 ? (

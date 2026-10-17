@@ -5,13 +5,11 @@ import { useThemeCustomizationSync } from "./useThemeCustomizationSync";
 import { useCustomizationStore } from "../store/customizationStore";
 
 const mockSetTheme = vi.fn();
-let mockTheme = "light";
-let mockResolvedTheme = "light";
 
 vi.mock("next-themes", () => ({
   useTheme: () => ({
-    theme: mockTheme,
-    resolvedTheme: mockResolvedTheme,
+    theme: "light",
+    resolvedTheme: "light",
     setTheme: mockSetTheme,
   }),
 }));
@@ -28,8 +26,6 @@ describe("useThemeCustomizationSync", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useCustomizationStore.getState().resetAll();
-    mockTheme = "light";
-    mockResolvedTheme = "light";
   });
 
   afterEach(() => {
@@ -53,27 +49,14 @@ describe("useThemeCustomizationSync", () => {
     });
   }
 
-  it("switches to dark theme when custom wallpaper with glass is active and theme is light", () => {
+  it("does not force a theme switch even when wallpaper glass is active", () => {
     useCustomizationStore.getState().setBackgroundImage("data:image/png;base64,mock");
     mount();
-
-    expect(mockSetTheme).toHaveBeenCalledWith("dark");
-  });
-
-  it("does not force dark theme when there is no custom wallpaper", () => {
-    mockTheme = "light";
-    mockResolvedTheme = "light";
-    mount();
-
     expect(mockSetTheme).not.toHaveBeenCalled();
   });
 
-  it("does not call setTheme if already in dark theme", () => {
-    mockTheme = "dark";
-    mockResolvedTheme = "dark";
-    useCustomizationStore.getState().setBackgroundImage("data:image/png;base64,mock");
+  it("does not call setTheme when there is no wallpaper", () => {
     mount();
-
     expect(mockSetTheme).not.toHaveBeenCalled();
   });
 });

@@ -71,7 +71,8 @@ describe("customizationStore", () => {
     expect(darkGlass.background).toContain("rgba(10, 10, 10, 0.7)");
 
     const lightGlass = getBlockStyle({ opacity: 50, blur: 12, dim: 0 }, false, true);
-    expect(lightGlass).toEqual({});
+    expect(lightGlass.background).toBe("rgba(245, 245, 245, 0.5)");
+    expect(lightGlass.backdropFilter).toBe("blur(12px)");
   });
 
   it("scales glass transparency progressively as opacity decreases", () => {

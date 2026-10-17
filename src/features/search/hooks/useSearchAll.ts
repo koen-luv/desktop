@@ -12,6 +12,7 @@ export interface UseSearchAllResult {
   loading: boolean;
   hasLoaded: boolean;
   partialWarning?: string;
+  error: Error | null;
   runNow: () => void;
 }
 
@@ -23,6 +24,7 @@ export function useSearchAll(
   const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [partialWarning, setPartialWarning] = useState<string | undefined>();
+  const [error, setError] = useState<Error | null>(null);
 
   const latestRequestIdRef = useRef(0);
   const lastFetchedQueryRef = useRef("");
@@ -37,12 +39,14 @@ export function useSearchAll(
         if (requestId !== latestRequestIdRef.current) return;
         setItems(res.items);
         setPartialWarning(undefined);
+        setError(null);
         lastFetchedQueryRef.current = q;
         setHasLoaded(true);
-      } catch {
+      } catch (err) {
         if (requestId !== latestRequestIdRef.current) return;
         setItems([]);
         setPartialWarning(undefined);
+        setError(err instanceof Error ? err : new Error(String(err)));
         setHasLoaded(true);
       } finally {
         if (requestId === latestRequestIdRef.current) setLoading(false);
@@ -58,6 +62,7 @@ export function useSearchAll(
       setHasLoaded(false);
       setLoading(false);
       setPartialWarning(undefined);
+      setError(null);
       lastFetchedQueryRef.current = "";
       return;
     }
@@ -92,5 +97,5 @@ export function useSearchAll(
     void runRequest(requestId, trimmed);
   }, [runRequest, shouldRunSearch, trimmed]);
 
-  return { items, loading, hasLoaded, partialWarning, runNow };
+  return { items, loading, hasLoaded, partialWarning, error, runNow };
 }

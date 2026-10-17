@@ -7,7 +7,6 @@ import {
 import { Upload2Line, CopyLine } from "@mingcute/react";
 
 import { useTranslation } from "@/languages";
-import { useTheme } from "next-themes";
 import { Button, Slider, ToggleSwitch, useToast } from "@/shared/ui";
 import {
   SettingBlock,
@@ -51,15 +50,6 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
   const resetBlock = useCustomizationStore((s) => s.resetBlock);
   const resetAll = useCustomizationStore((s) => s.resetAll);
 
-  const { resolvedTheme } = useTheme();
-  const isDark =
-    resolvedTheme
-      ? resolvedTheme === "dark"
-      : typeof document !== "undefined" &&
-        (document.documentElement.getAttribute("data-theme") === "dark" ||
-          (!document.documentElement.getAttribute("data-theme") &&
-            window.matchMedia?.("(prefers-color-scheme: dark)")?.matches));
-
   const handleFileChange = useCallback(
     (file: File) => {
       if (!file.type.startsWith("image/")) {
@@ -76,15 +66,7 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
         const result = reader.result as string;
         if (result) {
           setBackgroundImage(result);
-          if (!isDark) {
-            toast(
-              t("settings.customization.dark_theme_only") ||
-                "Customization is only available for dark theme",
-              "info",
-            );
-          } else {
-            toast(t("settings.customization.applied") || "Wallpaper applied", "success");
-          }
+          toast(t("settings.customization.applied") || "Wallpaper applied", "success");
         }
       };
       reader.onerror = () => {
@@ -92,7 +74,7 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
       };
       reader.readAsDataURL(file);
     },
-    [setBackgroundImage, toast, t, isDark],
+    [setBackgroundImage, toast, t],
   );
 
   const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

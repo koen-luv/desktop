@@ -209,7 +209,7 @@ function MiniPlayer({
   const usesBackgroundProgress = true;
   const backgroundImage = useCustomizationStore((state) => state.backgroundImage);
   const miniplayerConfig = useCustomizationStore((state) => state.miniplayer);
-  const hasCustomBg = Boolean(backgroundImage && !isLight);
+  const hasCustomBg = Boolean(backgroundImage);
   const miniplayerCustomStyle = getBlockStyle(miniplayerConfig, !isLight, hasCustomBg);
   const [accentColor, setAccentColor] = useState(
     isLight ? "rgba(0, 0, 0, 0.06)" : "rgba(255, 255, 255, 0.12)",

@@ -161,7 +161,7 @@ function Sidebar({ searchOpen, onSearchToggle }: SidebarProps) {
             window.matchMedia?.("(prefers-color-scheme: dark)")?.matches));
   const backgroundImage = useCustomizationStore((state) => state.backgroundImage);
   const sidebarConfig = useCustomizationStore((state) => state.sidebar);
-  const hasCustomBg = Boolean(backgroundImage && isDark);
+  const hasCustomBg = Boolean(backgroundImage);
   const sidebarStyle = getBlockStyle(sidebarConfig, isDark, hasCustomBg);
 
   return (

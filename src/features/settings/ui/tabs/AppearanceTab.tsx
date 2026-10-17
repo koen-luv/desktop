@@ -6,10 +6,6 @@ import {
 } from "@/features/player";
 import { useTranslation, LOCALE_OPTIONS } from "@/languages";
 import { Select } from "@/shared/ui";
-import {
-  useCustomizationStore,
-  selectIsGlassThemeActive,
-} from "../../store/customizationStore";
 import { SettingBlock, SettingRow, SettingSection } from "../controls";
 import defaultLogo from "@/assets/branding/logo-default.svg";
 import spotifyLogo from "@/assets/branding/logo-spotify.svg";
@@ -178,16 +174,10 @@ export function AppearanceTab({ searchQuery }: { searchQuery?: string }) {
   const { theme, setTheme } = useTheme();
   const accentVariant = usePlayerStore((state) => state.accentVariant);
   const setAccentVariant = usePlayerStore((state) => state.setAccentVariant);
-  const isGlassActive = useCustomizationStore(selectIsGlassThemeActive);
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  const systemIsLight =
-    mounted &&
-    typeof window !== "undefined" &&
-    !window.matchMedia("(prefers-color-scheme: dark)").matches;
 
   return (
     <SettingSection>
@@ -214,14 +204,9 @@ export function AppearanceTab({ searchQuery }: { searchQuery?: string }) {
 
       <SettingBlock
         title={t("settings.theme.title")}
-        description={
-          isGlassActive
-            ? t("settings.theme.disabled_for_glass") ||
-              "Light theme is disabled when using custom wallpaper glassmorphism."
-            : t("settings.theme.description")
-        }
+        description={t("settings.theme.description")}
         titleKey="settings.theme.title"
-        descKey={isGlassActive ? undefined : "settings.theme.description"}
+        descKey="settings.theme.description"
         searchQuery={searchQuery}
       >
         {mounted ? (
@@ -233,23 +218,12 @@ export function AppearanceTab({ searchQuery }: { searchQuery?: string }) {
                 { value: "dark", label: t("settings.theme.dark") },
               ] as const
             ).map((item) => {
-              const isLightOpt = item.value === "light";
-              const isSystemLightOpt = item.value === "system" && systemIsLight;
-              const disabled = isGlassActive && (isLightOpt || isSystemLightOpt);
-
               return (
                 <ThemeCard
                   key={item.value}
                   mode={item.value}
                   label={item.label}
                   active={theme === item.value}
-                  disabled={disabled}
-                  disabledReason={
-                    disabled
-                      ? t("settings.theme.disabled_for_glass") ||
-                        "Light theme is disabled when using custom wallpaper glassmorphism."
-                      : undefined
-                  }
                   onSelect={() => setTheme(item.value)}
                 />
               );
