@@ -68,8 +68,8 @@ function ScrollingLabel({ text }: { text: string }) {
 
   useLayoutEffect(() => {
     if (!outerRef.current || !innerRef.current) return;
-    const d = innerRef.current.scrollWidth - outerRef.current.clientWidth;
-    setDelta(Math.max(0, d));
+    const d = Math.round(innerRef.current.scrollWidth - outerRef.current.clientWidth);
+    setDelta(d > 4 ? d : 0);
   });
 
   const maskStyle = delta > 0
@@ -157,7 +157,10 @@ export function Select<T extends string = string>({
       menu.style.left = `${trigger.left}px`;
       menu.style.right = "";
     }
-    menu.style.width = `${trigger.width}px`;
+    const computedMinWidth = Math.max(trigger.width, 150);
+    menu.style.minWidth = `${computedMinWidth}px`;
+    menu.style.width = "max-content";
+    menu.style.maxWidth = "calc(100vw - 32px)";
 
     const menuRect = menu.getBoundingClientRect();
     const top =
@@ -167,7 +170,9 @@ export function Select<T extends string = string>({
 
     setMenuStyle({
       top,
-      width: trigger.width,
+      minWidth: computedMinWidth,
+      width: "max-content",
+      maxWidth: "calc(100vw - 32px)",
       ...(align === "bottom-right"
         ? { right: window.innerWidth - trigger.right }
         : { left: trigger.left }),
