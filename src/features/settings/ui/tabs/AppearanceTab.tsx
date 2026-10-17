@@ -288,7 +288,7 @@ export function AppearanceTab({ searchQuery }: { searchQuery?: string }) {
               options={artworkSizeOptions}
               value={fullscreenArtworkSize}
               onChange={setFullscreenArtworkSize}
-              ariaLabel="Fullscreen artwork size"
+              ariaLabel={t("settings.artwork_size.title")}
             />
             <span
               className="text-[12px] text-text-tertiary whitespace-nowrap"
