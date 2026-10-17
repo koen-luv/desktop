@@ -11,6 +11,38 @@ import {
 } from "@/shared/api";
 import { usePlayerStore, playerRuntime } from "@/features/player";
 
+// ---------------------------------------------------------------------------
+// Dev-only auth escape hatch.
+//
+// Set `localStorage.linerDevAuth = "1"` to skip the login gate when running
+// `pnpm dev`, for local UI testing without a backend account. This is guarded
+// by `import.meta.env.DEV`, which Vite statically inlines as `false` in
+// production builds — so the whole block is dead-code-removed and can never
+// ship as an auth hole in the release APK/web bundle. Note the app's data
+// (library, playback, party) is still fetched from the API and needs a real
+// token; this only removes the login screen.
+const DEV_AUTH_FLAG_KEY = "linerDevAuth";
+
+function devAuthBypassActive(): boolean {
+  if (!import.meta.env.DEV) return false;
+  try {
+    return (
+      typeof localStorage !== "undefined" &&
+      localStorage.getItem(DEV_AUTH_FLAG_KEY) === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+
+const DEV_AUTH_STUB_USER: AuthUser = {
+  id: "dev-auth-bypass",
+  email: "dev@localhost",
+  username: "dev",
+  displayName: "Dev (auth bypass)",
+};
+// ---------------------------------------------------------------------------
+
 export type AuthStatus = "initializing" | "authenticated" | "anonymous";
 export type AuthState = {
   status: AuthStatus;
@@ -31,6 +63,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   status: "initializing",
   user: null,
   initialize: async () => {
+    if (devAuthBypassActive()) {
+      set({ status: "authenticated", user: DEV_AUTH_STUB_USER });
+      return;
+    }
     const stored = getAuthSession();
     if (!stored) {
       set({ status: "anonymous", user: null });
