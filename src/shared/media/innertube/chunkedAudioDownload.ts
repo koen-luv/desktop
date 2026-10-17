@@ -1,3 +1,5 @@
+import { runWorkerPool } from "@/shared/utils/workerPool";
+
 export interface AudioDownloadOptions {
   contentLength?: number;
   signal?: AbortSignal;
@@ -45,15 +47,10 @@ async function downloadInChunks(url: string, total: number, options: AudioDownlo
   const chunkSize = options.chunkSize ?? DEFAULT_CHUNK_SIZE;
   const starts = Array.from({ length: Math.ceil(total / chunkSize) }, (_, index) => index * chunkSize);
   const output = new Uint8Array(total);
-  let cursor = 0;
-  const worker = async () => {
-    while (cursor < starts.length) {
-      const start = starts[cursor++];
-      const end = Math.min(start + chunkSize, total) - 1;
-      output.set(await fetchChunk(url, start, end, options.signal), start);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(options.concurrency ?? DEFAULT_CONCURRENCY, starts.length) }, worker));
+  await runWorkerPool(starts, options.concurrency ?? DEFAULT_CONCURRENCY, async (start) => {
+    const end = Math.min(start + chunkSize, total) - 1;
+    output.set(await fetchChunk(url, start, end, options.signal), start);
+  });
   return output;
 }
 

@@ -1,3 +1,4 @@
+import { runWorkerPool } from "@/shared/utils/workerPool";
 import { SoundCloudUnavailableError } from "./soundcloudTranscodings";
 
 export interface HlsMediaPlaylist {
@@ -75,25 +76,13 @@ export async function downloadHlsAudio(playlistUrl: string, options: HlsDownload
   const playlist = await loadMediaPlaylist(playlistUrl, signal);
   const urls = playlist.initSegment ? [playlist.initSegment, ...playlist.segments] : playlist.segments;
   const parts = Array.from({ length: urls.length }, () => new Uint8Array(0));
-  let cursor = 0;
   let total = 0;
-  let failed = false;
-  const worker = async () => {
-    while (cursor < urls.length && !failed) {
-      const index = cursor++;
-      const part = await fetchBytes(urls[index], signal);
-      total += part.byteLength;
-      if (total > maxBytes) throw new Error(`HLS stream is larger than ${maxBytes} bytes`);
-      parts[index] = part;
-    }
-  };
-  const workers = Array.from({ length: Math.min(options.concurrency ?? DEFAULT_CONCURRENCY, urls.length) }, () =>
-    worker().catch((error: unknown) => {
-      failed = true;
-      throw error;
-    }),
-  );
-  await Promise.all(workers);
+  await runWorkerPool(urls, options.concurrency ?? DEFAULT_CONCURRENCY, async (url, index) => {
+    const part = await fetchBytes(url, signal);
+    total += part.byteLength;
+    if (total > maxBytes) throw new Error(`HLS stream is larger than ${maxBytes} bytes`);
+    parts[index] = part;
+  });
   const output = new Uint8Array(total);
   let offset = 0;
   for (const part of parts) {
