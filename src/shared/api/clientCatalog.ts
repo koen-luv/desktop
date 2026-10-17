@@ -1,4 +1,6 @@
 import { innertubeCatalog } from "@/shared/media/innertube";
+import { isAbortError } from "@/shared/utils/abort";
+import { log } from "@/shared/utils/logger";
 import type {
   AlbumDetails,
   ArtistDetails,
@@ -16,16 +18,12 @@ export function isClientCatalogId(id: string): boolean {
   return !SERVER_ONLY_ID.test(id.trim());
 }
 
-function isAbort(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError";
-}
-
 async function preferClient<T>(label: string, client: () => Promise<T>, server: () => Promise<T>): Promise<T> {
   try {
     return await client();
   } catch (error) {
-    if (isAbort(error)) throw error;
-    console.warn(`[ClientCatalog] ${label} failed on client, using server fallback:`, error);
+    if (isAbortError(error)) throw error;
+    log("yellow", "catalog", `${label} failed on client, using server fallback`, error);
     return server();
   }
 }

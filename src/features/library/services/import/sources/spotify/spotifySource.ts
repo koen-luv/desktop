@@ -1,5 +1,5 @@
 import type { ClientImportedPlaylist, ClientImportedTrack } from "../../importTypes";
-import { rethrowIfAborted } from "../../shared/http";
+import { rethrowIfAborted } from "@/shared/utils/abort";
 import { fetchSpotifyEmbed } from "./spotifyEmbed";
 import { fetchSpotifyPlaylistTracks } from "./spotifyPathfinder";
 import { parseSpotifyUrl, resolveSpotifyUrl, type SpotifyEntityType } from "./spotifyUrl";

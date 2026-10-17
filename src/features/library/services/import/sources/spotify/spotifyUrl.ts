@@ -1,4 +1,4 @@
-import { rethrowIfAborted } from "../../shared/http";
+import { rethrowIfAborted } from "@/shared/utils/abort";
 
 export type SpotifyEntityType = "playlist" | "album" | "track";
 

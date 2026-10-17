@@ -1,4 +1,4 @@
-import { rethrowIfAborted } from "../../shared/http";
+import { rethrowIfAborted } from "@/shared/utils/abort";
 
 export async function resolveSoundCloudUrl(rawUrl: string, signal?: AbortSignal): Promise<string> {
   let url = rawUrl.trim();

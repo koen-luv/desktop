@@ -1,5 +1,5 @@
 import { asArray, asRecord, type JsonRecord } from "@/shared/utils/json";
-import { rethrowIfAborted } from "../../shared/http";
+import { rethrowIfAborted } from "@/shared/utils/abort";
 import { rememberSoundCloudClientId, SOUNDCLOUD_API } from "@/shared/media/soundcloud";
 
 const STUB_CHUNK_SIZE = 50;

@@ -1,5 +1,5 @@
 import { asArray, asRecord, isRecord, trimmedString } from "@/shared/utils/json";
-import { rethrowIfAborted } from "../../shared/http";
+import { rethrowIfAborted } from "@/shared/utils/abort";
 import { rememberSoundCloudClientId, SOUNDCLOUD_API } from "@/shared/media/soundcloud";
 import type { SoundCloudCollection } from "./soundcloudCollection";
 import { collectSoundCloudLikes, isSoundCloudUserEntity } from "./soundcloudLikes";

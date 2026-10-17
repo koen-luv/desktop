@@ -1,6 +1,6 @@
 import { asRecord, findFirst, trimmedString } from "@/shared/utils/json";
 import { postInnertube } from "@/shared/media/innertube/innertubeClient";
-import { rethrowIfAborted } from "../../shared/http";
+import { rethrowIfAborted } from "@/shared/utils/abort";
 
 function commandToken(endpoint: unknown): string | undefined {
   return trimmedString(asRecord(asRecord(endpoint)?.continuationCommand)?.token);

@@ -1,10 +1,10 @@
 import { resolveDirectAudioStream, toVideoId } from "@/shared/media/innertube";
 import { resolveSoundCloudStream, toSoundCloudTrackId } from "@/shared/media/soundcloud";
+import { isAbortError } from "@/shared/utils/abort";
 import { log } from "@/shared/utils/logger";
 import {
   fromInnertubeStream,
   fromSoundCloudStream,
-  isAbort,
   type PlayableTrack,
   type PlaybackStream,
 } from "./playbackStream";
@@ -23,12 +23,12 @@ async function resolveSoundCloud(track: PlayableTrack, signal?: AbortSignal): Pr
   try {
     return fromSoundCloudStream(await resolveSoundCloudStream(track.id, { signal }));
   } catch (soundCloudError) {
-    if (isAbort(soundCloudError, signal)) throw soundCloudError;
+    if (isAbortError(soundCloudError, signal)) throw soundCloudError;
     log("yellow", "playback", `soundcloud resolution failed, searching youtube: ${String(soundCloudError)}`);
     try {
       return await resolveYoutubeStandIn(track, signal);
     } catch (standInError) {
-      if (isAbort(standInError, signal)) throw standInError;
+      if (isAbortError(standInError, signal)) throw standInError;
       throw soundCloudError;
     }
   }

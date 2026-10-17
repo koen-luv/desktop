@@ -31,10 +31,6 @@ function toTimestamp(value: string | null | undefined): number | null {
   return Number.isFinite(time) ? time : null;
 }
 
-export function isAbort(error: unknown, signal?: AbortSignal): boolean {
-  return Boolean(signal?.aborted) || (error instanceof DOMException && error.name === "AbortError");
-}
-
 export function fromInnertubeStream(direct: ResolvedAudioStream): PlaybackStream {
   return {
     url: direct.url,
