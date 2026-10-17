@@ -788,7 +788,9 @@ export default function AppFrame({ children }: AppFrameProps) {
         {shouldShowMiniPlayer && (
           <div
             ref={miniPlayerContainerRef}
-            className="relative z-[40] w-full shrink-0"
+            // Above the right drawer (z-50) so the player's volume/speed/queue
+            // popups, which live in this stacking context, aren't hidden by it.
+            className="relative z-[55] w-full shrink-0"
           >
             <MiniPlayer
               embedded
