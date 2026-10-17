@@ -1,5 +1,5 @@
 import type { ClientImportedPlaylist, ClientImportedTrack } from "../../importTypes";
-import { getSoundCloudClientIdCandidates } from "@/shared/media/soundcloud";
+import { getSoundCloudClientId } from "@/shared/media/soundcloud";
 import { createSoundCloudCollection } from "./soundcloudCollection";
 import { scrapeSoundCloudHydration } from "./soundcloudHydration";
 import { resolveSoundCloudApi } from "./soundcloudResolve";
@@ -8,7 +8,6 @@ import { mapSoundCloudTrack, soundCloudCanonicalId } from "./soundcloudTracks";
 import { isSoundCloudLikesUrl, resolveSoundCloudUrl } from "./soundcloudUrl";
 
 export interface SoundCloudImportOptions {
-  clientId?: string;
   signal?: AbortSignal;
 }
 
@@ -24,12 +23,12 @@ export async function importSoundCloud(
     await scrapeSoundCloudHydration(canonicalUrl, collection, signal);
   }
 
-  const clientIds = await getSoundCloudClientIdCandidates(options.clientId, signal);
+  await getSoundCloudClientId(undefined, signal);
   if (collection.rawTracks.length === 0) {
-    await resolveSoundCloudApi(canonicalUrl, clientIds, collection, signal);
+    await resolveSoundCloudApi(canonicalUrl, collection, signal);
   }
 
-  const rawTracks = await hydrateSoundCloudStubs(collection.rawTracks, clientIds, signal);
+  const rawTracks = await hydrateSoundCloudStubs(collection.rawTracks, signal);
   const tracks = rawTracks
     .map(mapSoundCloudTrack)
     .filter((track): track is ClientImportedTrack => Boolean(track));

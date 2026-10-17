@@ -1,6 +1,5 @@
 export {
   getSoundCloudClientId,
-  getSoundCloudClientIdCandidates,
   refreshSoundCloudClientId,
   rememberSoundCloudClientId,
   resetSoundCloudClientIdCache,

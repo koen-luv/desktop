@@ -43,7 +43,3 @@ export async function refreshSoundCloudClientId(rejectedClientId: string, signal
   const discovered = await discoverSoundCloudClientId(signal);
   return discovered && discovered !== rejectedClientId ? discovered : undefined;
 }
-
-export async function getSoundCloudClientIdCandidates(configuredClientId?: string, signal?: AbortSignal): Promise<string[]> {
-  return [await getSoundCloudClientId(configuredClientId, signal)];
-}
