@@ -193,9 +193,13 @@ jobs:
             echo "No ANDROID_KEYSTORE_BASE64 secret — building an unsigned release APK."
           fi
 
-      - name: Build Android release APK
+      # Build both variants. The release APK is signed only when the keystore
+      # secrets are present (otherwise it is unsigned and not installable).
+      # The debug APK is auto-signed by the SDK with the debug key, so it is
+      # always installable for sideload testing even without release signing.
+      - name: Build Android APKs (release + debug)
         working-directory: android
-        run: ./gradlew :app:assembleRelease --no-daemon
+        run: ./gradlew :app:assembleRelease :app:assembleDebug --no-daemon
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -204,6 +208,7 @@ jobs:
           mkdir -p android-out
           find android/app/build/outputs/apk -name '*.apk' -exec cp {} android-out/ \;
           ls -la android-out
+          echo "Install app-debug.apk for sideloading (signed with the debug key)."
 
       - name: Upload Android Artifacts
         uses: actions/upload-artifact@v4
