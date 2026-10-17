@@ -1,4 +1,4 @@
-import { asRecord } from "@/shared/media/innertube/innertubeJson";
+import { asRecord } from "@/shared/utils/json";
 import { tryFetchJson, tryFetchText } from "../../shared/http";
 
 export interface SpotifyTotpSecret {

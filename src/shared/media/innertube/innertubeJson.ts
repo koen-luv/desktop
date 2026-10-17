@@ -1,7 +1,5 @@
 import { asArray, asRecord, type JsonRecord } from "@/shared/utils/json";
 
-export { asRecord } from "@/shared/utils/json";
-
 export function getRuns(value: unknown): JsonRecord[] {
   return asArray(asRecord(value)?.runs)
     .map(asRecord)
