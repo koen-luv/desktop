@@ -189,7 +189,6 @@ function SongCard({
                 fontFamily: "var(--font-inter), sans-serif",
                 fontWeight: 400,
               }}
-              title={title}
             >
               {title}
             </h3>

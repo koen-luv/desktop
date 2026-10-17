@@ -1,90 +1,23 @@
-// primary api and polish edge relay fallback
 export const DEFAULT_PRIMARY_API = "https://api.tryliner.fun";
-export const FALLBACK_EDGE_API = "http://edge.tryliner.fun:10518";
 
-const STORAGE_KEY = "liner_active_api_base";
-const HEALTH_TIMEOUT_MS = 6000;
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
-function isExplicitCustomOverride(url?: string): boolean {
-  if (!url) return false;
-  const clean = url.replace(/\/+$/, "");
-  return clean.length > 0 && clean !== DEFAULT_PRIMARY_API && clean !== FALLBACK_EDGE_API;
-}
-
-function loadStoredBaseUrl(): string {
-  const envUrl = import.meta.env.VITE_API_URL as string | undefined;
-  if (isExplicitCustomOverride(envUrl)) {
-    return envUrl!.replace(/\/+$/, "");
-  }
-  return DEFAULT_PRIMARY_API;
-}
-
-function persistBaseUrl(url: string): void {
-  if (typeof window === "undefined") return;
+export function isSecureBaseUrl(url: string): boolean {
   try {
-    localStorage.setItem(STORAGE_KEY, url);
-  } catch {}
+    const { protocol, hostname } = new URL(url);
+    return protocol === "https:" || (protocol === "http:" && LOOPBACK_HOSTS.has(hostname));
+  } catch {
+    return false;
+  }
 }
 
-let currentBaseUrl = loadStoredBaseUrl();
-let probePromise: Promise<string> | null = null;
+export function resolveApiBaseUrl(envUrl: string | undefined): string {
+  const clean = envUrl?.trim().replace(/\/+$/, "");
+  return clean && isSecureBaseUrl(clean) ? clean : DEFAULT_PRIMARY_API;
+}
+
+const baseUrl = resolveApiBaseUrl(import.meta.env.VITE_API_URL as string | undefined);
 
 export function getApiBaseUrl(): string {
-  return currentBaseUrl;
-}
-
-export function setApiBaseUrl(url: string): void {
-  currentBaseUrl = url.replace(/\/+$/, "");
-  persistBaseUrl(currentBaseUrl);
-}
-
-// never fall back to the edge relay while it is plain http: it would carry tokens and passwords unencrypted
-export function switchToFallbackEdge(): boolean {
-  return false;
-}
-
-export function switchToPrimaryApi(): void {
-  currentBaseUrl = DEFAULT_PRIMARY_API;
-  persistBaseUrl(DEFAULT_PRIMARY_API);
-}
-
-// eagerly probes primary health on launch and switches to edge if cloudflare is unreachable
-export function initApiEndpointProbe(timeoutMs = HEALTH_TIMEOUT_MS): Promise<string> {
-  if (probePromise) return probePromise;
-  const envUrl = import.meta.env.VITE_API_URL as string | undefined;
-  if (isExplicitCustomOverride(envUrl)) {
-    return Promise.resolve(currentBaseUrl);
-  }
-
-  probePromise = (async () => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(`${DEFAULT_PRIMARY_API}/health`, {
-        method: "GET",
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-      if (res.ok) {
-        currentBaseUrl = DEFAULT_PRIMARY_API;
-        persistBaseUrl(DEFAULT_PRIMARY_API);
-        return DEFAULT_PRIMARY_API;
-      }
-    } catch {}
-
-    clearTimeout(timer);
-    return DEFAULT_PRIMARY_API;
-  })();
-
-  return probePromise;
-}
-
-// reset probe promise (useful for tests and manual retry)
-export function resetEndpointProbe(): void {
-  probePromise = null;
-}
-
-// trigger health probe eagerly on startup in production/dev runtime
-if (typeof window !== "undefined" && !import.meta.env.TEST) {
-  initApiEndpointProbe().catch(() => {});
+  return baseUrl;
 }

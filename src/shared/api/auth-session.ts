@@ -3,7 +3,7 @@ import { signApiRequest, syncServerTime } from "./requestSigner";
 
 export type { AuthTokens, AuthUser };
 
-import { DEFAULT_PRIMARY_API, getApiBaseUrl, switchToFallbackEdge, switchToPrimaryApi } from "./baseUrl";
+import { getApiBaseUrl } from "./baseUrl";
  
 const STORAGE_KEY = "liner_auth_session";
 
@@ -119,49 +119,16 @@ export function refreshAuthSession(): Promise<AuthTokens | null> {
   refreshPromise = (async () => {
     try {
       const body = JSON.stringify({ refreshToken: current.refreshToken });
-      let signedHeaders = await signApiRequest("POST", "/v1/auth/refresh", body);
+      const signedHeaders = await signApiRequest("POST", "/v1/auth/refresh", body);
 
-      let response: Response;
-      try {
-        response = await fetch(`${getApiBaseUrl()}/v1/auth/refresh`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...signedHeaders,
-          },
-          body,
-        });
-      } catch (networkErr) {
-        if (switchToFallbackEdge()) {
-          try {
-            signedHeaders = await signApiRequest("POST", "/v1/auth/refresh", body);
-            response = await fetch(`${getApiBaseUrl()}/v1/auth/refresh`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                ...signedHeaders,
-              },
-              body,
-            });
-          } catch (fallbackErr) {
-            switchToPrimaryApi();
-            throw fallbackErr;
-          }
-        } else if (getApiBaseUrl() !== DEFAULT_PRIMARY_API) {
-          switchToPrimaryApi();
-          signedHeaders = await signApiRequest("POST", "/v1/auth/refresh", body);
-          response = await fetch(`${getApiBaseUrl()}/v1/auth/refresh`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...signedHeaders,
-            },
-            body,
-          });
-        } else {
-          throw networkErr;
-        }
-      }
+      const response = await fetch(`${getApiBaseUrl()}/v1/auth/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...signedHeaders,
+        },
+        body,
+      });
 
       const dateHeader = response.headers?.get?.("date");
       if (dateHeader) {

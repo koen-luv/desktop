@@ -18,6 +18,7 @@ export interface RecordPlaybackEventRequest {
   playbackSessionId: string;
   listeningSessionId: string;
   trackId: string;
+  trackSnapshot?: Track;
   playedDurationMs: number;
   trackDurationMs?: number;
   completionRate: number;
