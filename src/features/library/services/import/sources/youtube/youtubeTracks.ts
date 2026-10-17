@@ -1,7 +1,6 @@
 import { mapInnertubeTrack } from "@/shared/media/innertube/innertubeTrackMapper";
 import type { ClientImportedTrack } from "../../importTypes";
 import { collectByKey } from "@/shared/utils/json";
-import { parseFallbackTrack } from "./youtubeFallbackTrack";
 import { youtubeThumbnailUrl } from "./youtubeUrl";
 
 function mapRendererTrack(rawRenderer: unknown, seenIds: Set<string>): ClientImportedTrack | undefined {
@@ -22,7 +21,7 @@ function mapRendererTrack(rawRenderer: unknown, seenIds: Set<string>): ClientImp
 
 export function parseInnertubeTracks(body: unknown, seenIds: Set<string>, tracks: ClientImportedTrack[]): void {
   for (const rawRenderer of collectByKey(body, "musicResponsiveListItemRenderer")) {
-    const track = mapRendererTrack(rawRenderer, seenIds) ?? parseFallbackTrack(rawRenderer, seenIds);
+    const track = mapRendererTrack(rawRenderer, seenIds);
     if (track) tracks.push(track);
   }
 }
