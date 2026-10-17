@@ -68,6 +68,7 @@ const SETTING_ITEMS: { tabId: TabId; titleKey: string; descKey?: string }[] = [
   { tabId: "Discord", titleKey: "settings.discord.show_artist_image.title", descKey: "settings.discord.show_artist_image.description" },
   { tabId: "Discord", titleKey: "settings.discord.show_paused.title", descKey: "settings.discord.show_paused.description" },
   { tabId: "Discord", titleKey: "settings.discord.show_button.title", descKey: "settings.discord.show_button.description" },
+  { tabId: "Discord", titleKey: "settings.discord.show_download_button.title", descKey: "settings.discord.show_download_button.description" },
   { tabId: "Discord", titleKey: "settings.discord.client_id.title", descKey: "settings.discord.client_id.description" },
 
   // Appearance

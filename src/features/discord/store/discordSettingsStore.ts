@@ -15,6 +15,7 @@ interface DiscordSettingsState extends DiscordRpcSettings {
   setShowTime: (showTime: boolean) => void;
   setShowPaused: (showPaused: boolean) => void;
   setShowButton: (showButton: boolean) => void;
+  setShowDownloadButton: (showDownloadButton: boolean) => void;
 }
 
 function notifyElectron(patch: Partial<DiscordRpcSettings>) {
@@ -60,13 +61,22 @@ export const useDiscordSettingsStore = create<DiscordSettingsState>()(
         set({ showButton });
         notifyElectron({ showButton });
       },
+      setShowDownloadButton: (showDownloadButton) => {
+        set({ showDownloadButton });
+        notifyElectron({ showDownloadButton });
+      },
     }),
     {
       name: "liner_discord_settings_v1",
       storage: createJSONStorage(() => localStorage),
       onRehydrateStorage: () => (state) => {
-        if (state && (state.applicationId === "1165957668758900787" || !state.applicationId)) {
-          state.setApplicationId(DEFAULT_DISCORD_CLIENT_ID);
+        if (state) {
+          if (state.applicationId === "1165957668758900787" || !state.applicationId) {
+            state.setApplicationId(DEFAULT_DISCORD_CLIENT_ID);
+          }
+          if (typeof state.showDownloadButton !== "boolean") {
+            state.setShowDownloadButton(true);
+          }
         }
       },
     }

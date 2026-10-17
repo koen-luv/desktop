@@ -481,6 +481,9 @@
     },
     "discord": {
       "description": "Відображення поточного треку в Discord з обкладинкою, фото артиста та шкалою часу.",
+      "section_display": "Параметри відображення",
+      "section_buttons": "Кнопки профілю",
+      "section_advanced": "Додатково",
       "enable": {
         "title": "Discord Rich Presence",
         "description": "Транслювати активне відтворення музики у ваш профіль Discord."
@@ -504,6 +507,10 @@
       "show_button": {
         "title": "Кнопка «Слухати в Liner»",
         "description": "Додавати інтерактивну кнопку з посиланням на трек у Liner."
+      },
+      "show_download_button": {
+        "title": "Кнопка «Завантажити Liner»",
+        "description": "Додавати кнопку з посиланням на tryliner.fun для завантаження додатку."
       },
       "client_id": {
         "title": "ID додатку Discord",

@@ -477,6 +477,9 @@
     },
     "discord": {
       "description": "Show what you're listening to on Discord with album art, artist badge and progress bar.",
+      "section_display": "Display Options",
+      "section_buttons": "Profile Buttons",
+      "section_advanced": "Advanced",
       "enable": {
         "title": "Discord Rich Presence",
         "description": "Broadcast your active music playback to your Discord profile."
@@ -500,6 +503,10 @@
       "show_button": {
         "title": "'Listen on Liner' Button",
         "description": "Add an interactive button linking to the song on Liner."
+      },
+      "show_download_button": {
+        "title": "'Download Liner' Button",
+        "description": "Add an interactive button linking to tryliner.fun to download the app."
       },
       "client_id": {
         "title": "Discord Application ID",

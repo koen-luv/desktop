@@ -6,6 +6,7 @@ export interface DiscordRpcSettings {
   showTime: boolean;
   showPaused: boolean;
   showButton: boolean;
+  showDownloadButton: boolean;
 }
 
 export interface DiscordRpcTrackInfo {
@@ -36,4 +37,5 @@ export const DEFAULT_DISCORD_SETTINGS: DiscordRpcSettings = {
   showTime: true,
   showPaused: true,
   showButton: true,
+  showDownloadButton: true,
 };

@@ -13,6 +13,7 @@ describe("discordSettingsStore", () => {
     store.setShowTime(true);
     store.setShowPaused(true);
     store.setShowButton(true);
+    store.setShowDownloadButton(true);
   });
 
   it("initializes with expected default values", () => {
@@ -24,6 +25,7 @@ describe("discordSettingsStore", () => {
     expect(state.showTime).toBe(true);
     expect(state.showPaused).toBe(true);
     expect(state.showButton).toBe(true);
+    expect(state.showDownloadButton).toBe(true);
   });
 
   it("updates and resets custom application ID", () => {
@@ -49,6 +51,9 @@ describe("discordSettingsStore", () => {
 
     store.setShowButton(false);
     expect(useDiscordSettingsStore.getState().showButton).toBe(false);
+
+    store.setShowDownloadButton(false);
+    expect(useDiscordSettingsStore.getState().showDownloadButton).toBe(false);
 
     store.setShowArtwork(false);
     expect(useDiscordSettingsStore.getState().showArtwork).toBe(false);

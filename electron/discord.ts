@@ -9,6 +9,7 @@ export interface DiscordRpcSettings {
   showTime: boolean;
   showPaused: boolean;
   showButton: boolean;
+  showDownloadButton: boolean;
 }
 
 export interface DiscordRpcTrackInfo {
@@ -39,6 +40,7 @@ const DEFAULT_SETTINGS: DiscordRpcSettings = {
   showTime: true,
   showPaused: true,
   showButton: true,
+  showDownloadButton: true,
 };
 
 const RECONNECT_INTERVAL_MS = 15_000;
@@ -262,14 +264,25 @@ export class DiscordRpcManager {
         activity.smallImageText = sanitizeText(track.artist) || "Artist";
       }
 
-      // Action button linking to the song on Liner
+      // Action buttons linking to song or tryliner.fun (Discord allows up to 2 buttons)
+      const buttons: Array<{ label: string; url: string }> = [];
+
       if (this.settings.showButton && track.id) {
-        activity.buttons = [
-          {
-            label: "Listen on Liner",
-            url: `https://link.tryliner.fun/track?id=${encodeURIComponent(track.id)}`,
-          },
-        ];
+        buttons.push({
+          label: "Listen on Liner",
+          url: `https://link.tryliner.fun/track?id=${encodeURIComponent(track.id)}`,
+        });
+      }
+
+      if (this.settings.showDownloadButton) {
+        buttons.push({
+          label: "Download Liner",
+          url: "https://tryliner.fun",
+        });
+      }
+
+      if (buttons.length > 0) {
+        activity.buttons = buttons;
       }
 
       await this.client.user.setActivity(activity);
