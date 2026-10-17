@@ -521,14 +521,6 @@
         "title": "Botón 'Descargar Liner'",
         "description": "Añade un botón interactivo que enlaza a tryliner.fun para descargar la aplicación."
       },
-      "section_test": "Probar Presence",
-      "test_playback": {
-        "title": "Vista previa de estado en Discord",
-        "description": "Reproduce una canción demo o carga cualquier archivo MP3 local para probar Discord Rich Presence sin necesidad del servidor API.",
-        "play_demo": "Reproducir canción demo",
-        "load_file": "Cargar MP3 local...",
-        "loading": "Cargando..."
-      },
       "client_id": {
         "title": "ID de aplicación de Discord",
         "description": "ID de aplicación personalizado de Discord. Déjalo por defecto o crea tu propia app en el Discord Developer Portal.",

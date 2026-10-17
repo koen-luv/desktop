@@ -521,14 +521,6 @@
         "title": "Кнопка «Скачать Liner»",
         "description": "Добавлять интерактивную кнопку со ссылкой на tryliner.fun для загрузки приложения."
       },
-      "section_test": "Тестирование Presence",
-      "test_playback": {
-        "title": "Проверка статуса в Discord",
-        "description": "Воспроизведите демо-трек или загрузите локальный MP3-файл для проверки Discord Rich Presence без подключения к API.",
-        "play_demo": "Играть демо-трек",
-        "load_file": "Загрузить локальный MP3...",
-        "loading": "Загрузка..."
-      },
       "client_id": {
         "title": "ID приложения Discord",
         "description": "Пользовательский Application ID из Discord Developer Portal для кастомного названия.",

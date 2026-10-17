@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "@/languages";
 import {
   useDiscordSettingsStore,
@@ -7,10 +7,7 @@ import {
 } from "@/features/discord";
 import { ToggleSwitch, Button, TextInput, Select } from "@/shared/ui";
 import { SettingRow, SettingSection } from "../controls";
-import { Refresh1Line, FolderOpenLine, Music2Line } from "@mingcute/react";
-import { playerEngine } from "@/features/player";
-import { linerDb } from "@/shared/storage";
-import type { Track } from "@/shared/types";
+import { Refresh1Line } from "@mingcute/react";
 
 export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
   const { t } = useTranslation();
@@ -47,69 +44,6 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
 
   const showDownloadButton = useDiscordSettingsStore((s) => s.showDownloadButton);
   const setShowDownloadButton = useDiscordSettingsStore((s) => s.setShowDownloadButton);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isPlayingDemo, setIsPlayingDemo] = useState(false);
-
-  const handlePlayDemo = async () => {
-    try {
-      setIsPlayingDemo(true);
-      const DEMO_TRACK_ID = "demo-sample-track";
-      const DEMO_TRACK: Track = {
-        id: DEMO_TRACK_ID,
-        title: "Starboy",
-        artists: "The Weeknd",
-        album: { id: "starboy-album", title: "Starboy" },
-        durationMs: 32000,
-        coverUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80",
-        playCount: 1,
-      };
-
-      const cached = await linerDb.getAudio(DEMO_TRACK_ID);
-      if (!cached) {
-        const res = await fetch("/demo.mp3");
-        const blob = await res.blob();
-        await linerDb.putAudio(DEMO_TRACK_ID, blob, "audio/mpeg");
-      }
-      await linerDb.putTrack(DEMO_TRACK);
-      await playerEngine.playTrack(DEMO_TRACK);
-    } catch (err) {
-      console.error("[DiscordTab] Failed to play demo track", err);
-    } finally {
-      setIsPlayingDemo(false);
-    }
-  };
-
-  const handleLoadLocalFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const rawName = file.name.replace(/\.[^/.]+$/, "");
-      const parts = rawName.split(" - ");
-      const artist = parts.length > 1 ? parts[0].trim() : "Local Artist";
-      const title = parts.length > 1 ? parts.slice(1).join(" - ").trim() : rawName.trim();
-      const trackId = `local-${Date.now()}`;
-
-      const localTrack: Track = {
-        id: trackId,
-        title: title || "Unknown Title",
-        artists: artist || "Local Artist",
-        album: { id: "local-album", title: "Local Music" },
-        durationMs: 180000,
-        coverUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80",
-        playCount: 1,
-      };
-
-      await linerDb.putAudio(trackId, file, file.type || "audio/mpeg");
-      await linerDb.putTrack(localTrack);
-      await playerEngine.playTrack(localTrack);
-    } catch (err) {
-      console.error("[DiscordTab] Failed to load local file", err);
-    } finally {
-      if (e.target) e.target.value = "";
-    }
-  };
 
   useEffect(() => {
     setMounted(true);
@@ -337,53 +271,6 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
               onChange={setShowDownloadButton}
               disabled={!enabled}
             />
-          }
-        />
-      </SettingSection>
-
-      {/* Test Discord Presence */}
-      <SettingSection label={t("settings.discord.section_test") || "Test Presence"}>
-        <SettingRow
-          title={t("settings.discord.test_playback.title") || "Preview Discord Status"}
-          description={
-            t("settings.discord.test_playback.description") ||
-            "Play an included demo song or load any local MP3 file to preview Discord Rich Presence without cloud API."
-          }
-          titleKey="settings.discord.test_playback.title"
-          descKey="settings.discord.test_playback.description"
-          searchQuery={searchQuery}
-          control={
-            <div className="flex items-center gap-[8px]">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handlePlayDemo}
-                disabled={!enabled || isPlayingDemo}
-              >
-                <Music2Line size={13} />
-                <span>
-                  {isPlayingDemo
-                    ? t("settings.discord.test_playback.loading") || "Loading..."
-                    : t("settings.discord.test_playback.play_demo") || "Play Demo Song"}
-                </span>
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={!enabled}
-              >
-                <FolderOpenLine size={13} />
-                <span>{t("settings.discord.test_playback.load_file") || "Load Local MP3..."}</span>
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="audio/*"
-                className="hidden"
-                onChange={handleLoadLocalFile}
-              />
-            </div>
           }
         />
       </SettingSection>

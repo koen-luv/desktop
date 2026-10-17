@@ -521,14 +521,6 @@
         "title": "Кнопка «Завантажити Liner»",
         "description": "Додавати кнопку з посиланням на tryliner.fun для завантаження додатку."
       },
-      "section_test": "Тестування Presence",
-      "test_playback": {
-        "title": "Перевірка статусу в Discord",
-        "description": "Відтворіть демо-трек або завантажте локальний MP3-файл для перевірки Discord Rich Presence без підключення до API.",
-        "play_demo": "Грати демо-трек",
-        "load_file": "Завантажити локальний MP3...",
-        "loading": "Завантаження..."
-      },
       "client_id": {
         "title": "ID додатку Discord",
         "description": "Користувацький Application ID з Discord Developer Portal для власної назви.",
