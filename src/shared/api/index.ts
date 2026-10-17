@@ -1,11 +1,5 @@
 export { api, mediaUrl, toMaxQualityAvatarUrl, ApiError, resolveApiErrorMessage } from "./api";
 export { DEFAULT_PRIMARY_API, getApiBaseUrl } from "./baseUrl";
-export {
-  runCanaryProbe,
-  canClientDirectFetch,
-  markDirectFetchFailed,
-  type CanaryProbeResult,
-} from "./canaryProbe";
 export type {
   SearchType,
   ApiCover,
