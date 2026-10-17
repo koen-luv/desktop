@@ -34,6 +34,8 @@ describe("locale", () => {
     expect(getStoredLocale()).toBe("uk");
     storeLocale("es");
     expect(getStoredLocale()).toBe("es");
+    storeLocale("ko");
+    expect(getStoredLocale()).toBe("ko");
   });
 
   it("migrates legacy 'ua' stored value to 'uk'", () => {
@@ -70,6 +72,17 @@ describe("getBrowserLocale", () => {
       languages: ["es-ES", "en-US"],
     });
     expect(getBrowserLocale()).toBe("es");
+    vi.unstubAllGlobals();
+  });
+
+  it("returns ko when navigator.language is ko-KR", () => {
+    vi.stubGlobal("window", { navigator: { language: "ko-KR", languages: ["ko-KR", "en-US"] } });
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      language: "ko-KR",
+      languages: ["ko-KR", "en-US"],
+    });
+    expect(getBrowserLocale()).toBe("ko");
     vi.unstubAllGlobals();
   });
 
