@@ -34,6 +34,8 @@ describe("locale", () => {
     expect(getStoredLocale()).toBe("uk");
     storeLocale("es");
     expect(getStoredLocale()).toBe("es");
+    storeLocale("ja");
+    expect(getStoredLocale()).toBe("ja");
   });
 
   it("migrates legacy 'ua' stored value to 'uk'", () => {
@@ -70,6 +72,17 @@ describe("getBrowserLocale", () => {
       languages: ["es-ES", "en-US"],
     });
     expect(getBrowserLocale()).toBe("es");
+    vi.unstubAllGlobals();
+  });
+
+  it("returns ja when navigator.language is ja-JP", () => {
+    vi.stubGlobal("window", { navigator: { language: "ja-JP", languages: ["ja-JP", "en-US"] } });
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      language: "ja-JP",
+      languages: ["ja-JP", "en-US"],
+    });
+    expect(getBrowserLocale()).toBe("ja");
     vi.unstubAllGlobals();
   });
 
