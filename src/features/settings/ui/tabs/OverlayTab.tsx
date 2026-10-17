@@ -9,6 +9,7 @@ import {
   normalizeShortcutToEnglish,
 } from "@/features/overlay";
 import { useShortcutsStore } from "@/features/shortcuts";
+import { acquireEscapeGuard } from "@/shared/utils/escapeGuard";
 import { ToggleSwitch, Tooltip } from "@/shared/ui";
 import { SettingRow, SettingSection, SegmentedControl } from "../controls";
 
@@ -62,6 +63,19 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
   const [isRecording, setIsRecording] = useState(false);
   const [heldModifiers, setHeldModifiers] = useState<string[]>([]);
   const recordButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Suspend the registered global hotkeys while recording. Otherwise the OS
+  // swallows the key combo that is already bound (e.g. pressing the current
+  // shortcut again) and the recorder never receives it, so it can't be saved.
+  useEffect(() => {
+    useShortcutsStore.getState().setIsRecording(isRecording);
+    // Esc cancels recording instead of closing the settings dialog
+    const releaseEscape = isRecording ? acquireEscapeGuard() : null;
+    return () => {
+      releaseEscape?.();
+      useShortcutsStore.getState().setIsRecording(false);
+    };
+  }, [isRecording]);
 
   useEffect(() => {
     if (!isRecording) {
