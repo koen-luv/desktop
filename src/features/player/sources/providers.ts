@@ -1,9 +1,11 @@
 import type { Track } from "@/shared/types";
-import { isCodecSupported } from "./codecSupport";
+import { api } from "@/shared/api";
+import { isCodecSupported, canExecuteDirectInnertubePlans } from "./codecSupport";
 import {
   classifySourceError,
   resolveDirectInnertubeStream,
   resolveProxyInnertubeStream,
+  resolveSessionStream,
 } from "../engine/streamResolver";
 import type { ResolveContext, ResolvedStream, SourceProvider } from "./types";
 
@@ -14,24 +16,31 @@ import type { ResolveContext, ResolvedStream, SourceProvider } from "./types";
  * session API (`POST /v1/tracks/:id/playback`). No stream URL is invented and
  * no provider endpoint is scraped:
  *
- *  - `liner-direct-opus`  — direct Innertube player request, WebM/Opus (default).
+ *  - `liner-auto`         — one session request, server-selected transport and
+ *                           codec. This is the app's historical behaviour and
+ *                           the most reliable path.
  *  - `liner-direct-aac`   — direct Innertube player request, MP4/AAC.
- *  - `liner-proxy-aac`    — Liner's own proxy transport (used when the resolver
- *                           explicitly supports it; 404 otherwise).
+ *  - `liner-direct-opus`  — direct Innertube player request, WebM/Opus.
+ *  - `liner-proxy-aac`    — Liner's own proxy transport (explicit request).
  *
  * Providers are ranked by expected reliability and codec compatibility, so a
  * browser that cannot decode Opus (e.g. Safari) never receives an Opus stream.
+ * Direct providers only run where the renderer may call youtube.com directly
+ * (Electron / Android native bridge); elsewhere the proxy fallback serves.
  */
 
 interface LinerProviderConfig {
   id: string;
   label: string;
   priority: number;
-  transport: "direct" | "proxy";
+  /** "auto" = let the server pick the transport in a single round-trip. */
+  transport: "auto" | "direct" | "proxy";
   preferredCodec?: "aac" | "opus";
   /** mime/codec pair that must be decodable on this platform. */
-  mime: string;
+  mime?: string;
   codec?: string;
+  /** Direct execution requires a CORS-privileged renderer. */
+  requiresDirectExecution?: boolean;
 }
 
 function createLinerProvider(config: LinerProviderConfig): SourceProvider {
@@ -42,7 +51,9 @@ function createLinerProvider(config: LinerProviderConfig): SourceProvider {
 
     supports(track: Track): boolean {
       if (!track?.id) return false;
-      return isCodecSupported(config.mime, config.codec);
+      if (config.requiresDirectExecution && !canExecuteDirectInnertubePlans()) return false;
+      if (config.mime && !isCodecSupported(config.mime, config.codec)) return false;
+      return true;
     },
 
     matchConfidence(): number {
@@ -59,6 +70,19 @@ function createLinerProvider(config: LinerProviderConfig): SourceProvider {
         providerId: config.id,
       };
       try {
+        if (config.transport === "auto") {
+          // Let the server pick the transport — unless this renderer cannot
+          // execute Innertube plans directly (plain browser, no CORS bypass),
+          // in which case explicitly request the proxy transport.
+          const transport = canExecuteDirectInnertubePlans() ? undefined : "proxy";
+          const session = await api.createPlaybackSession(
+            ctx.track.id,
+            config.preferredCodec,
+            ctx.signal,
+            transport,
+          );
+          return await resolveSessionStream(ctx.track, session, options);
+        }
         if (config.transport === "proxy") {
           return await resolveProxyInnertubeStream(ctx.track, options);
         }
@@ -70,13 +94,12 @@ function createLinerProvider(config: LinerProviderConfig): SourceProvider {
   };
 }
 
-export const linerDirectOpusProvider = createLinerProvider({
-  id: "liner-direct-opus",
-  label: "Liner (direct, WebM/Opus)",
+/** Server-selected transport — one round-trip, handles either response shape. */
+export const linerAutoProvider = createLinerProvider({
+  id: "liner-auto",
+  label: "Liner",
   priority: 100,
-  transport: "direct",
-  mime: "audio/webm",
-  codec: "opus",
+  transport: "auto",
 });
 
 export const linerDirectAacProvider = createLinerProvider({
@@ -87,6 +110,18 @@ export const linerDirectAacProvider = createLinerProvider({
   preferredCodec: "aac",
   mime: "audio/mp4",
   codec: "mp4a.40.2",
+  requiresDirectExecution: true,
+});
+
+export const linerDirectOpusProvider = createLinerProvider({
+  id: "liner-direct-opus",
+  label: "Liner (direct, WebM/Opus)",
+  priority: 85,
+  transport: "direct",
+  preferredCodec: "opus",
+  mime: "audio/webm",
+  codec: "opus",
+  requiresDirectExecution: true,
 });
 
 export const linerProxyAacProvider = createLinerProvider({
@@ -101,7 +136,8 @@ export const linerProxyAacProvider = createLinerProvider({
 
 /** Default ordered provider list. Ordering is by priority (descending). */
 export const defaultSourceProviders: SourceProvider[] = [
-  linerDirectOpusProvider,
+  linerAutoProvider,
   linerDirectAacProvider,
+  linerDirectOpusProvider,
   linerProxyAacProvider,
 ];

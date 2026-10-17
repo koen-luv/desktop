@@ -88,7 +88,7 @@ interface CacheEntry {
 }
 
 const urlCache = new Map<string, CacheEntry>();
-const inFlight = new Map<string, PlaybackResolution>();
+const inFlight = new Map<string, Promise<PlaybackResolution>>();
 const trackControllers = new Map<string, AbortController>();
 
 /** True when a resolved stream can still be handed to the audio engine. */
@@ -128,7 +128,7 @@ function purgeStaleCacheEntries(now: number): void {
   }
 }
 
-function abortSignalFor(trackId: string): AbortSignal {
+function controllerFor(trackId: string): AbortController {
   const existing = trackControllers.get(trackId);
   if (existing && !existing.signal.aborted) {
     // A newer request for the same track supersedes the older one.
@@ -137,7 +137,7 @@ function abortSignalFor(trackId: string): AbortSignal {
   }
   const controller = new AbortController();
   trackControllers.set(trackId, controller);
-  return controller.signal;
+  return controller;
 }
 
 function isCancelled(err: unknown, ...signals: Array<AbortSignal | undefined>): boolean {
@@ -341,10 +341,12 @@ export function resolvePlayback(options: ResolvePlaybackOptions): Promise<Playba
     return existing;
   }
 
-  const controllerSignal = abortSignalFor(track.id);
+  const controller = controllerFor(track.id);
+  const controllerSignal = controller.signal;
 
-  const promise = (async (): Promise<PlaybackResolution> => {
-    const abort = () => controllerSignal.abort();
+  let promise!: Promise<PlaybackResolution>;
+  promise = (async (): Promise<PlaybackResolution> => {
+    const abort = () => controller.abort();
     if (signal) {
       if (signal.aborted) throw new SourceError("cancelled", "cancelled", "resolver");
       signal.addEventListener("abort", abort, { once: true });
@@ -362,13 +364,13 @@ export function resolvePlayback(options: ResolvePlaybackOptions): Promise<Playba
     } finally {
       if (signal) signal.removeEventListener("abort", abort);
       if (inFlight.get(key) === promise) inFlight.delete(key);
-      if (trackControllers.get(track.id)?.signal === controllerSignal) {
+      if (trackControllers.get(track.id) === controller) {
         trackControllers.delete(track.id);
       }
     }
   })();
 
-  inFlight.set(key, promise as Promise<PlaybackResolution>);
+  inFlight.set(key, promise);
   return promise;
 }
 

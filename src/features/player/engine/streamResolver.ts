@@ -1,6 +1,6 @@
 import { api, mediaUrl } from "@/shared/api";
 import type { Track } from "@/shared/types";
-import type { PlaybackSession } from "@/shared/contracts/playback";
+import type { PlaybackSession, PlaybackSessionResponse } from "@/shared/contracts/playback";
 import { getClientVisitorData } from "@/shared/api/visitorSession";
 import { SourceError, type ResolvedStream, type SourceErrorCode } from "../sources/types";
 
@@ -9,6 +9,15 @@ export interface StreamResolveOptions {
   /** Codec preference forwarded to the resolver endpoint. */
   preferredCodec?: "aac" | "opus";
   providerId?: string;
+}
+
+/**
+ * The resolver endpoint returns `PlaybackSessionResponse` (which carries the
+ * optional direct-plan fields) or, rarely, a bare `DirectInnertubePlan`. Both
+ * are fully described by `PlaybackSessionResponse`, so we normalize to it.
+ */
+function asSessionResponse(session: PlaybackSession): PlaybackSessionResponse {
+  return session as PlaybackSessionResponse;
 }
 
 /**
@@ -74,10 +83,11 @@ function assertFreshExpiry(expiresAtMs: number | null, providerId: string): numb
  */
 export async function executeDirectPlanStream(
   track: Track,
-  session: PlaybackSession,
+  rawSession: PlaybackSession,
   options: StreamResolveOptions = {},
 ): Promise<ResolvedStream> {
   const providerId = options.providerId ?? "liner-direct";
+  const session = asSessionResponse(rawSession);
   if (!session.endpoint || !session.body) {
     throw new SourceError(
       "invalid_response",
@@ -160,10 +170,11 @@ export async function resolveDirectInnertubeStream(
  */
 export function resolveProxySessionStream(
   track: Track,
-  session: PlaybackSession,
+  rawSession: PlaybackSession,
   options: StreamResolveOptions = {},
 ): ResolvedStream {
   const providerId = options.providerId ?? "liner-proxy";
+  const session = asSessionResponse(rawSession);
   if (!session.streamUrl) {
     throw new SourceError(
       "unavailable",

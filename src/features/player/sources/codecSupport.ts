@@ -32,8 +32,12 @@ export function isCodecSupported(mimeType: string, codec?: string): boolean {
   if (canary && typeof canary.canPlayType === "function") {
     const type = codec ? `${mimeType}; codecs="${codec}"` : mimeType;
     try {
-      // "no" = definitely unsupported. "maybe"/"probably" = usable.
-      supported = canary.canPlayType(type) !== "no";
+      // `canPlayType` returns "" (not "no") when a type is definitely
+      // unsupported, "maybe"/"probably" when usable. If the probe cannot even
+      // recognise plain MP3 (e.g. jsdom / native runtimes), it provides no
+      // signal at all and we must not gate providers on it.
+      const baseline = canary.canPlayType("audio/mpeg");
+      supported = baseline === "" ? true : canary.canPlayType(type) !== "";
     } catch {
       supported = true;
     }
@@ -48,7 +52,30 @@ export function isCodecSupported(mimeType: string, codec?: string): boolean {
   return supported;
 }
 
+let directPlanSupport: boolean | null = null;
+
+/**
+ * Whether the client can execute signed Innertube plans directly.
+ *
+ * The renderer must be allowed to call youtube.com (Electron runs with
+ * `webSecurity: false` + CORS header injection; Android routes YouTube hosts
+ * through the native OkHttp bridge). A plain browser cannot — so direct
+ * providers are skipped there and the server's proxy transport is used
+ * instead of burning retries on requests CORS will always block.
+ */
+export function canExecuteDirectInnertubePlans(): boolean {
+  if (directPlanSupport !== null) return directPlanSupport;
+  if (typeof window === "undefined") {
+    directPlanSupport = false;
+    return false;
+  }
+  const w = window as unknown as { linerElectron?: unknown; LinerAndroid?: unknown };
+  directPlanSupport = Boolean(w.linerElectron || w.LinerAndroid);
+  return directPlanSupport;
+}
+
 /** Test hook — resets memoized probe results. */
 export function resetCodecProbeCache(): void {
   probeCache.clear();
+  directPlanSupport = null;
 }

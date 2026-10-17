@@ -1,12 +1,12 @@
 import { usePlayerStore } from "../store/playerStore";
-import { api, mediaUrl, ApiError } from "@/shared/api";
+import { ApiError } from "@/shared/api";
 import { log } from "@/shared/utils/logger";
 import { telemetry } from "@/shared/telemetry";
 import { linerDb } from "@/shared/storage";
 import { isStandaloneAudioFile } from "@/shared/storage/audioFormat";
 import type { Track } from "@/shared/types";
 import { pitchShifter } from "./pitchShifter";
-import { resolveDirectInnertubeStream } from "./streamResolver";
+import { resolvePlayback, invalidateCachedStream } from "./playbackSource";
 
 export class PlayerRuntime {
   private audio: HTMLAudioElement;
@@ -264,6 +264,12 @@ export class PlayerRuntime {
         const posMs = store.positionMs;
         const failedFromCache = Boolean(this.activeBlobUrl) && this.audio.src === this.activeBlobUrl;
         log("yellow", "playback", `audio error encountered — recovering via ${failedFromCache ? "fresh stream (dropping bad cache)" : "cache/stream"} at ${posMs}ms`);
+        if (!failedFromCache) {
+          // The resolver may have cached the failing URL — drop it so the
+          // recovery resolves a fresh stream (recoveryAttempts > 0 also
+          // forces a refresh inside `loadAndPlay`).
+          invalidateCachedStream(currentTrack.id);
+        }
         const evict = failedFromCache ? linerDb.deleteAudio(currentTrack.id) : Promise.resolve();
         void evict.finally(() => this.loadAndPlay(currentTrack, posMs));
         return;
@@ -415,31 +421,17 @@ export class PlayerRuntime {
 
     const promise = (async () => {
       try {
-        const session = await api.createPlaybackSession(
-          track.id,
-          undefined,
-          controller.signal,
-        );
+        // Single source of truth: the provider resolver handles transport
+        // selection (server-auto / direct / proxy), expiry and fallback.
+        const resolution = await resolvePlayback({
+          track,
+          purpose: "preload",
+          signal: controller.signal,
+        });
         if (controller.signal.aborted) return;
 
-        let url: string;
-        let streamMimeType = session.mimeType || 'audio/webm';
-        if (session.transport === 'direct_innertube' && session.endpoint && session.headers && session.body) {
-          const direct = await resolveDirectInnertubeStream({
-            endpoint: session.endpoint,
-            method: session.method,
-            headers: session.headers,
-            body: session.body,
-          }, controller.signal);
-          if (controller.signal.aborted) return;
-          url = direct.url;
-          streamMimeType = direct.mimeType;
-        } else if (session.streamUrl) {
-          url = mediaUrl(session.streamUrl);
-        } else {
-          return;
-        }
-        const response = await fetch(url, {
+        const stream = resolution.stream;
+        const response = await fetch(stream.url, {
           headers: { Range: "bytes=0-" },
           signal: controller.signal,
         });
@@ -451,7 +443,7 @@ export class PlayerRuntime {
         if (!isStandaloneAudioFile(new Uint8Array(arrayBuffer, 0, Math.min(16, arrayBuffer.byteLength)))) return;
 
         const mimeType =
-          streamMimeType ||
+          stream.mimeType ||
           response.headers.get("content-type") ||
           "audio/webm";
         const blob = new Blob([arrayBuffer], { type: mimeType });
@@ -602,11 +594,13 @@ export class PlayerRuntime {
         return;
       }
 
-      const session = await api.createPlaybackSession(
-        track.id,
-        undefined,
-        controller.signal,
-      );
+      const resolution = await resolvePlayback({
+        track,
+        purpose: "playback",
+        signal: controller.signal,
+        // A recovery attempt must never reuse the stream that just failed.
+        forceRefresh: this.recoveryAttempts > 0,
+      });
       this.ttfbMs = Math.round(performance.now() - this.loadStartTime);
 
       if (epoch !== this.loadEpoch || controller.signal.aborted) {
@@ -614,32 +608,18 @@ export class PlayerRuntime {
         return;
       }
 
-      let url: string;
-      let streamCodec = session.codec || 'opus';
-      let streamBitrate = session.bitrate || 160000;
-      let streamMimeType = session.mimeType || 'audio/webm';
-
-      if (session.transport === 'direct_innertube' && session.endpoint && session.headers && session.body) {
-        log("cyan", "playback", `resolving direct innertube stream on client for ${track.title}`);
-        const direct = await resolveDirectInnertubeStream({
-          endpoint: session.endpoint,
-          method: session.method,
-          headers: session.headers,
-          body: session.body,
-        }, controller.signal);
-        if (epoch !== this.loadEpoch || controller.signal.aborted) return;
-        url = direct.url;
-        streamCodec = direct.codec as any;
-        streamBitrate = direct.bitrate;
-        streamMimeType = direct.mimeType;
-        const expiry = direct.expiresAt ? new Date(direct.expiresAt).getTime() : null;
-        this.currentSessionExpiresAt = Number.isFinite(expiry) ? expiry : null;
-      } else if (session.streamUrl) {
-        const expiry = session.expiresAt ? new Date(session.expiresAt).getTime() : null;
-        this.currentSessionExpiresAt = Number.isFinite(expiry) ? expiry : null;
-        url = mediaUrl(session.streamUrl);
-      } else {
-        throw new Error("No playable stream URL returned by server");
+      const stream = resolution.stream;
+      const url = stream.url;
+      const streamCodec = stream.codec || "opus";
+      const streamBitrate = stream.bitrate || 160000;
+      const streamMimeType = stream.mimeType || "audio/webm";
+      this.currentSessionExpiresAt = stream.expiresAtMs;
+      if (resolution.providerId !== "liner-auto") {
+        log(
+          "cyan",
+          "playback",
+          `resolved via fallback provider ${resolution.providerId} (${track.title})`,
+        );
       }
       if (this.activeBlobUrl) {
         URL.revokeObjectURL(this.activeBlobUrl);

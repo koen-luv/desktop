@@ -36,6 +36,7 @@ export function resolvePlaybackWithFallback(
 }
 
 export {
+  resolvePlayback,
   cancelPendingResolution,
   getCachedStream,
   invalidateCachedStream,

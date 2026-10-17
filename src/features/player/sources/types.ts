@@ -61,7 +61,14 @@ export class SourceError extends Error {
 }
 
 export function isRetryableCode(code: SourceErrorCode): boolean {
-  return code === "network" || code === "rate_limited" || code === "server";
+  return (
+    code === "network" ||
+    code === "rate_limited" ||
+    code === "server" ||
+    // A stream that is already expired when we receive it is transient — the
+    // next attempt gets a freshly signed URL (bounded by RETRY_MAX_ATTEMPTS).
+    code === "expired"
+  );
 }
 
 export type ResolvePurpose = "playback" | "preload";

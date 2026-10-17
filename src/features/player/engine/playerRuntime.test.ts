@@ -3,6 +3,7 @@ import { playerRuntime, PlayerRuntime } from "./playerRuntime";
 import { usePlayerStore } from "../store/playerStore";
 import { api } from "@/shared/api";
 import { linerDb } from "@/shared/storage";
+import { __resetSourceResolverForTests } from "../sources/sourceResolver";
 import type { Track } from "@/shared/types";
 
 const track: Track = {
@@ -97,6 +98,7 @@ describe("PlayerRuntime — status must always match the real audio state", () =
 
 describe("PlayerRuntime audio caching", () => {
   beforeEach(() => {
+    __resetSourceResolverForTests();
     if (!globalThis.URL.createObjectURL) {
       globalThis.URL.createObjectURL = vi.fn((_blob: Blob) => "blob:mock-object-url");
     } else {
@@ -146,7 +148,7 @@ describe("PlayerRuntime audio caching", () => {
       mimeType: "audio/webm",
       codec: "opus",
       bitrate: 128000,
-      expiresAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 600_000).toISOString(),
     });
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0]), {
@@ -219,7 +221,7 @@ describe("PlayerRuntime audio caching", () => {
       mimeType: "audio/webm",
       codec: "opus",
       bitrate: 128000,
-      expiresAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 600_000).toISOString(),
     });
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0]), {
@@ -266,7 +268,7 @@ describe("PlayerRuntime audio caching", () => {
       mimeType: "audio/webm",
       codec: "opus",
       bitrate: 128000,
-      expiresAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 600_000).toISOString(),
     });
     // background re-cache gets a dash segment again, which must not be stored
     vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
