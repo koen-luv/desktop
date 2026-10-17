@@ -309,6 +309,9 @@ if (!gotTheLock) {
     });
 
     let lastIconBytes: Buffer | null = null;
+    // serialize fs work on the icon theme so rapid accent switches cannot
+    // leave an install and a remove interleaved
+    let linuxIconTask: Promise<void> = Promise.resolve();
 
     // linux dash/taskbar/launcher icons come from the freedesktop icon theme,
     // not from the window (wayland has no window-icon protocol at all, and
@@ -345,13 +348,15 @@ if (!gotTheLock) {
           execFile(cmd, args, { timeout: 5000 }, () => {});
         } catch {}
       };
+      // gtk's icon cache is the only one our injected files affect;
+      // update-desktop-database rebuilds the MIME cache and never touches
+      // icons
       tryOnce("gtk-update-icon-cache", ["-f", "-t", path.join(dataHome, "icons", "hicolor")]);
-      tryOnce("update-desktop-database", [path.join(dataHome, "applications")]);
     };
 
     // electron-builder writes `desktopName` into the packaged package.json
     // (syncDesktopName) and uses it for /usr/share/applications/<name>.desktop
-    // and the Icon= key; app.getDesktopFileName() is typed yet in this
+    // and the Icon= key; app.getDesktopFileName() doesn't exist in this
     // Electron, so read the field Electron would.
     const resolveLinuxDesktopIconName = async (): Promise<string> => {
       try {
@@ -387,11 +392,17 @@ if (!gotTheLock) {
     };
 
     const removeLinuxAppIcon = async (iconName: string) => {
+      let removedAny = false;
       for (const { file } of appIconPaths(iconName)) {
-        // force: no error when the file is already gone (idempotent)
-        await fs.promises.rm(file, { force: true });
+        try {
+          // only real removals (and the cache refresh) matter; force keeps
+          // an already-missing file silent
+          await fs.promises.access(file);
+          removedAny = true;
+          await fs.promises.rm(file, { force: true });
+        } catch {}
       }
-      refreshLinuxIconCaches();
+      if (removedAny) refreshLinuxIconCaches();
     };
 
     ipcMain.handle(
@@ -415,20 +426,32 @@ if (!gotTheLock) {
             const png = /^data:image\/png;base64,(.+)$/.exec(dataUrl)?.[1];
             if (png) {
               const bytes = Buffer.from(png, "base64");
-              if (options?.isDefault) {
-                // branding back to stock: drop the injected icon and let the
-                // packaged system icon win again
-                lastIconBytes = null;
-                await removeLinuxAppIcon(
-                  await resolveLinuxDesktopIconName(),
-                );
-              } else if (!lastIconBytes || !lastIconBytes.equals(bytes)) {
-                lastIconBytes = bytes;
-                await installLinuxAppIcon(
-                  await resolveLinuxDesktopIconName(),
-                  bytes,
-                );
-              }
+              // chain onto the previous icon task so a fast accent switch
+              // (e.g. spotify then default) cannot interleave install/remove
+              const runIconTask = async () => {
+                try {
+                  if (options?.isDefault) {
+                    // branding back to stock: drop the injected icon and let the
+                    // packaged system icon win again
+                    lastIconBytes = null;
+                    await removeLinuxAppIcon(
+                      await resolveLinuxDesktopIconName(),
+                    );
+                  } else if (
+                    !lastIconBytes ||
+                    !lastIconBytes.equals(bytes)
+                  ) {
+                    lastIconBytes = bytes;
+                    await installLinuxAppIcon(
+                      await resolveLinuxDesktopIconName(),
+                      bytes,
+                    );
+                  }
+                } catch (err) {
+                  console.error("\x1b[41;37m icon \x1b[0m set-icon error:", err);
+                }
+              };
+              linuxIconTask = linuxIconTask.then(runIconTask);
             }
           }
         }
