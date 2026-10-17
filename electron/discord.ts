@@ -66,6 +66,7 @@ export class DiscordRpcManager {
   private client: Client | null = null;
   private settings: DiscordRpcSettings = { ...DEFAULT_SETTINGS };
   private latestPayload: DiscordRpcStatePayload | null = null;
+  private latestPayloadReceivedAt = 0;
   private isConnecting = false;
   private isConnected = false;
   private reconnectTimer: NodeJS.Timeout | null = null;
@@ -205,6 +206,7 @@ export class DiscordRpcManager {
 
   public updateState(payload: DiscordRpcStatePayload): void {
     this.latestPayload = payload;
+    this.latestPayloadReceivedAt = Date.now();
 
     if (!this.settings.enabled) {
       return;
@@ -296,9 +298,10 @@ export class DiscordRpcManager {
       // Timestamps (media timeline / live progress bar like Spotify)
       if (isPlaying && this.settings.showTime && dur > 0) {
         const now = Date.now();
-        const pos = Math.max(0, payload.positionMs || 0);
-        activity.startTimestamp = new Date(now - pos);
-        activity.endTimestamp = new Date(now - pos + dur);
+        const elapsedSincePayload = Math.max(0, now - (this.latestPayloadReceivedAt || now));
+        const currentPos = Math.min(dur, Math.max(0, (payload.positionMs || 0) + elapsedSincePayload));
+        activity.startTimestamp = new Date(now - currentPos);
+        activity.endTimestamp = new Date(now - currentPos + dur);
       }
 
       // Large artwork (Album/Track cover)
