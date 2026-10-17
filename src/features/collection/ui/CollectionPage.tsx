@@ -266,7 +266,7 @@ function CollectionContent() {
   return (
     <div className="relative h-full w-full overflow-hidden bg-transparent">
 
-      <div className="absolute top-0 left-0 right-0 h-[56px] z-10 flex flex-row items-stretch select-none pointer-events-none">
+      <div className="hidden md:flex absolute top-0 left-0 right-0 h-[56px] z-10 flex-row items-stretch select-none pointer-events-none">
         <div
           data-window-drag
           onContextMenu={(e) => e.preventDefault()}
@@ -285,7 +285,7 @@ function CollectionContent() {
         title={t("common.back")}
         aria-label={t("common.back")}
         data-no-window-drag
-        className={`absolute top-[12px] left-[32px] z-20 group inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-md px-[10px] active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto text-[13px] font-[500] border-0 !border-none ${
+        className={`absolute top-[calc(var(--inset-top,0px)+12px)] md:top-[12px] left-4 md:left-[32px] z-20 group inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-md px-[10px] active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto text-[13px] font-[500] border-0 !border-none ${
           hasCustomBg
             ? "apple-glass-pill !border-none"
             : "bg-bg-panel/85 backdrop-blur-xl text-text-primary hover:bg-bg-panel border-0 !border-none"
@@ -298,16 +298,16 @@ function CollectionContent() {
         />
         <span className="relative -left-[1.5px] top-[1px]">{t("common.back")}</span>
       </button>
-      <div className="relative z-1 grid grid-cols-1 w-full h-full min-h-0 overflow-hidden">
+      <div className="relative z-1 grid grid-cols-1 w-full h-full min-h-0 overflow-y-auto md:overflow-hidden">
         {data && (
           <div
             className={`col-start-1 row-start-1 w-full h-full min-h-0 overflow-hidden transition-opacity duration-200 ease-out ${
               isReady ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
           >
-            <div className="relative z-10 flex flex-row items-stretch gap-[16px] pl-[32px] pr-[16px] h-full w-full min-h-0 box-border">
+            <div className="relative z-10 flex flex-col md:flex-row items-stretch gap-2 md:gap-[16px] px-3 md:pl-[32px] md:pr-[16px] h-full w-full min-h-0 box-border">
               <div
-                className="shrink-0 w-[280px] self-start pt-[56px] pb-[24px]"
+                className="shrink-0 w-full max-w-[280px] md:w-[280px] self-start pt-[calc(var(--inset-top,0px)+56px)] md:pt-[56px] pb-2 md:pb-[24px]"
                 data-no-window-drag
               >
                 <EntitySidebar
@@ -513,7 +513,7 @@ function CollectionContent() {
                     targetScrollTopRef.current = null;
                   }
                 }}
-                className="min-w-0 flex-1 h-full min-h-0 overflow-y-auto overflow-x-hidden px-[8px] pt-[56px] pb-[24px] overscroll-contain"
+                className="min-w-0 flex-1 h-auto md:h-full min-h-0 overflow-visible md:overflow-y-auto overflow-x-hidden px-1 md:px-[8px] pt-2 md:pt-[56px] pb-[24px] overscroll-contain"
                 style={{ willChange: "scroll-position" }}
               >
               <section>

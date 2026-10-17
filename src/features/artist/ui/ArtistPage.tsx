@@ -285,9 +285,9 @@ function ArtistContent() {
                 )}
 
 
-                <div className="relative z-10 px-[32px] pt-[56px]" data-window-drag />
+                <div className="relative z-10 px-4 md:px-[32px] pt-[calc(var(--inset-top,0px)+48px)] md:pt-[56px]" data-window-drag />
 
-              <div className="relative z-10 px-[32px] pb-[20px] flex flex-col md:flex-row items-start md:items-end justify-between gap-[24px]">
+              <div className="relative z-10 px-4 md:px-[32px] pb-[20px] flex flex-col md:flex-row items-start md:items-end justify-between gap-[24px]">
                 <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-[8px] md:gap-[10px]">
                     <h1
@@ -451,7 +451,7 @@ function ArtistContent() {
               </div>
             </div>
 
-            <div className="relative z-10 px-[32px] pt-[24px]">
+            <div className="relative z-10 px-4 md:px-[32px] pt-[24px]">
               <div className="flex flex-col gap-[40px]">
                 <section id="artist-tracks-section" ref={tracksSectionRef}>
                   <div className="flex items-center justify-between mb-[16px]">

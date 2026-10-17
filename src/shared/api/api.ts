@@ -9,6 +9,11 @@ import {
   type AuthUser,
 } from "./auth-session";
 import { signApiRequest, syncServerTime } from "./requestSigner";
+import {
+  executePlaybackEndpoint as executeInnertubePlan,
+  type InnertubePlan,
+  type ExecutedInnertubeStream,
+} from "./innertube";
 import { telemetry } from "@/shared/telemetry";
 import type {
   PublicUser,
@@ -41,6 +46,7 @@ function translate(key: string, vars?: Record<string, string | number>) {
 }
 
 import { DEFAULT_PRIMARY_API, getApiBaseUrl, switchToFallbackEdge, switchToPrimaryApi } from "./baseUrl";
+import { platformFetch } from "@/platform/http";
 
 const CLIENT_VERSION =
   (import.meta.env.VITE_CLIENT_VERSION as string | undefined) || "1.0.4-desktop";
@@ -76,7 +82,7 @@ async function fetchWithTimeout(
   }
 
   try {
-    const res = await fetch(url, {
+    const res = await platformFetch(url, {
       ...init,
       signal: controller.signal,
     });
@@ -116,6 +122,7 @@ async function fetchWithTimeout(
 function getPlatform(): string {
   if (typeof navigator === "undefined") return "desktop";
   const ua = navigator.userAgent.toLowerCase();
+  if (ua.includes("android")) return "android";
   if (ua.includes("win")) return "windows";
   if (ua.includes("mac")) return "macos";
   if (ua.includes("linux")) return "linux";
@@ -943,6 +950,18 @@ export const api = {
         }),
       },
     );
+  },
+
+  /**
+   * Executes a signed direct_innertube plan returned by `createPlaybackSession`
+   * from the client. The signed plan is posted to Innertube verbatim; the
+   * resulting media URL is played directly (never proxied through Liner).
+   */
+  executePlaybackEndpoint(
+    plan: InnertubePlan,
+    signal?: AbortSignal,
+  ): Promise<ExecutedInnertubeStream> {
+    return executeInnertubePlan(plan, signal);
   },
 
   async *streamLyrics(

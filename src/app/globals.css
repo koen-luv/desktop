@@ -411,6 +411,59 @@ button.apple-glass-action:hover,
   pointer-events: none;
 }
 
+/* ── Android / responsive shell ─────────────────────────────────────────── */
+
+.search-popup-wrapper {
+  left: 70px;
+  right: 12px;
+  top: 12px;
+  padding-top: 56px;
+}
+
+@media (max-width: 767px) {
+  .search-popup-wrapper {
+    left: 0;
+    right: 0;
+    top: 0;
+    padding-top: calc(max(env(safe-area-inset-top), var(--inset-top, 0px)) + 10px);
+  }
+}
+
+/* Edge-to-edge shell: keep content out of status bar / cutout. The native host
+   publishes real WindowInsets as --inset-* because Android WebView reports
+   env(safe-area-inset-*) as 0 even when it draws edge-to-edge. */
+.platform-android .safe-area-shell {
+  padding-top: max(env(safe-area-inset-top), var(--inset-top, 0px));
+  padding-left: max(env(safe-area-inset-left), var(--inset-left, 0px));
+  padding-right: max(env(safe-area-inset-right), var(--inset-right, 0px));
+}
+
+.platform-android .platform-safe-top {
+  padding-top: max(env(safe-area-inset-top), var(--inset-top, 0px));
+}
+
+.platform-android .platform-safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), var(--inset-bottom, 0px));
+}
+
+.platform-android body {
+  padding: 0 !important;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+.platform-android * {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Keep touch targets usable on scaled displays. */
+.platform-android button,
+.platform-android a,
+.platform-android [role="button"] {
+  touch-action: manipulation;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .page-transition {
     animation: none;

@@ -1,5 +1,6 @@
 import type { AuthTokens, AuthUser } from "../contracts";
 import { signApiRequest, syncServerTime } from "./requestSigner";
+import { platformFetch } from "@/platform/http";
 
 export type { AuthTokens, AuthUser };
 
@@ -123,7 +124,7 @@ export function refreshAuthSession(): Promise<AuthTokens | null> {
 
       let response: Response;
       try {
-        response = await fetch(`${getApiBaseUrl()}/v1/auth/refresh`, {
+        response = await platformFetch(`${getApiBaseUrl()}/v1/auth/refresh`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -135,7 +136,7 @@ export function refreshAuthSession(): Promise<AuthTokens | null> {
         if (switchToFallbackEdge()) {
           try {
             signedHeaders = await signApiRequest("POST", "/v1/auth/refresh", body);
-            response = await fetch(`${getApiBaseUrl()}/v1/auth/refresh`, {
+            response = await platformFetch(`${getApiBaseUrl()}/v1/auth/refresh`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -150,7 +151,7 @@ export function refreshAuthSession(): Promise<AuthTokens | null> {
         } else if (getApiBaseUrl() !== DEFAULT_PRIMARY_API) {
           switchToPrimaryApi();
           signedHeaders = await signApiRequest("POST", "/v1/auth/refresh", body);
-          response = await fetch(`${getApiBaseUrl()}/v1/auth/refresh`, {
+          response = await platformFetch(`${getApiBaseUrl()}/v1/auth/refresh`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -211,7 +212,7 @@ export async function clearAuthSession(): Promise<void> {
   if (!current?.refreshToken) return;
   const body = JSON.stringify({ refreshToken: current.refreshToken });
   const signedHeaders = await signApiRequest("POST", "/v1/auth/logout", body);
-  const response = await fetch(`${getApiBaseUrl()}/v1/auth/logout`, {
+  const response = await platformFetch(`${getApiBaseUrl()}/v1/auth/logout`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

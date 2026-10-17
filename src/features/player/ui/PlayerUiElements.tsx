@@ -85,7 +85,7 @@ export function PlayerUiElements({
     <>
       {/* Artwork (Compact, flat, no drop shadows) */}
       <div
-        className={`relative shrink-0 overflow-hidden rounded-xl w-[280px] h-[280px] bg-black/20 ${
+        className={`relative shrink-0 overflow-hidden rounded-xl w-[min(280px,44vh,72vw)] h-[min(280px,44vh,72vw)] bg-black/20 ${
           coverUrl && !isCoverLoaded ? "animate-pulse" : ""
         }`}
       >
@@ -162,10 +162,10 @@ export function PlayerUiElements({
       </div>
 
       {/* Track info */}
-      <div className="w-[280px] flex items-start justify-center min-w-0">
+      <div className="w-full md:w-[280px] flex items-start justify-center min-w-0 px-4">
         <div className="flex flex-col gap-[2px] min-w-0 text-center">
           <p
-            className="m-0 text-[15px] font-[600] text-white flex items-center justify-center gap-[6px] max-w-[280px]"
+            className="m-0 text-[15px] font-[600] text-white flex items-center justify-center gap-[6px] max-w-[min(280px,82vw)]"
             style={{ letterSpacing: "-0.03em" }}
           >
             <span className="min-w-0 truncate">{trackTitle}</span>
@@ -196,7 +196,7 @@ export function PlayerUiElements({
         onSeek={(pos) => playerEngine.seek(pos)}
         showTime
         size="md"
-        className="w-[320px]"
+        className="w-[min(320px,84vw)] md:w-[320px]"
       />
 
       {/* Primary Playback Controls */}

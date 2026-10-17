@@ -51,7 +51,8 @@
       "home": "Inicio",
       "search": "Buscar",
       "library": "Biblioteca",
-      "settings": "Ajustes"
+      "settings": "Ajustes",
+      "now_playing": "Reproduciendo"
     },
     "loading": "Cargando",
     "signed_in": "Sesión iniciada",

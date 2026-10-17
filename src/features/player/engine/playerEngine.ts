@@ -5,7 +5,7 @@ import {
   type RepeatMode,
   type PlayerState,
 } from "../store/playerStore";
-import { playerRuntime } from "./playerRuntime";
+import { playerRuntime } from "./runtime";
 import { pitchShifter } from "./pitchShifter";
 import {
   api,

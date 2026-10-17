@@ -18,6 +18,7 @@ import { UserAvatar } from "@/shared/ui";
 import { useTranslation, getTranslationsForAllLocales } from "@/languages";
 import { useModalStore } from "@/features/library";
 import { useAuthStore } from "@/features/auth";
+import { isAndroidApp } from "@/platform";
 import {
   PlaybackTab,
   AppearanceTab,
@@ -167,19 +168,29 @@ export default function SettingsModal() {
     return set;
   }, [searchQuery]);
 
-  const filteredGroups = useMemo(() => {
-    if (!matchingTabIds) return TAB_GROUPS;
+  const visibleGroups = useMemo(() => {
+    // The overlay is a separate always-on-top desktop window and has no Android
+    // equivalent. It is omitted rather than shown as a dead settings page.
+    if (!isAndroidApp()) return TAB_GROUPS;
+    return TAB_GROUPS.map((group) => ({
+      ...group,
+      ids: group.ids.filter((id) => id !== "Overlay"),
+    })).filter((group) => group.ids.length > 0);
+  }, []);
 
-    return TAB_GROUPS.map((group) => {
+  const filteredGroups = useMemo(() => {
+    if (!matchingTabIds) return visibleGroups;
+
+    return visibleGroups.map((group) => {
       const ids = group.ids.filter((id) => matchingTabIds.has(id));
       return { ...group, ids };
     }).filter((group) => group.ids.length > 0);
-  }, [matchingTabIds]);
+  }, [matchingTabIds, visibleGroups]);
 
   useEffect(() => {
     if (!searchQuery.trim()) return;
     if (matchingTabIds && matchingTabIds.size > 0 && !matchingTabIds.has(activeTab)) {
-      const firstMatch = TAB_GROUPS.flatMap((g) => g.ids).find((id) => matchingTabIds.has(id));
+      const firstMatch = visibleGroups.flatMap((g) => g.ids).find((id) => matchingTabIds.has(id));
       if (firstMatch) {
         setActiveTab(firstMatch);
       }
@@ -204,9 +215,9 @@ export default function SettingsModal() {
       open={open}
       onOpenChange={(next) => (!next ? handleClose() : undefined)}
       maxWidth={880}
-      className="p-0 h-[620px] max-h-[86vh] !flex-row overflow-hidden !bg-bg-elevated !border-0"
+      className="p-0 h-[calc(100dvh-24px)] max-h-[calc(100dvh-24px)] md:h-[620px] md:max-h-[86vh] !flex-col md:!flex-row overflow-hidden !bg-bg-elevated !border-0"
     >
-      <aside className="w-[248px] shrink-0 flex flex-col min-h-0 bg-transparent">
+      <aside className="w-full md:w-[248px] shrink-0 flex flex-col min-h-0 max-md:max-h-[44%] bg-transparent">
         <div className="px-[12px] pt-[14px] pb-[8px]">
           <div className="relative flex items-center">
             <Search2Line
@@ -347,7 +358,7 @@ export default function SettingsModal() {
       {/* ── Right secondary frame: same roundness, inset with padding, darker ── */}
       <div className="flex-1 min-w-0 min-h-0 p-[2px] flex">
         <div className="flex-1 min-w-0 min-h-0 flex flex-col rounded-xl bg-bg-primary overflow-hidden">
-        <div className="flex items-start justify-between gap-[16px] px-[24px] pt-[20px] pb-[10px] shrink-0">
+        <div className="flex items-start justify-between gap-[16px] px-4 md:px-[24px] pt-3 md:pt-[20px] pb-[10px] shrink-0">
           <div className="min-w-0">
             <h3
               className="text-text-primary text-[15px] m-0 font-[600] tracking-[-0.01em]"
@@ -372,7 +383,7 @@ export default function SettingsModal() {
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-[24px] pb-[16px] flex flex-col">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-[24px] pb-[16px] flex flex-col">
           <motion.div
             key={activeTab}
             initial={{ opacity: 0 }}

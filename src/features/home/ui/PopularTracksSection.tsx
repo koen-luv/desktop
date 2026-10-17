@@ -496,7 +496,7 @@ function PopularTracksSection({
 }: PopularTracksSectionProps) {
   return (
     <div className="flex flex-col">
-      <div className={`${headingMarginTop} px-8 flex items-center justify-between`}>
+      <div className={`${headingMarginTop} px-4 md:px-8 flex items-center justify-between`}>
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2.5">
             {icon && <div className="flex items-center shrink-0">{icon}</div>}

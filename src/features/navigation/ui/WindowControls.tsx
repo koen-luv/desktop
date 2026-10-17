@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { LuMinus, LuSquare, LuX } from "react-icons/lu";
 import { useIsContentTransparent } from "@/features/settings/store/customizationStore";
+import { isAndroidApp } from "@/platform";
 
 export interface WindowControlsProps {
   className?: string;
@@ -60,6 +61,9 @@ export default function WindowControls({
   const isMinimizeDisabled = isWindowFullScreen || isHyprland;
   const hasCustomBg = useIsContentTransparent();
   const isGlass = hasCustomBg || variant === "glass";
+
+  // Android owns the system UI; desktop window chrome has no meaning here.
+  if (isAndroidApp()) return null;
 
   return (
     <div

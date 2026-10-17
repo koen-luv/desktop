@@ -171,7 +171,7 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-5xl border border-border-primary bg-bg-primary">
+    <main className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-none md:rounded-5xl border-0 md:border md:border-border-primary bg-bg-primary pt-[var(--inset-top,0px)] pb-[var(--inset-bottom,0px)]">
       <div className="absolute inset-0 z-0 select-none overflow-hidden rounded-5xl">
         <CircleDitherCanvas
           src={cloudsBanner}

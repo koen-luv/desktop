@@ -16,6 +16,16 @@
 # testing
 /coverage
 
+# android (generated bundle + signing + local test credentials)
+/android/app/src/main/assets/
+/android/keystore.properties
+/android/*.jks
+/android/local.properties
+/android/.gradle
+/android/build
+/android/app/build
+/android-test-account.json
+
 # misc
 .DS_Store
 *.pem

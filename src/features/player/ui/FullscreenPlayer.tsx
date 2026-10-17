@@ -24,6 +24,7 @@ import "@braccato/core/styles/lyrics.css";
 import "@braccato/core/styles/instrumental.css";
 import KawarpWrapper from "./KawarpWrapper";
 import { useTranslation } from "@/languages";
+import { isAndroidApp } from "@/platform";
 
 const BRACCATO_TAG = "braccato-lyrics";
 
@@ -131,7 +132,10 @@ function BraccatoLyricsView({ lyrics }: BraccatoLyricsViewProps) {
     if (!el) return;
     el.theme = braccatoThemeCss;
     el.lyrics = latestLyricsRef.current;
-    el.source = "#liner-audio";
+    const androidClock = isAndroidApp();
+    if (!androidClock) {
+      el.source = "#liner-audio";
+    }
 
     const handleBraccatoLineClick = (e: Event) => {
       const isAudioLoading = playerEngine.getSnapshot().status === "loading";
@@ -182,11 +186,46 @@ function BraccatoLyricsView({ lyrics }: BraccatoLyricsViewProps) {
 
     let syncRafId: number;
     let lastReportedIndex = -1;
+    let clockAnchorMs = playerEngine.getSnapshot().positionMs;
+    let clockStamp = performance.now();
+    let clockRate = playerEngine.getSnapshot().playbackRate || 1;
+
+    // Native ExoPlayer is the clock source on Android. Its position is polled
+    // into the store; between polls we carry it forward at the real playback
+    // rate so syllable highlighting stays frame-accurate. The same carried
+    // value drives Braccato, replacing the <audio> element clock.
+    const readNativePosition = (): number => {
+      const state = playerEngine.getSnapshot();
+      if (state.positionMs !== clockAnchorMs) {
+        clockAnchorMs = state.positionMs;
+        clockStamp = performance.now();
+      }
+      if ((state.playbackRate || 1) !== clockRate) {
+        clockRate = state.playbackRate || 1;
+        clockStamp = performance.now();
+      }
+      if (state.status !== "playing") return clockAnchorMs;
+      const carried = clockAnchorMs + (performance.now() - clockStamp) * clockRate;
+      const duration = state.durationMs || state.currentTrack?.durationMs || 0;
+      return duration > 0 ? Math.min(duration, carried) : carried;
+    };
 
     const checkActiveLine = () => {
-      const audioEl = document.getElementById("liner-audio") as HTMLAudioElement | null;
-      if (audioEl && !Number.isNaN(audioEl.currentTime)) {
-        const currentMs = audioEl.currentTime * 1000;
+      let currentMs: number | null = null;
+      const state = playerEngine.getSnapshot();
+      if (androidClock) {
+        currentMs = readNativePosition();
+        try {
+          el.currentTime = currentMs / 1000;
+          el.playing = state.status === "playing";
+        } catch {}
+      } else {
+        const audioEl = document.getElementById("liner-audio") as HTMLAudioElement | null;
+        if (audioEl && !Number.isNaN(audioEl.currentTime)) {
+          currentMs = audioEl.currentTime * 1000;
+        }
+      }
+      if (currentMs !== null) {
         const lines = useLyricsStore.getState().syncedLines;
         let idx = -1;
         for (let i = 0; i < lines.length; i++) {
@@ -273,8 +312,8 @@ function BraccatoLyricsView({ lyrics }: BraccatoLyricsViewProps) {
     <div className="relative flex flex-col flex-1 w-full h-full min-h-0">
       {createElement(BRACCATO_TAG, {
         ref: setElement,
-        source: "#liner-audio",
-        className: "block flex-1 w-full h-full px-6",
+        ...(isAndroidApp() ? {} : { source: "#liner-audio" }),
+        className: "block flex-1 w-full h-full px-4 md:px-6",
         style: {
           overflowY: "auto",
           overflowX: "hidden",
@@ -368,12 +407,12 @@ export function FullscreenPlayer({
 
       <div className="absolute inset-0 z-[1] bg-black/40" />
 
-      <div className="absolute inset-0 z-10 flex">
-        <div className="flex-1 flex flex-col items-center justify-center gap-5">
+      <div className="absolute inset-0 z-10 flex flex-col md:flex-row pt-[var(--inset-top,0px)] pb-[var(--inset-bottom,0px)]">
+        <div className="w-full shrink-0 md:flex-1 flex flex-col items-center justify-center gap-3 md:gap-5 px-4 pt-12 pb-2 md:p-0">
           <PlayerUiElements onClose={onClose} />
         </div>
 
-        <div className="flex-1 h-full min-h-0 pl-2 pr-6 flex flex-col relative">
+        <div className="flex-1 w-full min-h-0 pl-0 pr-0 md:pl-2 md:pr-6 flex flex-col relative">
           {showProviderIsland && (
             <div className="absolute top-[12px] left-1/2 -translate-x-1/2 z-30 pointer-events-none flex justify-center">
               <LyricsProviderIsland />
@@ -481,7 +520,7 @@ export function FullscreenPlayer({
         title={t("player.close_fullscreen") || "Close"}
         onClick={onClose}
         data-no-window-drag
-        className="absolute top-[12px] left-[12px] z-30 inline-flex h-[32px] w-[32px] items-center justify-center rounded-lg border-none bg-black/50 backdrop-blur-xl text-white/80 hover:text-white hover:bg-white/10 active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto"
+        className="absolute top-[calc(var(--inset-top,0px)+12px)] left-[12px] z-30 inline-flex h-[32px] w-[32px] items-center justify-center rounded-lg border-none bg-black/50 backdrop-blur-xl text-white/80 hover:text-white hover:bg-white/10 active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto"
       >
         <DownLine size={18} />
       </button>

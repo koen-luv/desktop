@@ -169,7 +169,7 @@ function DailyMixesSection({ mixes, headingMarginTop = "mt-[22px]" }: DailyMixes
 
   return (
     <div className="flex flex-col">
-      <div className={`${headingMarginTop} px-8 flex items-center justify-between`}>
+      <div className={`${headingMarginTop} px-4 md:px-8 flex items-center justify-between`}>
         <div className="flex items-center gap-2.5">
           <div className="flex items-center shrink-0">
             <SparklesFill className="w-5 h-5 text-amber-400" />

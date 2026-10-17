@@ -3,6 +3,7 @@
  * Fetches fresh, authentic visitorData directly from the client's residential IP
  * and caches it in-memory / session for up to 6 hours.
  */
+import { platformFetch } from "@/platform/http";
 
 interface VisitorSession {
   visitorData: string;
@@ -26,7 +27,7 @@ export async function getClientVisitorData(): Promise<string> {
 
   pendingFetch = (async () => {
     try {
-      const res = await fetch("https://www.youtube.com/sw.js_data", {
+      const res = await platformFetch("https://www.youtube.com/sw.js_data", {
         headers: {
           "user-agent":
             typeof navigator !== "undefined"

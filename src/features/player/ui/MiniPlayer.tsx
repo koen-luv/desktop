@@ -657,11 +657,11 @@ function MiniPlayer({
         <div
           className={`relative grid h-full pointer-events-none ${
             embedded
-              ? "grid-cols-[280px_minmax(0,1fr)_260px]"
+              ? "grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[280px_minmax(0,1fr)_260px]"
               : "grid-cols-[286px_minmax(0,1fr)]"
           } ${!usesRoundedStyle && !embedded ? "pb-[4px]" : ""}`}
         >
-          <div className="flex h-full items-center gap-[16px] px-[18px] pt-[1px] pointer-events-none cursor-default">
+          <div className="flex h-full min-w-0 items-center gap-[10px] px-[10px] md:gap-[16px] md:px-[18px] pt-[1px] pointer-events-none cursor-default">
             <div
               role="button"
               tabIndex={0}
@@ -731,7 +731,7 @@ function MiniPlayer({
             <button
               type="button"
               aria-label={isLiked ? "Unlike" : "Like"}
-              className={`${iconButtonClass} shrink-0 transition-colors duration-150 pointer-events-auto prevent-seek ${
+              className={`${iconButtonClass} hidden sm:inline-flex shrink-0 transition-colors duration-150 pointer-events-auto prevent-seek ${
                 isLiked ? "text-accent-primary" : "text-text-secondary hover:text-text-primary"
               }`}
               onPointerDown={(e) => e.stopPropagation()}
@@ -742,8 +742,56 @@ function MiniPlayer({
             </button>
           </div>
 
+          {/* Touch-first compact controls; desktop keeps the full toolbox. */}
           <div
-            className={`flex h-full items-center pl-[10px] pr-[18px] pointer-events-none ${
+            className="flex md:hidden h-full items-center gap-[2px] pr-[6px] pointer-events-auto prevent-seek"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              aria-label="Previous track"
+              className={`${iconButtonClass} !h-[38px] !w-[38px]`}
+              onClick={() => void playerEngine.skipPrevious()}
+            >
+              <SkipPrevious size={18} weight="Bold" />
+            </button>
+            <button
+              type="button"
+              aria-label={isPlaying ? "Pause" : "Play"}
+              className="inline-flex h-[38px] w-[38px] items-center justify-center rounded-full bg-btn-primary-bg text-btn-primary-text active:scale-[0.95] border-none cursor-pointer"
+              onClick={() => void playerEngine.togglePlayPause()}
+            >
+              {isLoading ? (
+                <span className="h-[16px] w-[16px] animate-spin rounded-full border-[2px] border-current border-t-transparent" />
+              ) : isPlaying ? (
+                <Pause size={16} weight="Bold" />
+              ) : (
+                <Play size={16} weight="Bold" className="translate-x-[1px]" />
+              )}
+            </button>
+            <button
+              type="button"
+              aria-label="Next track"
+              className={`${iconButtonClass} !h-[38px] !w-[38px]`}
+              onClick={() => void playerEngine.skipNext()}
+            >
+              <SkipNext size={18} weight="Bold" />
+            </button>
+            <button
+              type="button"
+              aria-label="Queue"
+              className={`${iconButtonClass} !h-[38px] !w-[38px]`}
+              onClick={() => {
+                setQueueLimit(50);
+                onQueueToggle?.();
+              }}
+            >
+              <Sidebar size={19} weight="Bold" />
+            </button>
+          </div>
+
+          <div
+            className={`hidden md:flex h-full items-center pl-[10px] pr-[18px] pointer-events-none ${
               embedded ? "col-start-3" : ""
             }`}
           >
@@ -880,7 +928,7 @@ function MiniPlayer({
           </div>
         </div>
 
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <div className="pointer-events-none absolute inset-0 hidden md:flex items-center justify-center">
           <div
             className="pointer-events-auto flex items-center gap-[8px] prevent-seek cursor-default"
             onPointerDown={(e) => e.stopPropagation()}

@@ -19,6 +19,7 @@ import {
   PlaylistFill,
 } from "@mingcute/react";
 import Sidebar from "./Sidebar";
+import MobileNav from "./MobileNav";
 import WindowControls from "./WindowControls";
 import PageTransition from "./PageTransition";
 import RightDrawer from "./RightDrawer";
@@ -54,6 +55,7 @@ import {
 } from "@/features/library";
 import { SettingsModal, useCustomizationStore, getBlockStyle } from "@/features/settings";
 import { UpdateModal, UpdateToastBridge } from "@/features/updater";
+import { setBackHandler } from "@/platform";
 
 
 interface AppFrameProps {
@@ -82,6 +84,8 @@ export default function AppFrame({ children }: AppFrameProps) {
   const closeSearch = useModalStore((state) => state.closeSearch);
   const toggleSearch = useModalStore((state) => state.toggleSearch);
   const openSettings = useModalStore((state) => state.openSettings);
+  const settingsOpen = useModalStore((state) => state.settingsOpen);
+  const closeSettings = useModalStore((state) => state.closeSettings);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [queuePopupOpen, setQueuePopupOpen] = useState(false);
@@ -269,6 +273,49 @@ export default function AppFrame({ children }: AppFrameProps) {
   }, [isBackNavigableRoute, queuePopupOpen, searchOpen, isFullscreenPlayer, navigate]);
 
   useDisableButtonFocus();
+
+  // Android system back: close the topmost surface first, then navigate back,
+  // then let the native activity finish. Registered through the platform bridge.
+  useEffect(() => {
+    setBackHandler(() => {
+      if (settingsOpen) {
+        closeSettings();
+        return true;
+      }
+      if (searchOpen) {
+        closeSearch();
+        return true;
+      }
+      if (queuePopupOpen) {
+        setQueuePopupOpen(false);
+        return true;
+      }
+      if (isFullscreenPlayer) {
+        handleCloseFullscreen();
+        return true;
+      }
+      if (pathname !== "/" && pathname !== "/library") {
+        navigate(-1);
+        return true;
+      }
+      if (pathname === "/library" && window.history.length > 1) {
+        navigate(-1);
+        return true;
+      }
+      return false;
+    });
+    return () => setBackHandler(null);
+  }, [
+    settingsOpen,
+    closeSettings,
+    searchOpen,
+    closeSearch,
+    queuePopupOpen,
+    isFullscreenPlayer,
+    handleCloseFullscreen,
+    pathname,
+    navigate,
+  ]);
 
   useGlobalShortcuts({
     searchOpen,
@@ -683,7 +730,7 @@ export default function AppFrame({ children }: AppFrameProps) {
     <div
       ref={appFrameRef}
       data-custom-bg={hasCustomBg ? "true" : undefined}
-      className="relative flex flex-row h-full w-full overflow-hidden rounded-5xl bg-bg-canvas p-1.5 gap-1.5"
+      className="safe-area-shell relative flex flex-col md:flex-row h-full w-full overflow-hidden rounded-none md:rounded-5xl bg-bg-canvas p-0 md:p-1.5 gap-0 md:gap-1.5"
       onScroll={(e) => {
         if (e.currentTarget.scrollLeft !== 0) e.currentTarget.scrollLeft = 0;
         if (e.currentTarget.scrollTop !== 0) e.currentTarget.scrollTop = 0;
@@ -714,7 +761,7 @@ export default function AppFrame({ children }: AppFrameProps) {
 
       <aside
         ref={sidebarRef}
-        className="w-[58px] h-full shrink-0 z-[45] relative"
+        className="hidden md:block w-[58px] h-full shrink-0 z-[45] relative"
       >
         <Sidebar
           searchOpen={searchOpen}
@@ -722,15 +769,15 @@ export default function AppFrame({ children }: AppFrameProps) {
         />
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0 h-full relative gap-1.5 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full relative gap-0 md:gap-1.5 overflow-hidden">
         <main
           data-custom-bg={hasCustomBg ? "true" : undefined}
           className={`flex-1 min-w-0 flex flex-col relative h-full ${
             hasCustomBg ? "" : "bg-bg-primary"
-          } rounded-sm ${
+          } rounded-none md:rounded-sm ${
             isFullscreenPlayer
-              ? "rounded-tr-none"
-              : "rounded-tr-xl"
+              ? "md:rounded-tr-none"
+              : "md:rounded-tr-xl"
           } overflow-hidden`}
           style={mainStyle}
         >
@@ -771,8 +818,7 @@ export default function AppFrame({ children }: AppFrameProps) {
                   animate={{ x: 0 }}
                   exit={{ x: RIGHT_DRAWER_WIDTH }}
                   transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-                  className="pointer-events-auto absolute inset-y-0 right-0 z-[50]"
-                  style={{ width: RIGHT_DRAWER_WIDTH }}
+                  className="pointer-events-auto absolute inset-y-0 right-0 z-[50] w-full sm:w-[440px]"
                 >
                   <RightDrawer
                     activeTab={rightDrawerTab}
@@ -788,7 +834,7 @@ export default function AppFrame({ children }: AppFrameProps) {
         {shouldShowMiniPlayer && (
           <div
             ref={miniPlayerContainerRef}
-            className="relative z-[40] w-full shrink-0"
+            className="relative z-[40] w-full shrink-0 px-0 md:px-0"
           >
             <MiniPlayer
               embedded
@@ -833,16 +879,11 @@ export default function AppFrame({ children }: AppFrameProps) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -12, scale: 0.99 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className={`absolute right-0 z-[60] flex flex-col items-center pointer-events-none pt-[56px]`}
-            style={{
-              left: SIDEBAR_WIDTH + SHELL_EDGE_GAP,
-              right: SHELL_EDGE_GAP,
-              top: 12,
-            }}
+            className="search-popup-wrapper absolute right-0 z-[60] flex flex-col items-center pointer-events-none"
           >
             {/* 1. Search Input Island */}
             <div
-              className="w-[min(660px,calc(100vw-72px))] h-[54px] rounded-[8px] pointer-events-auto flex items-center px-[18px] gap-[14px] bg-bg-panel/95 border border-border-primary/50 backdrop-blur-2xl"
+              className="w-[min(660px,calc(100vw-72px))] max-md:w-[calc(100vw-16px)] h-[54px] rounded-[8px] pointer-events-auto flex items-center px-[18px] gap-[14px] bg-bg-panel/95 border border-border-primary/50 backdrop-blur-2xl"
             >
               <span className="shrink-0 flex items-center justify-center text-text-tertiary">
                 <AnimatePresence mode="wait" initial={false}>
@@ -923,7 +964,7 @@ export default function AppFrame({ children }: AppFrameProps) {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.99 }}
                   transition={{ duration: 0.1, ease: [0.16, 1, 0.3, 1] }}
-                  className="w-[min(660px,calc(100vw-72px))] mt-[8px] max-h-[500px] h-[500px] rounded-[8px] pointer-events-auto flex flex-col overflow-hidden bg-bg-panel/95 border border-border-primary/50 backdrop-blur-2xl"
+                  className="w-[min(660px,calc(100vw-72px))] max-md:w-[calc(100vw-16px)] mt-[8px] h-[500px] max-h-[500px] max-md:h-[calc(100dvh-120px)] max-md:max-h-[calc(100dvh-120px)] rounded-[8px] pointer-events-auto flex flex-col overflow-hidden bg-bg-panel/95 border border-border-primary/50 backdrop-blur-2xl"
                 >
                   <div className="flex gap-[6px] px-[14px] pt-[12px] pb-[6px] shrink-0 overflow-x-auto">
                     {filterKeys.map((key) => {
@@ -1036,7 +1077,7 @@ export default function AppFrame({ children }: AppFrameProps) {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.99 }}
                   transition={{ duration: 0.1, ease: [0.16, 1, 0.3, 1] }}
-                  className="w-[min(660px,calc(100vw-72px))] mt-[8px] max-h-[480px] h-auto rounded-[8px] pointer-events-auto flex flex-col overflow-hidden bg-bg-panel/95 border border-border-primary/50 backdrop-blur-2xl"
+                  className="w-[min(660px,calc(100vw-72px))] max-md:w-[calc(100vw-16px)] mt-[8px] max-h-[480px] max-md:max-h-[calc(100dvh-120px)] h-auto rounded-[8px] pointer-events-auto flex flex-col overflow-hidden bg-bg-panel/95 border border-border-primary/50 backdrop-blur-2xl"
                 >
                   <SearchHistoryList
                     onSelectQuery={handleSelectHistoryQuery}
@@ -1053,8 +1094,9 @@ export default function AppFrame({ children }: AppFrameProps) {
               ) : null}
             </AnimatePresence>
         </motion.div>
-      )}
-    </AnimatePresence>
+      )}      </AnimatePresence>
+
+      <MobileNav searchOpen={searchOpen} onSearchToggle={handleSearchToggle} />
 
       <AddToPlaylistModal />
       <AddToLibraryModal />

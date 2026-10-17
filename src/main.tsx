@@ -7,6 +7,10 @@ import { initTelemetry } from "@/shared/telemetry";
 import { initBackgroundStorageAnalytics } from "@/shared/utils/cacheManager";
 import { initApiEndpointProbe } from "@/shared/api";
 import { initClientVisitorSession } from "@/shared/api/visitorSession";
+import { installAndroidPlatform } from "@/platform";
+
+// Install the native Android platform boundary before anything reads it.
+installAndroidPlatform();
 
 // Initialize global uncaught error, telemetry listeners, background storage tracker, edge health probe, and visitor session
 initGlobalErrorHandlers();

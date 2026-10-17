@@ -51,7 +51,8 @@
       "home": "Home",
       "search": "Search",
       "library": "Library",
-      "settings": "Settings"
+      "settings": "Settings",
+      "now_playing": "Now playing"
     },
     "loading": "Loading",
     "signed_in": "Signed in",

@@ -1,4 +1,5 @@
 import { linerDb } from "./linerDb";
+import { getAndroidBridge } from "@/platform";
 
 export const AUDIO_CACHE_LIMIT_STORAGE_KEY = "liner_audio_cache_limit_bytes";
 export const DEFAULT_AUDIO_CACHE_LIMIT_BYTES = 3 * 1024 * 1024 * 1024;
@@ -28,6 +29,7 @@ class AudioCache {
         localStorage.setItem(AUDIO_CACHE_LIMIT_STORAGE_KEY, String(clamped));
       }
     }
+    getAndroidBridge()?.audioSetCacheLimit(bytes);
     await this.enforceCacheLimit();
   }
 
