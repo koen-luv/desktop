@@ -3,8 +3,9 @@ import { useTranslation } from "@/languages";
 import {
   useDiscordSettingsStore,
   DEFAULT_DISCORD_CLIENT_ID,
+  type DiscordStatusDisplayType,
 } from "@/features/discord";
-import { ToggleSwitch, Button, TextInput } from "@/shared/ui";
+import { ToggleSwitch, Button, TextInput, Select } from "@/shared/ui";
 import { SettingRow, SettingSection } from "../controls";
 import { Refresh1Line } from "@mingcute/react";
 
@@ -22,6 +23,9 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
   const applicationId = useDiscordSettingsStore((s) => s.applicationId);
   const setApplicationId = useDiscordSettingsStore((s) => s.setApplicationId);
   const resetApplicationId = useDiscordSettingsStore((s) => s.resetApplicationId);
+
+  const statusDisplayType = useDiscordSettingsStore((s) => s.statusDisplayType);
+  const setStatusDisplayType = useDiscordSettingsStore((s) => s.setStatusDisplayType);
 
   const showTime = useDiscordSettingsStore((s) => s.showTime);
   const setShowTime = useDiscordSettingsStore((s) => s.setShowTime);
@@ -106,6 +110,53 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
 
       {/* Display Options */}
       <SettingSection label={t("settings.discord.section_display") || "Display Options"}>
+        {/* Status Line Format */}
+        <SettingRow
+          title={t("settings.discord.status_display.title") || "Status Format"}
+          description={
+            t("settings.discord.status_display.description") ||
+            "Choose what appears in Discord's 'Listening to...' status header."
+          }
+          titleKey="settings.discord.status_display.title"
+          descKey="settings.discord.status_display.description"
+          searchQuery={searchQuery}
+          control={
+            mounted ? (
+              <Select<DiscordStatusDisplayType>
+                aria-label={t("settings.discord.status_display.title") || "Status Format"}
+                className="w-[210px]"
+                value={statusDisplayType}
+                onChange={setStatusDisplayType}
+                disabled={!enabled}
+                options={[
+                  {
+                    value: "artist",
+                    label: t("settings.discord.status_display.artist") || "Artist (Default)",
+                  },
+                  {
+                    value: "title",
+                    label: t("settings.discord.status_display.song") || "Song Title",
+                  },
+                  {
+                    value: "artist_title",
+                    label: t("settings.discord.status_display.artist_song") || "Artist - Song",
+                  },
+                  {
+                    value: "title_artist",
+                    label: t("settings.discord.status_display.song_artist") || "Song - Artist",
+                  },
+                  {
+                    value: "app",
+                    label: t("settings.discord.status_display.app") || "Liner (App name)",
+                  },
+                ]}
+              />
+            ) : (
+              <span />
+            )
+          }
+        />
+
         {/* Timeline progress bar */}
         <SettingRow
           title={t("settings.discord.show_timeline.title") || "Playback Timeline"}

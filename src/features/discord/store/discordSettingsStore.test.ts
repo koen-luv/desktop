@@ -8,6 +8,7 @@ describe("discordSettingsStore", () => {
     const store = useDiscordSettingsStore.getState();
     store.setEnabled(true);
     store.resetApplicationId();
+    store.setStatusDisplayType("artist");
     store.setShowArtwork(true);
     store.setShowArtistSmallImage(true);
     store.setShowTime(true);
@@ -20,12 +21,28 @@ describe("discordSettingsStore", () => {
     const state = useDiscordSettingsStore.getState();
     expect(state.enabled).toBe(true);
     expect(state.applicationId).toBe(DEFAULT_DISCORD_CLIENT_ID);
+    expect(state.statusDisplayType).toBe("artist");
     expect(state.showArtwork).toBe(true);
     expect(state.showArtistSmallImage).toBe(true);
     expect(state.showTime).toBe(true);
     expect(state.showPaused).toBe(true);
     expect(state.showButton).toBe(true);
     expect(state.showDownloadButton).toBe(true);
+  });
+
+  it("updates status display format", () => {
+    const store = useDiscordSettingsStore.getState();
+    store.setStatusDisplayType("title");
+    expect(useDiscordSettingsStore.getState().statusDisplayType).toBe("title");
+
+    store.setStatusDisplayType("artist_title");
+    expect(useDiscordSettingsStore.getState().statusDisplayType).toBe("artist_title");
+
+    store.setStatusDisplayType("title_artist");
+    expect(useDiscordSettingsStore.getState().statusDisplayType).toBe("title_artist");
+
+    store.setStatusDisplayType("app");
+    expect(useDiscordSettingsStore.getState().statusDisplayType).toBe("app");
   });
 
   it("updates and resets custom application ID", () => {

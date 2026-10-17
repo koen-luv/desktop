@@ -4,12 +4,14 @@ import {
   DEFAULT_DISCORD_SETTINGS,
   DEFAULT_DISCORD_CLIENT_ID,
   type DiscordRpcSettings,
+  type DiscordStatusDisplayType,
 } from "../contracts";
 
 interface DiscordSettingsState extends DiscordRpcSettings {
   setEnabled: (enabled: boolean) => void;
   setApplicationId: (applicationId: string) => void;
   resetApplicationId: () => void;
+  setStatusDisplayType: (statusDisplayType: DiscordStatusDisplayType) => void;
   setShowArtwork: (showArtwork: boolean) => void;
   setShowArtistSmallImage: (showArtistSmallImage: boolean) => void;
   setShowTime: (showTime: boolean) => void;
@@ -40,6 +42,10 @@ export const useDiscordSettingsStore = create<DiscordSettingsState>()(
       resetApplicationId: () => {
         set({ applicationId: DEFAULT_DISCORD_CLIENT_ID });
         notifyElectron({ applicationId: DEFAULT_DISCORD_CLIENT_ID });
+      },
+      setStatusDisplayType: (statusDisplayType) => {
+        set({ statusDisplayType });
+        notifyElectron({ statusDisplayType });
       },
       setShowArtwork: (showArtwork) => {
         set({ showArtwork });
@@ -76,6 +82,9 @@ export const useDiscordSettingsStore = create<DiscordSettingsState>()(
           }
           if (typeof state.showDownloadButton !== "boolean") {
             state.setShowDownloadButton(true);
+          }
+          if (!state.statusDisplayType) {
+            state.setStatusDisplayType("artist");
           }
         }
       },

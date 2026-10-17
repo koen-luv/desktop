@@ -1,9 +1,17 @@
-import { Client, type SetActivity } from "@xhayper/discord-rpc";
+import { Client, StatusDisplayType, type SetActivity } from "@xhayper/discord-rpc";
 import { ipcMain } from "electron";
+
+export type DiscordStatusDisplayType =
+  | "artist"
+  | "title"
+  | "artist_title"
+  | "title_artist"
+  | "app";
 
 export interface DiscordRpcSettings {
   enabled: boolean;
   applicationId: string;
+  statusDisplayType: DiscordStatusDisplayType;
   showArtwork: boolean;
   showArtistSmallImage: boolean;
   showTime: boolean;
@@ -35,6 +43,7 @@ export const DEFAULT_DISCORD_CLIENT_ID = "1560629184605323385";
 const DEFAULT_SETTINGS: DiscordRpcSettings = {
   enabled: true,
   applicationId: DEFAULT_DISCORD_CLIENT_ID,
+  statusDisplayType: "artist",
   showArtwork: true,
   showArtistSmallImage: true,
   showTime: true,
@@ -237,11 +246,45 @@ export class DiscordRpcManager {
 
       const dur = Math.max(0, payload.durationMs || track.durationMs || 0);
 
+      let detailsText = title;
+      let stateText = isPaused ? `${artist} (Paused)` : artist;
+      let rpcStatusDisplayType = StatusDisplayType.STATE; // 1 -> "Listening to [Artist]"
+
+      switch (this.settings.statusDisplayType) {
+        case "title":
+          rpcStatusDisplayType = StatusDisplayType.DETAILS; // 2 -> "Listening to [Title]"
+          detailsText = isPaused ? `${title} (Paused)` : title;
+          stateText = artist;
+          break;
+        case "app":
+          rpcStatusDisplayType = StatusDisplayType.NAME; // 0 -> "Listening to Liner"
+          detailsText = title;
+          stateText = isPaused ? `${artist} (Paused)` : artist;
+          break;
+        case "artist_title":
+          rpcStatusDisplayType = StatusDisplayType.STATE; // 1 -> "Listening to [Artist - Title]"
+          detailsText = title;
+          stateText = isPaused ? `${artist} - ${title} (Paused)` : `${artist} - ${title}`;
+          break;
+        case "title_artist":
+          rpcStatusDisplayType = StatusDisplayType.DETAILS; // 2 -> "Listening to [Title - Artist]"
+          detailsText = isPaused ? `${title} - ${artist} (Paused)` : `${title} - ${artist}`;
+          stateText = artist;
+          break;
+        case "artist":
+        default:
+          rpcStatusDisplayType = StatusDisplayType.STATE; // 1 -> "Listening to [Artist]"
+          detailsText = title;
+          stateText = isPaused ? `${artist} (Paused)` : artist;
+          break;
+      }
+
       const activity: SetActivity = {
         name: "Liner",
         type: 2, // 2 = ActivityType.Listening -> renders "Listening to" + live progress bar
-        details: title,
-        state: isPaused ? sanitizeText(`${artist} (Paused)`) : artist,
+        details: sanitizeText(detailsText),
+        state: sanitizeText(stateText),
+        statusDisplayType: rpcStatusDisplayType,
       };
 
       // Timestamps (media timeline / live progress bar like Spotify)

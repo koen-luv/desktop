@@ -488,6 +488,15 @@
         "title": "Discord Rich Presence",
         "description": "Transmite tu música en reproducción activa a tu perfil de Discord."
       },
+      "status_display": {
+        "title": "Línea de estado",
+        "description": "Elige qué se muestra en la cabecera 'Escuchando a...' de Discord.",
+        "artist": "Artista (Por defecto)",
+        "song": "Canción",
+        "artist_song": "Artista - Canción",
+        "song_artist": "Canción - Artista",
+        "app": "Liner (Nombre de app)"
+      },
       "show_timeline": {
         "title": "Línea de tiempo de reproducción",
         "description": "Muestra una barra de progreso interactiva con el tiempo transcurrido y restante."

@@ -484,6 +484,15 @@
         "title": "Discord Rich Presence",
         "description": "Broadcast your active music playback to your Discord profile."
       },
+      "status_display": {
+        "title": "Status Format",
+        "description": "Choose what appears in Discord's 'Listening to...' status header.",
+        "artist": "Artist (Default)",
+        "song": "Song Title",
+        "artist_song": "Artist - Song",
+        "song_artist": "Song - Artist",
+        "app": "Liner (App name)"
+      },
       "show_timeline": {
         "title": "Playback Timeline",
         "description": "Display interactive progress bar with elapsed and remaining track time."

@@ -1,6 +1,14 @@
+export type DiscordStatusDisplayType =
+  | "artist"
+  | "title"
+  | "artist_title"
+  | "title_artist"
+  | "app";
+
 export interface DiscordRpcSettings {
   enabled: boolean;
   applicationId: string;
+  statusDisplayType: DiscordStatusDisplayType;
   showArtwork: boolean;
   showArtistSmallImage: boolean;
   showTime: boolean;
@@ -32,6 +40,7 @@ export const DEFAULT_DISCORD_CLIENT_ID = "1560629184605323385";
 export const DEFAULT_DISCORD_SETTINGS: DiscordRpcSettings = {
   enabled: true,
   applicationId: DEFAULT_DISCORD_CLIENT_ID,
+  statusDisplayType: "artist",
   showArtwork: true,
   showArtistSmallImage: true,
   showTime: true,
