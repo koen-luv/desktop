@@ -39,6 +39,7 @@ import { BundleManager } from "./bundle-manager.js";
 import { createBundleErrorStamp } from "./bundle-stamp.js";
 import { createSleepBlocker } from "./sleep-blocker.js";
 import { createShutdown } from "./shutdown.js";
+import { computeDragBounds } from "./window-drag.js";
 
 // root error handling for main process
 process.on("uncaughtException", (error) => {
@@ -812,49 +813,50 @@ if (!gotTheLock) {
     });
 
     // manual window move for windows/macos, anchored on the system cursor.
-    // linux uses css app-region instead (see useWindowDrag): wayland ignores setPosition
+    // linux uses css app-region instead (see useWindowDrag): wayland ignores setPosition.
+    // moves go through setBounds with the size locked at drag start: setPosition
+    // on scaled / mixed-dpi windows displays rounds the size and grows the window
+    // (see window-drag.ts)
     let dragStartCursor: { x: number; y: number } | null = null;
-    let dragStartWinPos: { x: number; y: number } | null = null;
+    let dragStartBounds: { x: number; y: number; width: number; height: number } | null = null;
+
+    const beginDrag = () => {
+      if (!mainWindow) return;
+      dragStartCursor = screen.getCursorScreenPoint();
+      dragStartBounds = mainWindow.getBounds();
+    };
 
     ipcMain.on("window:drag-start", () => {
       if (!mainWindow || mainWindow.isFullScreen()) return;
       if (mainWindow.isMaximized()) {
         mainWindow.unmaximize();
       }
-      const [wx, wy] = mainWindow.getPosition();
-      dragStartCursor = screen.getCursorScreenPoint();
-      dragStartWinPos = { x: wx, y: wy };
+      beginDrag();
     });
 
     ipcMain.on("window:drag-end", () => {
       dragStartCursor = null;
-      dragStartWinPos = null;
+      dragStartBounds = null;
     });
 
-    ipcMain.on("window:drag-move", (_event, { deltaX, deltaY }: { deltaX: number; deltaY: number }) => {
+    ipcMain.on("window:drag-move", () => {
       if (!mainWindow || mainWindow.isFullScreen()) return;
       if (mainWindow.isMaximized()) {
         mainWindow.unmaximize();
-        const [wx, wy] = mainWindow.getPosition();
-        dragStartCursor = screen.getCursorScreenPoint();
-        dragStartWinPos = { x: wx, y: wy };
+        beginDrag();
       }
+      if (!dragStartCursor || !dragStartBounds) beginDrag();
+      if (!dragStartCursor || !dragStartBounds) return;
 
-      if (!dragStartCursor || !dragStartWinPos) {
-        const [wx, wy] = mainWindow.getPosition();
-        dragStartCursor = screen.getCursorScreenPoint();
-        dragStartWinPos = { x: wx, y: wy };
-      }
-
-      const currentCursor = screen.getCursorScreenPoint();
-      const dx = currentCursor.x - dragStartCursor.x;
-      const dy = currentCursor.y - dragStartCursor.y;
-
-      if ((dx !== 0 || dy !== 0) && dragStartWinPos) {
-        mainWindow.setPosition(Math.round(dragStartWinPos.x + dx), Math.round(dragStartWinPos.y + dy));
-      } else {
-        const [x, y] = mainWindow.getPosition();
-        mainWindow.setPosition(Math.round(x + deltaX), Math.round(y + deltaY));
+      const next = computeDragBounds(dragStartBounds, dragStartCursor, screen.getCursorScreenPoint());
+      const cur = mainWindow.getBounds();
+      if (
+        next.x !== cur.x ||
+        next.y !== cur.y ||
+        next.width !== cur.width ||
+        next.height !== cur.height
+      ) {
+        mainWindow.setBounds(next);
       }
     });
 
