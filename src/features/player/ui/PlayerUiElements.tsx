@@ -206,8 +206,7 @@ export function PlayerUiElements({
       <div className="flex items-center gap-[14px]">
         <button
           type="button"
-          aria-label="Shuffle"
-          title={player.shuffle ? t("player.shuffle_on") : t("player.shuffle_off")}
+          aria-label={player.shuffle ? t("player.shuffle_on") : t("player.shuffle_off")}
           onClick={() => playerEngine.setShuffle(!player.shuffle)}
           className={`${iconButtonClass} ${
             player.shuffle ? "!text-white !opacity-100" : "!text-white/40"
