@@ -409,6 +409,10 @@ function MiniPlayer({
   }, [player.repeat]);
   const repeatLabel = t(`player.repeat_${player.repeat}`);
 
+  // one solid, inverted "on" tile shared by shuffle and repeat so both toggles read
+  // identically; important so it beats the base transparent bg / secondary text
+  const ACTIVE_TOGGLE_CLASS = "!bg-text-primary/85 !text-bg-primary";
+
   const iconButtonClass =
     "inline-flex h-[30px] w-[30px] items-center justify-center rounded-md text-text-secondary transition-colors duration-150 hover:bg-black/[0.05] dark:hover:bg-white/[0.09] hover:text-text-primary active:scale-[0.96] border-none bg-transparent cursor-pointer";
 
@@ -813,7 +817,7 @@ function MiniPlayer({
                 aria-label="Shuffle"
                 title={player.shuffle ? t("player.shuffle_on") : t("player.shuffle_off")}
                 className={`${iconButtonClass} ${
-                  player.shuffle ? "bg-bg-toolbox-active text-text-primary" : ""
+                  player.shuffle ? ACTIVE_TOGGLE_CLASS : ""
                 }`}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => playerEngine.setShuffle(!player.shuffle)}
@@ -825,9 +829,7 @@ function MiniPlayer({
                 aria-label={repeatLabel}
                 title={repeatLabel}
                 className={`${iconButtonClass} ${
-                  // important so the active fill always beats the base transparent bg,
-                  // giving the same highlight the shuffle button has
-                  player.repeat !== "off" ? "!bg-bg-toolbox-active !text-text-primary" : ""
+                  player.repeat !== "off" ? ACTIVE_TOGGLE_CLASS : ""
                 }`}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() =>
