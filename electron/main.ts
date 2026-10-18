@@ -271,7 +271,12 @@ function createWindow() {
       defaultRendererDist: RENDERER_DIST,
     });
     bundleManager.setMainWindow(mainWindow);
-    mainWindow.loadFile(bundleManager.getEffectiveIndexPath());
+    const manager = bundleManager;
+    const win = mainWindow;
+    void (async () => {
+      if (app.isPackaged) await manager.updateBeforeLaunch().catch(() => undefined);
+      if (!win.isDestroyed()) win.loadFile(manager.getEffectiveIndexPath());
+    })();
   }
 
   mainWindow.once("ready-to-show", () => {
@@ -1268,9 +1273,6 @@ if (!gotTheLock) {
       setTimeout(() => {
         autoUpdater.checkForUpdates().catch((err) => {
           console.error("\x1b[31m updater \x1b[0m background check error:", err?.message || err);
-        });
-        bundleManager?.checkForUpdates().catch((err) => {
-          console.error("\x1b[31m bundle updater \x1b[0m check error:", err?.message || err);
         });
       }, 4000);
 
