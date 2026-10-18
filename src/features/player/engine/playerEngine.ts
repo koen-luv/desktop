@@ -6,6 +6,7 @@ import {
   type PlayerState,
 } from "../store/playerStore";
 import { playerRuntime } from "./playerRuntime";
+import { isRadioContext, shouldRefillRadio } from "./radioMode";
 import { pitchShifter } from "./pitchShifter";
 import {
   api,
@@ -261,6 +262,8 @@ class PlayerEngine {
   private telemetry = new PlaybackTelemetryTracker();
   private radioAppendTimeout: ReturnType<typeof setTimeout> | null = null;
   private radioWaveId: string | null = null;
+  // single in-flight similar-tracks request, so a refill and an end-of-queue wait share it
+  private radioFetchInFlight: Promise<void> | null = null;
   private consecutiveAutoSkips = 0;
   private lastPreloadKey: string | null = null;
   private inFlightLyricsPrefetches = new Map<string, Promise<void>>();
@@ -466,9 +469,7 @@ class PlayerEngine {
       void playerRuntime.loadAndPlay(selectedTrack);
     }
 
-    if (finalIndex === finalQueue.length - 1) {
-      this.scheduleAppendSimilarTracks(mySession, selectedTrack.id);
-    }
+    this.maybeExtendQueue(mySession, selectedTrack.id, finalIndex, finalQueue.length);
   }
 
   public async playShuffled(
@@ -516,9 +517,7 @@ class PlayerEngine {
       void playerRuntime.loadAndPlay(seedTrack);
     }
 
-    if (finalQueue.length === 1) {
-      this.scheduleAppendSimilarTracks(mySession, seedTrack.id);
-    }
+    this.maybeExtendQueue(mySession, seedTrack.id, 0, finalQueue.length);
   }
 
   public async startRadioStation(track: Track): Promise<void> {
@@ -530,6 +529,8 @@ class PlayerEngine {
     const waveId = this.radioWaveId;
 
     store.setPlaybackContext(`radio:${track.id}`);
+    // a station never loops back to its first track
+    if (store.repeat === "all") store.setRepeat("off");
     store.setPlaybackContextCover(track.coverUrl ?? null);
     store.setQueue([track]);
     this.originalUpcomingQueue = [];
@@ -620,6 +621,23 @@ class PlayerEngine {
     const store = usePlayerStore.getState();
     const nextIndex = this.computeNextIndex(isAutoEnd);
 
+    if (nextIndex === null && isRadioContext(store.playbackContext) && store.currentTrack) {
+      // radio ran dry (refill not back yet / failed earlier): fetch now and carry on
+      const lengthBefore = store.queue.length;
+      const waitSession = this.sessionId;
+      store.setStatus("loading", null);
+      if (this.radioAppendTimeout) {
+        clearTimeout(this.radioAppendTimeout);
+        this.radioAppendTimeout = null;
+      }
+      await this.appendSimilarTracksForSeed(waitSession, store.currentTrack.id);
+      if (waitSession !== this.sessionId) return;
+      if (usePlayerStore.getState().queue.length > lengthBefore) {
+        await this.skipNext(isAutoEnd);
+        return;
+      }
+    }
+
     if (nextIndex === null) {
       this.stopPlayback();
       store.setStatus("idle");
@@ -643,9 +661,7 @@ class PlayerEngine {
       if (playerRuntime) {
         void playerRuntime.loadAndPlay(nextTrack);
       }
-      if (nextIndex === store.queue.length - 1) {
-        this.scheduleAppendSimilarTracks(mySession, nextTrack.id);
-      }
+      this.maybeExtendQueue(mySession, nextTrack.id, nextIndex, store.queue.length);
     }
   }
 
@@ -662,7 +678,7 @@ class PlayerEngine {
     const prevIndex =
       store.currentIndex > 0
         ? store.currentIndex - 1
-        : store.repeat === "all"
+        : store.repeat === "all" && !isRadioContext(store.playbackContext)
           ? store.queue.length - 1
           : 0;
 
@@ -679,9 +695,7 @@ class PlayerEngine {
       if (playerRuntime) {
         void playerRuntime.loadAndPlay(prevTrack);
       }
-      if (prevIndex === store.queue.length - 1) {
-        this.scheduleAppendSimilarTracks(mySession, prevTrack.id);
-      }
+      this.maybeExtendQueue(mySession, prevTrack.id, prevIndex, store.queue.length);
     }
   }
 
@@ -962,8 +976,22 @@ class PlayerEngine {
     if (isAutoEnd && store.repeat === "one") return store.currentIndex;
 
     if (store.currentIndex + 1 < queueSize) return store.currentIndex + 1;
+    // radio never wraps to its first track; skipNext refills it instead
+    if (isRadioContext(store.playbackContext)) return null;
     if (store.repeat === "all" || store.repeat === "one") return 0;
     return null;
+  }
+
+  /** queue refill trigger: radio refills early (one track left), autoplay-similar on the last track */
+  private maybeExtendQueue(
+    session: number,
+    seedTrackId: string,
+    index: number,
+    queueLength: number,
+  ): void {
+    const radio = isRadioContext(usePlayerStore.getState().playbackContext);
+    const due = radio ? shouldRefillRadio(queueLength, index) : index === queueLength - 1;
+    if (due) this.scheduleAppendSimilarTracks(session, seedTrackId);
   }
 
   private scheduleAppendSimilarTracks(
@@ -980,12 +1008,24 @@ class PlayerEngine {
     }, 400);
   }
 
-  private async appendSimilarTracksForSeed(
+  private appendSimilarTracksForSeed(session: number, seedTrackId: string): Promise<void> {
+    if (this.radioFetchInFlight) return this.radioFetchInFlight;
+    const run = this.fetchAndAppendSimilarTracks(session, seedTrackId).finally(() => {
+      if (this.radioFetchInFlight === run) this.radioFetchInFlight = null;
+    });
+    this.radioFetchInFlight = run;
+    return run;
+  }
+
+  private async fetchAndAppendSimilarTracks(
     session: number,
     seedTrackId: string,
   ): Promise<void> {
     const currentState = usePlayerStore.getState();
-    if (!currentState.autoplaySimilar) return;
+    // radio always continues; plain lists only when "autoplay similar" is on
+    const radio = isRadioContext(currentState.playbackContext);
+    if (!radio && !currentState.autoplaySimilar) return;
+    const startContext = currentState.playbackContext;
 
     const historyIds = currentState.queue.map((track) => track.id);
     // keep paginating the same wave instance across queue generations
@@ -1010,8 +1050,10 @@ class PlayerEngine {
     }
 
     const state = usePlayerStore.getState();
-    if (session !== this.sessionId) return;
-    if (!state.autoplaySimilar) return;
+    // radio: still valid while the same station plays (skipping within it is fine);
+    // anything else: only for the exact track session that asked
+    if (radio ? state.playbackContext !== startContext : session !== this.sessionId) return;
+    if (!radio && !state.autoplaySimilar) return;
 
     const queuedIds = new Set(state.queue.map((track) => track.id));
     const additions = items
@@ -1041,7 +1083,7 @@ class PlayerEngine {
     let nextTrack: Track | null = null;
     if (currentIndex >= 0 && currentIndex < queue.length - 1) {
       nextTrack = queue[currentIndex + 1];
-    } else if (state.repeat === "all" && queue.length > 0) {
+    } else if (state.repeat === "all" && queue.length > 0 && !isRadioContext(state.playbackContext)) {
       nextTrack = queue[0];
     }
 

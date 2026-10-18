@@ -16,6 +16,7 @@ import {
 } from "./morphPlayerIcons";
 import { usePlayerState } from "../hooks/usePlayerState";
 import { playerEngine } from "../engine/playerEngine";
+import { isRadioContext, nextRepeatMode } from "../engine/radioMode";
 import { useIsTrackLiked, useLikeTrack, useUnlikeTrack } from "@/features/library/hooks";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArtistLink } from "@/features/artist";
@@ -247,11 +248,8 @@ export function PlayerUiElements({
           aria-label="Repeat"
           onClick={() =>
             playerEngine.setRepeat(
-              player.repeat === "off"
-                ? "all"
-                : player.repeat === "all"
-                  ? "one"
-                  : "off",
+              // radio has no repeat-all: it refills instead of looping
+              nextRepeatMode(player.repeat, isRadioContext(player.playbackContext)),
             )
           }
           className={`${iconButtonClass} ${

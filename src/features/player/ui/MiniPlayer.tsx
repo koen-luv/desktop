@@ -27,6 +27,7 @@ import {
 
 import { usePlayerState } from "../hooks/usePlayerState";
 import { playerEngine } from "../engine/playerEngine";
+import { isRadioContext, nextRepeatMode } from "../engine/radioMode";
 import Button from "@/shared/ui/Button";
 import SongCard from "./SongCard";
 import { useTranslation } from "@/languages";
@@ -834,11 +835,8 @@ function MiniPlayer({
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() =>
                   playerEngine.setRepeat(
-                    player.repeat === "off"
-                      ? "all"
-                      : player.repeat === "all"
-                        ? "one"
-                        : "off",
+                    // radio has no repeat-all: it refills instead of looping
+                    nextRepeatMode(player.repeat, isRadioContext(player.playbackContext)),
                   )
                 }
               >
