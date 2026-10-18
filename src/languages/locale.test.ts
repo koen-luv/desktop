@@ -98,11 +98,11 @@ describe("getBrowserLocale", () => {
   });
 
   it("falls back to ru for unknown locales", () => {
-    vi.stubGlobal("window", { navigator: { language: "fr-FR", languages: ["fr-FR"] } });
+    vi.stubGlobal("window", { navigator: { language: "nl-NL", languages: ["nl-NL"] } });
     vi.stubGlobal("navigator", {
       ...navigator,
-      language: "fr-FR",
-      languages: ["fr-FR"],
+      language: "nl-NL",
+      languages: ["nl-NL"],
     });
     expect(getBrowserLocale()).toBe("ru");
   });
