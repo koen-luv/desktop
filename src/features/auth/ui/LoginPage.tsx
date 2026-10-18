@@ -210,7 +210,7 @@ export default function LoginPage() {
               onChange={setLocale}
               align="bottom-right"
               variant="transparent"
-              className="ml-auto"
+              className="ml-auto min-w-[120px]"
               aria-label={t("login.select_language")}
             />
           </div>

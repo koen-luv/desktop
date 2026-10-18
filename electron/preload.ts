@@ -77,7 +77,10 @@ export interface LinerElectronApi {
     canceled?: boolean;
     error?: string;
   }>;
-  setAppIcon: (dataUrl: string) => Promise<void>;
+  setAppIcon: (
+    dataUrl: string,
+    options?: { isDefault?: boolean },
+  ) => Promise<void>;
   getAppVersion: () => Promise<string>;
   getCacheStats: () => Promise<ElectronCacheStats>;
   openCacheFolder: () => Promise<boolean>;
@@ -106,6 +109,7 @@ export interface LinerElectronApi {
   onBundleAvailable: (cb: (manifest: any) => void) => () => void;
   onBundleDownloadProgress: (cb: (progress: { percent: number; transferred: number; total: number }) => void) => () => void;
   onBundleReady: (cb: (state: any) => void) => () => void;
+  onBundleStamp: (cb: (line: string) => void) => () => void;
   touchbarUpdateState: (state: any) => void;
   onTouchBarAction: (cb: (action: any) => void) => () => void;
   sendTouchBarAction: (action: any) => void;
@@ -184,7 +188,8 @@ const api: LinerElectronApi = {
   openDownloads: (customPath) => ipcRenderer.invoke("shell:open-downloads", customPath),
   openExportFolder: (customPath) => ipcRenderer.invoke("shell:open-export-folder", customPath),
   saveDump: (input) => ipcRenderer.invoke("dialog:save-dump", input),
-  setAppIcon: (dataUrl) => ipcRenderer.invoke("app:set-icon", dataUrl),
+  setAppIcon: (dataUrl, options) =>
+    ipcRenderer.invoke("app:set-icon", dataUrl, options),
   getAppVersion: () => ipcRenderer.invoke("app:get-version"),
   getCacheStats: () => ipcRenderer.invoke("storage:get-cache-stats"),
   openCacheFolder: () => ipcRenderer.invoke("shell:open-cache-folder"),
@@ -247,6 +252,13 @@ const api: LinerElectronApi = {
     ipcRenderer.on("bundle:ready", listener);
     return () => {
       ipcRenderer.removeListener("bundle:ready", listener);
+    };
+  },
+  onBundleStamp: (cb) => {
+    const listener = (_event: unknown, line: string) => cb(line);
+    ipcRenderer.on("bundle:stamp", listener);
+    return () => {
+      ipcRenderer.removeListener("bundle:stamp", listener);
     };
   },
   onDeeplink: (cb) => {

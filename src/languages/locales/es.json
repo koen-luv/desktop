@@ -86,6 +86,7 @@
     "confirm": "Confirmar",
     "are_you_sure": "¿Estás seguro?",
     "delete_playlist_desc": "Esta lista de reproducción se eliminará permanentemente.",
+    "add_to_library_desc": "Este elemento se añadirá a tu biblioteca.",
     "remove_from_library_desc": "Este elemento se eliminará de tu biblioteca.",
     "remove_track_from_playlist_desc": "Esta canción se eliminará de esta lista de reproducción.",
     "close": "Cerrar",
@@ -134,6 +135,7 @@
     "removed_from_library": "Se ha quitado {type} de la biblioteca",
     "removed_from_library_success": "Quitado de la biblioteca",
     "failed_remove_from_library": "Error al quitar de la biblioteca",
+    "failed_to_remove_library": "Error al quitar de la biblioteca",
     "failed_to_load_track": "Error al cargar la canción",
     "failed_to_resolve_link": "Error al resolver el enlace",
     "unsupported_link": "Enlace no reconocido o no compatible",
@@ -406,7 +408,8 @@
     "min": "min",
     "sec": "s",
     "empty_title": "Esta lista de reproducción está vacía",
-    "empty_subtitle": "Busca canciones para añadirlas"
+    "empty_subtitle": "Busca canciones para añadirlas",
+    "likes_empty": "Aún no hay canciones que te gusten"
   },
   "search": {
     "placeholder": "Buscar canciones, artistas, álbumes...",
@@ -679,14 +682,6 @@
       "light": "Claro",
       "dark": "Oscuro",
       "system": "Sistema"
-    },
-    "artwork_size": {
-      "title": "Tamaño de la carátula en pantalla completa",
-      "description": "Elige el tamaño de la carátula en el reproductor a pantalla completa.",
-      "small": "Pequeño",
-      "medium": "Mediano",
-      "large": "Grande",
-      "default": "Predeterminado"
     },
     "branding": {
       "title": "Color de énfasis",

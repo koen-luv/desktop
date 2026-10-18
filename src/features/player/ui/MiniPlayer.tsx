@@ -820,8 +820,8 @@ function MiniPlayer({
               </button>
               <button
                 type="button"
-                aria-label="Repeat"
-                title="Repeat"
+                aria-label={t("player.repeat")}
+                title={t("player.repeat")}
                 className={`${iconButtonClass} ${
                   player.repeat !== "off" ? "bg-bg-toolbox-active text-text-primary" : ""
                 }`}
@@ -902,8 +902,8 @@ function MiniPlayer({
               </button>
               <button
                 type="button"
-                aria-label="Open player"
-                title="Open player"
+                aria-label={t("player.open_player")}
+                title={t("player.open_player")}
                 className={iconButtonClass}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => {
@@ -920,8 +920,8 @@ function MiniPlayer({
               />
               <button
                 type="button"
-                aria-label="Queue"
-                title="Queue"
+                aria-label={t("player.queue")}
+                title={t("player.queue")}
                 className={iconButtonClass}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => {
