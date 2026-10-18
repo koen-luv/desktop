@@ -964,5 +964,13 @@
     "downloaded_desc": "{version} sürümünü yüklemek için Liner'ı yeniden başlat.",
     "install_button": "Yükle",
     "error_title": "Güncelleme başarısız"
+  },
+  "track_search": {
+    "placeholder_playlist": "Çalma listesinde ara",
+    "placeholder_album": "Albümde ara",
+    "button": "Parça ara",
+    "count": "{count} / {total}",
+    "no_results": "“{query}” ile eşleşen parça yok",
+    "clear": "Aramayı temizle"
   }
 }

@@ -4,6 +4,7 @@ import DropdownMenu from "@/shared/ui/DropdownMenu";
 import type { DropdownMenuItem } from "@/shared/ui/DropdownMenu";
 import { useTranslation } from "@/languages";
 import { ArtistLink } from "@/features/artist";
+import HighlightedText from "@/shared/ui/HighlightedText";
 import ExplicitBadge from "@/shared/ui/ExplicitBadge";
 import CoverImage from "@/features/covers/ui/CoverImage";
 import { isCoverReady } from "@/features/covers/lib/coverArt";
@@ -36,6 +37,8 @@ export interface SongCardProps {
   icon?: React.ReactNode;
   showReorderHandle?: boolean;
   onGrabStart?: (e: React.PointerEvent<HTMLDivElement>) => void;
+  /** search query whose matches get marked in the title */
+  highlight?: string;
 }
 
 function SongCard({
@@ -64,6 +67,7 @@ function SongCard({
   icon,
   showReorderHandle,
   onGrabStart,
+  highlight,
 }: SongCardProps) {
   const { t } = useTranslation();
   const [imageLoaded, setImageLoaded] = useState(() => isCoverReady(coverUrl));
@@ -190,7 +194,7 @@ function SongCard({
                 fontWeight: 400,
               }}
             >
-              {title}
+              {highlight ? <HighlightedText text={title} query={highlight} /> : title}
             </h3>
             {repostedBy && (
               <div

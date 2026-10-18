@@ -968,5 +968,13 @@
     "downloaded_desc": "Uruchom ponownie Liner, aby zainstalować wersję {version}.",
     "install_button": "Zainstaluj",
     "error_title": "Aktualizacja nie powiodła się"
+  },
+  "track_search": {
+    "placeholder_playlist": "Szukaj w playliście",
+    "placeholder_album": "Szukaj w albumie",
+    "button": "Szukaj utworów",
+    "count": "{count} z {total}",
+    "no_results": "Brak utworów dla „{query}”",
+    "clear": "Wyczyść wyszukiwanie"
   }
 }

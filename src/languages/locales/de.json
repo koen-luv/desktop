@@ -905,5 +905,13 @@
     "downloaded_desc": "Starte Liner neu, um Version {version} zu installieren.",
     "install_button": "Installieren",
     "error_title": "Update fehlgeschlagen"
+  },
+  "track_search": {
+    "placeholder_playlist": "In Playlist suchen",
+    "placeholder_album": "Im Album suchen",
+    "button": "Titel suchen",
+    "count": "{count} von {total}",
+    "no_results": "Keine Titel für „{query}“",
+    "clear": "Suche löschen"
   }
 }

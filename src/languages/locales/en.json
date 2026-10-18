@@ -972,5 +972,13 @@
     "downloaded_desc": "Restart Liner to install version {version}.",
     "install_button": "Install",
     "error_title": "Update failed"
+  },
+  "track_search": {
+    "placeholder_playlist": "Search in playlist",
+    "placeholder_album": "Search in album",
+    "button": "Search tracks",
+    "count": "{count} of {total}",
+    "no_results": "No tracks match “{query}”",
+    "clear": "Clear search"
   }
 }

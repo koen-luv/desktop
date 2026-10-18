@@ -1000,5 +1000,13 @@
     "downloaded_desc": "Перезапустіть Liner для встановлення версії {version}.",
     "install_button": "Встановити",
     "error_title": "Помилка оновлення"
+  },
+  "track_search": {
+    "placeholder_playlist": "Пошук у плейлисті",
+    "placeholder_album": "Пошук в альбомі",
+    "button": "Пошук треків",
+    "count": "{count} з {total}",
+    "no_results": "Немає треків за запитом «{query}»",
+    "clear": "Очистити пошук"
   }
 }

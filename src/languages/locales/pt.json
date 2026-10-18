@@ -901,5 +901,13 @@
     "downloaded_desc": "Reinicie o Liner para instalar a versão {version}.",
     "install_button": "Instalar",
     "error_title": "Falha na atualização"
+  },
+  "track_search": {
+    "placeholder_playlist": "Pesquisar na playlist",
+    "placeholder_album": "Pesquisar no álbum",
+    "button": "Pesquisar faixas",
+    "count": "{count} de {total}",
+    "no_results": "Nenhuma faixa corresponde a “{query}”",
+    "clear": "Limpar pesquisa"
   }
 }

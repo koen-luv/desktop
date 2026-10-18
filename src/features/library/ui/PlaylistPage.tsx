@@ -14,6 +14,7 @@ import {
   CheckLine,
   ArrowLeftLine,
   ShareForwardLine,
+  Search2Line,
 } from "@mingcute/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { LuPencil, LuTrash2, LuText, LuShuffle } from "react-icons/lu";
@@ -34,6 +35,12 @@ import type { Track } from "@/shared/types";
 import { useTranslation } from "@/languages";
 import { api } from "@/shared/api";
 import { useIsContentTransparent } from "@/features/settings/store/customizationStore";
+import {
+  useTrackSearch,
+  useTrackSearchButtonLabel,
+  TrackSearchField,
+  TrackSearchEmpty,
+} from "./TrackSearch";
 
 interface TrackItemProps {
   track: Track;
@@ -44,6 +51,7 @@ interface TrackItemProps {
   style?: React.CSSProperties;
   showReorderHandle?: boolean;
   onGrabStart?: (e: React.PointerEvent<HTMLDivElement>) => void;
+  highlight?: string;
 }
 
 const TrackItem = memo(function TrackItem({
@@ -55,6 +63,7 @@ const TrackItem = memo(function TrackItem({
   style,
   showReorderHandle,
   onGrabStart,
+  highlight,
 }: TrackItemProps) {
   const handlePlay = useCallback(() => {
     if (typeof window !== "undefined" && window.__linerWasDragging) return;
@@ -81,6 +90,7 @@ const TrackItem = memo(function TrackItem({
         playlistTitle={playlistTitle}
         showReorderHandle={showReorderHandle}
         onGrabStart={onGrabStart}
+        highlight={highlight}
         duration={
           track.durationMs
             ? `${Math.floor(track.durationMs / 60000)}:${String(
@@ -191,6 +201,26 @@ function LibraryPlaylistContent() {
     return optimisticTracks ?? viewData?.tracks ?? [];
   }, [optimisticTracks, viewData?.tracks]);
 
+  const search = useTrackSearch(currentTracks, id);
+  const searchButtonLabel = useTrackSearchButtonLabel();
+  const isFiltering = search.matches !== null;
+  const visibleTracks = useMemo(
+    () => search.matches ?? currentTracks.map((track, index) => ({ track, index })),
+    [search.matches, currentTracks],
+  );
+
+  // results start at the top, not wherever the full list was scrolled to
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [search.activeQuery]);
+
+  const handleSearchSubmit = useCallback(() => {
+    const first = search.matches?.[0];
+    if (!first || !viewData) return;
+    const context = decodedId ? `playlist:${decodedId}` : viewData.title;
+    playerEngine.playTrack(first.track, currentTracks, context, viewData.coverUrl);
+  }, [search.matches, viewData, decodedId, currentTracks]);
+
   const handlePlayAll = useCallback(() => {
     if (!currentTracks.length || !viewData) return;
     const context = decodedId ? `playlist:${decodedId}` : viewData.title;
@@ -287,13 +317,13 @@ function LibraryPlaylistContent() {
   });
 
   const rowVirtualizer = useVirtualizer({
-    count: currentTracks.length,
+    count: visibleTracks.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 64,
     overscan: 25,
     getItemKey: (index) =>
-      currentTracks[index]?.playlistItemId ??
-      currentTracks[index]?.id ??
+      visibleTracks[index]?.track.playlistItemId ??
+      visibleTracks[index]?.track.id ??
       index,
   });
 
@@ -468,6 +498,18 @@ function LibraryPlaylistContent() {
         />
         <span className="relative -left-[1.5px] top-[1px]">{t("common.back")}</span>
       </button>
+      {/* track search sits in the top bar, aligned with the track list */}
+      {viewData && isReady && (
+        <div className="absolute top-[12px] left-[336px] z-20 pointer-events-none">
+          <TrackSearchField
+            search={search}
+            totalCount={currentTracks.length}
+            placeholder={t("track_search.placeholder_playlist")}
+            glass={hasCustomBg}
+            onSubmit={handleSearchSubmit}
+          />
+        </div>
+      )}
       <div className="relative z-1 grid grid-cols-1 w-full h-full min-h-0 overflow-hidden">
         {viewData && (
           <div
@@ -712,6 +754,16 @@ function LibraryPlaylistContent() {
                           <LuShuffle size={16} />
                         </Button>
 
+                        <Button
+                          variant={hasCustomBg ? "glass-action" : "outline"}
+                          onClick={search.open}
+                          disabled={currentTracks.length === 0}
+                          className="!h-[36px] !w-[36px] shrink-0 !p-0 flex items-center justify-center text-text-primary"
+                          title={searchButtonLabel}
+                        >
+                          <Search2Line size={16} />
+                        </Button>
+
                         {!isLikesMode && (
                           <DropdownMenu
                             trigger={
@@ -796,6 +848,8 @@ function LibraryPlaylistContent() {
                     </p>
                   </div>
                 </div>
+              ) : search.matches && search.matches.length === 0 ? (
+                <TrackSearchEmpty query={search.activeQuery} onClear={() => search.setQuery("")} />
               ) : (
               <div
                 ref={trackListContainerRef}
@@ -824,9 +878,10 @@ function LibraryPlaylistContent() {
                 )}
 
                 {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                  const index = virtualRow.index;
-                  const track = currentTracks[index];
-                  if (!track) return null;
+                  const entry = visibleTracks[virtualRow.index];
+                  if (!entry) return null;
+                  // original position; equals the row index whenever not filtering
+                  const { track, index } = entry;
 
                   const isThisDragged = isDragging && index === dragIndex;
 
@@ -839,8 +894,9 @@ function LibraryPlaylistContent() {
                     }
                   }
 
+                  // reordering a filtered view would be ambiguous, so it waits for the full list
                   const canReorder = Boolean(
-                    !isLikesMode && decodedId && track.playlistItemId,
+                    !isLikesMode && decodedId && track.playlistItemId && !isFiltering,
                   );
 
                   return (
@@ -854,6 +910,7 @@ function LibraryPlaylistContent() {
                       playlistCoverUrl={viewData.coverUrl}
                       allTracks={currentTracks}
                       showReorderHandle={canReorder}
+                      highlight={search.activeQuery || undefined}
                       onGrabStart={
                         canReorder && !isDragging
                           ? (e) => handleCardGrab(index, track, e)

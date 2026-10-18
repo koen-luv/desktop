@@ -966,5 +966,13 @@
     "downloaded_desc": "Redémarrez Liner pour installer la version {version}.",
     "install_button": "Installer",
     "error_title": "Échec de la mise à jour"
+  },
+  "track_search": {
+    "placeholder_playlist": "Rechercher dans la playlist",
+    "placeholder_album": "Rechercher dans l’album",
+    "button": "Rechercher des titres",
+    "count": "{count} sur {total}",
+    "no_results": "Aucun titre ne correspond à « {query} »",
+    "clear": "Effacer la recherche"
   }
 }
