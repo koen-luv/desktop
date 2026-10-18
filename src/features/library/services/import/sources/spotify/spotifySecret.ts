@@ -6,7 +6,7 @@ export interface SpotifyTotpSecret {
   version: number;
 }
 
-const WEB_PLAYER_SCRIPT = /src="(https:\/\/open\.spotifycdn\.com\/cdn\/build\/web-player\/web-player\.[a-f0-9]+\.js)"/;
+const WEB_PLAYER_SCRIPT = /src="(https:\/\/open\.spotifycdn\.com\/cdn\/build\/(?:mobile-)?web-player\/(?:mobile-)?web-player\.[a-f0-9]+\.js)"/;
 const SECRET_ENTRY = /\{secret:(['"])((?:\\.|(?!\1)[^\\])*)\1,version:(\d+)\}/g;
 
 export function extractSpotifySecret(js: string): SpotifyTotpSecret | undefined {
