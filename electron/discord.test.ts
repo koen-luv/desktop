@@ -62,12 +62,20 @@ describe("DiscordRpcManager", () => {
     vi.useRealTimers();
   });
 
-  it("does not connect without an application id", async () => {
+  it("connects with Liner's built-in application id by default", async () => {
     delete process.env.LINER_DISCORD_CLIENT_ID;
     const manager = new DiscordRpcManager();
-    manager.updateState(playing("a"));
-    await vi.advanceTimersByTimeAsync(20_000);
-    expect(mocks.clients).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(mocks.clients).toEqual(["1561339119617974362"]);
+    manager.destroy();
+  });
+
+  it("uses a custom application id from settings instead", async () => {
+    delete process.env.LINER_DISCORD_CLIENT_ID;
+    const manager = new DiscordRpcManager();
+    manager.updateSettings({ applicationId: "987654321098765432" });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(mocks.clients.at(-1)).toBe("987654321098765432");
     manager.destroy();
   });
 

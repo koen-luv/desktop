@@ -38,7 +38,7 @@ export interface DiscordRpcStatePayload {
   artistImageUrl?: string;
 }
 
-export const LINER_DISCORD_APPLICATION_ID = "";
+export const LINER_DISCORD_APPLICATION_ID = "1561339119617974362";
 
 function builtInApplicationId(): string {
   return process.env.LINER_DISCORD_CLIENT_ID?.trim() || LINER_DISCORD_APPLICATION_ID;
