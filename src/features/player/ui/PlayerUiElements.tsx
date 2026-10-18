@@ -8,7 +8,7 @@ import {
   RepeatOne,
   Shuffle,
 } from "@solar-icons/react";
-import { AddLine, CheckFill } from "@mingcute/react";
+import { HeartFill, HeartLine } from "@mingcute/react";
 import {
   PlayerMorphIcon,
   ICON_PLAY,
@@ -21,7 +21,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArtistLink } from "@/features/artist";
 import { useCoverReady, CoverImage } from "@/features/covers";
 import ExplicitBadge from "@/shared/ui/ExplicitBadge";
-import Tooltip from "@/shared/ui/Tooltip";
 import { VolumePicker } from "./VolumePicker";
 import { TimelineSlider } from "./TimelineSlider";
 
@@ -131,49 +130,39 @@ export function PlayerUiElements({
             )}
           </motion.div>
         </AnimatePresence>
-        {/* tooltip wrapper positioned on cover corner */}
-        <Tooltip
-          content={isLiked ? t("common.unlike") : t("common.like")}
-          side="top"
-          wrapperClassName="!absolute bottom-2.5 left-2.5 z-20"
+        {/* like button on the cover corner; data-tooltip uses the app-wide small tooltip */}
+        <button
+          type="button"
+          aria-label={isLiked ? t("common.unlike") : t("common.like")}
+          data-tooltip={isLiked ? t("common.unlike") : t("common.like")}
+          className={`absolute bottom-2.5 left-2.5 z-20 inline-flex h-[30px] w-[30px] items-center justify-center rounded-full transition-colors duration-200 ease-out active:scale-[0.92] bg-black/40 backdrop-blur-md border-none hover:bg-black/60 ${
+            isLiked ? "text-white" : "text-white/70 hover:text-white"
+          }`}
+          onClick={handleLikeToggle}
+          style={{ cursor: "pointer" }}
         >
-          <button
-            type="button"
-            aria-label={isLiked ? t("common.unlike") : t("common.like")}
-            className={`relative inline-flex h-[30px] w-[30px] items-center justify-center rounded-full transition-all duration-200 ease-out active:scale-[0.92] bg-black/40 backdrop-blur-md border-none ${
-              isLiked
-                ? "text-white hover:bg-black/60"
-                : "text-white/70 hover:text-white hover:bg-black/60"
-            }`}
-            onClick={handleLikeToggle}
-            style={{ cursor: "pointer" }}
+          {/* outline heart fades out while the filled one pops in (and back) */}
+          <motion.div
+            initial={false}
+            animate={{ scale: isLiked ? 0.6 : 1, opacity: isLiked ? 0 : 1 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute inset-0 flex items-center justify-center"
           >
-            <motion.div
-              initial={false}
-              animate={{
-                scale: isLiked ? 1 : 0.5,
-                opacity: isLiked ? 1 : 0,
-                rotate: isLiked ? 0 : -45,
-              }}
-              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute inset-0 flex items-center justify-center"
-            >
-              <CheckFill size={16} />
-            </motion.div>
-            <motion.div
-              initial={false}
-              animate={{
-                scale: !isLiked ? 1 : 0.5,
-                opacity: !isLiked ? 1 : 0,
-                rotate: !isLiked ? 0 : 45,
-              }}
-              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute inset-0 flex items-center justify-center"
-            >
-              <AddLine size={16} />
-            </motion.div>
-          </button>
-        </Tooltip>
+            <HeartLine size={16} />
+          </motion.div>
+          <motion.div
+            initial={false}
+            animate={{ scale: isLiked ? 1 : 0.4, opacity: isLiked ? 1 : 0 }}
+            transition={
+              isLiked
+                ? { type: "spring", stiffness: 520, damping: 17, mass: 0.6 }
+                : { duration: 0.16, ease: "easeOut" }
+            }
+            className="absolute inset-0 flex items-center justify-center"
+          >
+            <HeartFill size={16} />
+          </motion.div>
+        </button>
       </div>
 
       {/* Track info */}
