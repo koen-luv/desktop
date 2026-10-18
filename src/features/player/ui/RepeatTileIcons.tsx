@@ -35,7 +35,14 @@ function RepeatTileBase({ size = 18, className, one }: TileIconProps & { one: bo
     >
       <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
         <path d={TILE} fill="white" />
-        <g stroke="black" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <g
+          stroke="black"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          // glyph scaled up around the centre so it stays legible at 18px
+          transform="translate(12 12) scale(1.18) translate(-12 -12)"
+        >
           {LOOP.map((d) => (
             <path key={d} d={d} />
           ))}
