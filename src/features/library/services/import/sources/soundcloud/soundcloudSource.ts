@@ -1,9 +1,8 @@
 import type { ClientImportedPlaylist, ClientImportedTrack } from "../../importTypes";
-import { getSoundCloudClientId } from "@/shared/media/soundcloud";
+import { getSoundCloudClientId, hydrateSoundCloudStubs } from "@/shared/media/soundcloud";
 import { createSoundCloudCollection } from "./soundcloudCollection";
 import { scrapeSoundCloudHydration } from "./soundcloudHydration";
 import { resolveSoundCloudApi } from "./soundcloudResolve";
-import { hydrateSoundCloudStubs } from "./soundcloudStubs";
 import { mapSoundCloudTrack, soundCloudCanonicalId } from "./soundcloudTracks";
 import { isSoundCloudLikesUrl, resolveSoundCloudUrl } from "./soundcloudUrl";
 
