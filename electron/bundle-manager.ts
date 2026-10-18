@@ -157,6 +157,22 @@ export class BundleManager {
     );
   }
 
+  private compareVersions(left: string, right: string): number {
+    const a = left.split("-")[0].split(".").map(Number);
+    const b = right.split("-")[0].split(".").map(Number);
+    for (let i = 0; i < 3; i += 1) {
+      const diff = (a[i] || 0) - (b[i] || 0);
+      if (diff !== 0) return diff;
+    }
+    return 0;
+  }
+
+  private isUpgradeOver(state: ActiveBundleState | null, manifest: BundleManifest): boolean {
+    const order = this.compareVersions(manifest.bundleVersion, state?.bundleVersion ?? app.getVersion());
+    if (order !== 0) return order > 0;
+    return !this.matches(state, manifest);
+  }
+
   private async fetchManifest(timeoutMs: number): Promise<BundleManifest> {
     const res = await fetch(`${this.updaterUrl}/updates/manifest.json?t=${Date.now()}`, {
       cache: "no-store",
@@ -193,7 +209,7 @@ export class BundleManager {
       return;
     }
     if (!this.isVersionCompatible(app.getVersion(), manifest.minAppVersion)) return;
-    if (this.matches(this.installedState, manifest)) return;
+    if (!this.isUpgradeOver(this.installedState, manifest)) return;
 
     const remaining = deadline - Date.now();
     if (remaining < 1_000) {
@@ -215,7 +231,7 @@ export class BundleManager {
       if (!this.isVersionCompatible(app.getVersion(), manifest.minAppVersion)) {
         return { kind: "needs-app-update" };
       }
-      return this.matches(this.activeState, manifest) ? { kind: "latest" } : { kind: "available", version: manifest.bundleVersion };
+      return this.isUpgradeOver(this.activeState, manifest) ? { kind: "available", version: manifest.bundleVersion } : { kind: "latest" };
     } catch {
       return { kind: "unknown" };
     }
@@ -239,10 +255,10 @@ export class BundleManager {
         return { available: false, reason: "App version too old for bundle" };
       }
 
-      if (this.matches(this.installedState, manifest)) {
+      if (!this.isUpgradeOver(this.installedState, manifest)) {
         return {
           available: false,
-          reason: this.matches(this.activeState, manifest) ? "Already up to date" : "Installed, applies on next launch",
+          reason: this.isUpgradeOver(this.activeState, manifest) ? "Installed, applies on next launch" : "Already up to date",
         };
       }
 

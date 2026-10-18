@@ -5,10 +5,10 @@ import path from "node:path";
 import * as tar from "tar";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const env = vi.hoisted(() => ({ userData: "" }));
+const env = vi.hoisted(() => ({ userData: "", appVersion: "0.1.35" }));
 
 vi.mock("electron", () => ({
-  app: { getPath: () => env.userData, getVersion: () => "0.1.35" },
+  app: { getPath: () => env.userData, getVersion: () => env.appVersion },
   BrowserWindow: class {},
 }));
 
@@ -74,6 +74,7 @@ function runningHtml(bundles: BundleManager): string {
 }
 
 beforeEach(() => {
+  env.appVersion = "0.1.35";
   root = fs.mkdtempSync(path.join(os.tmpdir(), "liner-bundles-"));
   env.userData = path.join(root, "userData");
   builtInDist = path.join(root, "built-in");
@@ -154,5 +155,27 @@ describe("BundleManager", () => {
     expect(left).toHaveLength(1);
     expect(left[0]).toMatch(/^bundle-0\.1\.40-/);
     expect(runningHtml(next)).toBe("<html>0.1.40</html>");
+  });
+
+  it("never replaces a newer built-in bundle with an older published one", async () => {
+    env.appVersion = "0.1.40";
+    const fetchSpy = serve(makeBundle("0.1.38"));
+    const bundles = manager();
+    await bundles.updateBeforeLaunch();
+    await bundles.checkForUpdates();
+    expect(runningHtml(bundles)).toBe("<html>built-in</html>");
+    expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes("/bundles/"))).toHaveLength(0);
+    expect(await bundles.peekUpdate()).toEqual({ kind: "latest" });
+  });
+
+  it("takes a hotfix published under the same version as the installed bundle", async () => {
+    serve(makeBundle("0.1.40"));
+    await manager().updateBeforeLaunch();
+    vi.restoreAllMocks();
+    serve(makeBundle("0.1.40"));
+    const next = manager();
+    await next.updateBeforeLaunch();
+    expect(runningHtml(next)).toBe("<html>0.1.40</html>");
+    expect(fs.readdirSync(path.join(env.userData, "bundles")).length).toBeGreaterThanOrEqual(1);
   });
 });
