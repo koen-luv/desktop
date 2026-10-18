@@ -407,9 +407,9 @@ function MiniPlayer({
   }, [player.repeat]);
   const repeatLabel = t(`player.repeat_${player.repeat}`);
 
-  // "on" state for the shuffle / repeat toggles: solid white tile, dark icon
-  // (inverted tokens, so it flips to a dark tile in the light theme)
-  const activeToggleClass = "!bg-text-primary !text-bg-primary";
+  // "on" state for the shuffle / repeat toggles: the same tint the buttons get on
+  // hover, kept while on (important so it beats the base transparent bg)
+  const activeToggleClass = "!bg-black/[0.05] dark:!bg-white/[0.09] !text-text-primary";
 
   const iconButtonClass =
     "inline-flex h-[30px] w-[30px] items-center justify-center rounded-md text-text-secondary transition-colors duration-150 hover:bg-black/[0.05] dark:hover:bg-white/[0.09] hover:text-text-primary active:scale-[0.96] border-none bg-transparent cursor-pointer";
