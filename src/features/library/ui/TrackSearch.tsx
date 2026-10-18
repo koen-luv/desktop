@@ -34,6 +34,8 @@ export interface TrackSearchState<T> {
   setQuery: (q: string) => void;
   open: () => void;
   close: () => void;
+  /** search button: hides an open field, opens a closed one */
+  toggle: () => void;
 }
 
 export function useTrackSearch<T extends SearchableTrack>(
@@ -79,7 +81,12 @@ export function useTrackSearch<T extends SearchableTrack>(
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open]);
 
-  return { isOpen, query, activeQuery, matches, focusToken, setQuery, open, close };
+  const toggle = useCallback(() => {
+    if (isOpen) close();
+    else open();
+  }, [isOpen, open, close]);
+
+  return { isOpen, query, activeQuery, matches, focusToken, setQuery, open, close, toggle };
 }
 
 interface TrackSearchFieldProps {
@@ -188,7 +195,7 @@ export const TrackSearchField = memo(function TrackSearchField({
                 aria-label={t("track_search.clear")}
                 data-no-tooltip="true"
                 // keep focus in the field while clearing
-                onPointerDown={(e) => e.preventDefault()}
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   setQuery("");
                   inputRef.current?.focus();

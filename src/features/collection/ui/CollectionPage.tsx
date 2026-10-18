@@ -327,7 +327,7 @@ function CollectionContent() {
       </button>
       {/* track search sits in the top bar, aligned with the track list */}
       {data && isReady && (
-        <div className="absolute top-[12px] left-[336px] z-20 pointer-events-none">
+        <div className="absolute top-[12px] left-[336px] right-[24px] z-20 flex justify-center pointer-events-none">
           <TrackSearchField
             search={search}
             totalCount={data.tracks.length}
@@ -464,7 +464,10 @@ function CollectionContent() {
                           variant={hasCustomBg ? "glass-action" : "outline"}
                           onClick={handleAddToQueue}
                           disabled={!data || data.tracks.length === 0}
-                          className="!h-[36px] flex-1 min-w-0 !text-[13px] !font-[500] px-[12px] flex items-center justify-center gap-[6px]"
+                          className={`!h-[36px] flex-1 min-w-0 !text-[13px] !font-[500] px-[12px] flex items-center justify-center gap-[6px] ${
+                            // optical centring: with three icon buttons beside it the label reads 1px right
+                            !isDailyMix ? "[&>*]:-translate-x-px" : ""
+                          }`}
                           title={t("common.add_to_queue")}
                         >
                           <AnimatePresence mode="wait">
@@ -507,7 +510,11 @@ function CollectionContent() {
 
                         <Button
                           variant={hasCustomBg ? "glass-action" : "outline"}
-                          onClick={search.open}
+                          onClick={search.toggle}
+                          // keep focus in the field so its blur-to-close doesn't fire first
+                          onMouseDown={(e) => {
+                            if (search.isOpen) e.preventDefault();
+                          }}
                           disabled={!data || data.tracks.length === 0}
                           className="!h-[36px] !w-[36px] shrink-0 !p-0 flex items-center justify-center text-text-primary"
                           title={searchButtonLabel}

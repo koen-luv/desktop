@@ -135,6 +135,15 @@ describe("track search", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
+  it("the search button toggles: hides an open field, opens a closed one", () => {
+    act(() => latest!.toggle());
+    expect(input()).not.toBeNull();
+    type("vill");
+    act(() => latest!.toggle());
+    expect(input()).toBeNull();
+    expect(latest!.query).toBe("");
+  });
+
   it("resets when the page changes", () => {
     act(() => latest!.open());
     type("vill");
