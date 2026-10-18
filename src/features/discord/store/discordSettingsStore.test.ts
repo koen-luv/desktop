@@ -100,4 +100,18 @@ describe("discordSettingsStore", () => {
     store.setApplicationId(null);
     expect(useDiscordSettingsStore.getState().applicationId).toBe(DEFAULT_DISCORD_CLIENT_ID);
   });
+
+  it("ignores invalid custom application ID format (non-snowflake)", () => {
+    const store = useDiscordSettingsStore.getState();
+    store.resetApplicationId();
+    expect(useDiscordSettingsStore.getState().applicationId).toBe(DEFAULT_DISCORD_CLIENT_ID);
+
+    // Too short (not 17-20 digits)
+    store.setApplicationId("12345");
+    expect(useDiscordSettingsStore.getState().applicationId).toBe(DEFAULT_DISCORD_CLIENT_ID);
+
+    // Non-numeric characters
+    store.setApplicationId("abcdef123456789012");
+    expect(useDiscordSettingsStore.getState().applicationId).toBe(DEFAULT_DISCORD_CLIENT_ID);
+  });
 });

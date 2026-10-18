@@ -44,9 +44,21 @@ export const useDiscordSettingsStore = create<DiscordSettingsState>()(
         notifyElectron({ enabled });
       },
       setApplicationId: (rawId) => {
-        const applicationId = typeof rawId === "string" ? rawId.trim() || DEFAULT_DISCORD_CLIENT_ID : DEFAULT_DISCORD_CLIENT_ID;
-        set({ applicationId });
-        notifyElectron({ applicationId });
+        if (typeof rawId !== "string") {
+          set({ applicationId: DEFAULT_DISCORD_CLIENT_ID });
+          notifyElectron({ applicationId: DEFAULT_DISCORD_CLIENT_ID });
+          return;
+        }
+        const trimmed = rawId.trim();
+        if (!trimmed || trimmed === DEFAULT_DISCORD_CLIENT_ID) {
+          set({ applicationId: DEFAULT_DISCORD_CLIENT_ID });
+          notifyElectron({ applicationId: DEFAULT_DISCORD_CLIENT_ID });
+          return;
+        }
+        if (/^\d{17,20}$/.test(trimmed)) {
+          set({ applicationId: trimmed });
+          notifyElectron({ applicationId: trimmed });
+        }
       },
       resetApplicationId: () => {
         set({ applicationId: DEFAULT_DISCORD_CLIENT_ID });
@@ -103,7 +115,8 @@ export const useDiscordSettingsStore = create<DiscordSettingsState>()(
         if (
           typeof state.applicationId !== "string" ||
           !state.applicationId.trim() ||
-          state.applicationId === "1165957668758900787"
+          state.applicationId === "1165957668758900787" ||
+          !/^\d{17,20}$/.test(state.applicationId.trim())
         ) {
           state.setApplicationId(DEFAULT_DISCORD_CLIENT_ID);
         }

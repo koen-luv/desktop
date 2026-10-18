@@ -163,13 +163,53 @@ export class DiscordRpcManager {
   }
 
   public updateSettings(patch: Partial<DiscordRpcSettings>): void {
+    if (!patch || typeof patch !== "object") return;
+
+    const validatedPatch: Partial<DiscordRpcSettings> = {};
+
+    const booleanFields: (keyof DiscordRpcSettings)[] = [
+      "enabled",
+      "showArtwork",
+      "showArtistSmallImage",
+      "showTime",
+      "showPaused",
+      "showButton",
+      "showDownloadButton",
+    ];
+    for (const key of booleanFields) {
+      if (typeof patch[key] === "boolean") {
+        (validatedPatch as any)[key] = patch[key];
+      }
+    }
+
+    const validStatusTypes: DiscordStatusDisplayType[] = [
+      "artist",
+      "title",
+      "artist_title",
+      "title_artist",
+      "app",
+    ];
+    if (patch.statusDisplayType && validStatusTypes.includes(patch.statusDisplayType)) {
+      validatedPatch.statusDisplayType = patch.statusDisplayType;
+    }
+
+    if (typeof patch.applicationId === "string") {
+      const trimmed = patch.applicationId.trim();
+      if (trimmed === "" || /^\d{17,20}$/.test(trimmed)) {
+        validatedPatch.applicationId = trimmed;
+      }
+    }
+
     const oldEnabled = this.settings.enabled;
     const oldAppId = this.settings.applicationId;
+    const oldEffectiveClientId = oldAppId || DEFAULT_DISCORD_CLIENT_ID;
 
-    this.settings = { ...this.settings, ...patch };
+    this.settings = { ...this.settings, ...validatedPatch };
+
+    const newEffectiveClientId = this.settings.applicationId || DEFAULT_DISCORD_CLIENT_ID;
 
     // If app ID changed, disconnect and reconnect with the new client ID
-    if (this.settings.applicationId !== oldAppId && this.settings.enabled) {
+    if (newEffectiveClientId !== oldEffectiveClientId && this.settings.enabled) {
       this.isConnected = false;
       this.isConnecting = false;
       this.clearReconnectTimer();

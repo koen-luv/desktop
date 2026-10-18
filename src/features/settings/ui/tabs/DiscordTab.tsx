@@ -61,6 +61,38 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
     return () => clearInterval(interval);
   }, []);
 
+  const [draftAppId, setDraftAppId] = useState(applicationId);
+
+  useEffect(() => {
+    setDraftAppId(applicationId);
+  }, [applicationId]);
+
+  const commitAppId = () => {
+    const trimmed = draftAppId.trim();
+    if (!trimmed || trimmed === DEFAULT_DISCORD_CLIENT_ID) {
+      resetApplicationId();
+      setDraftAppId(DEFAULT_DISCORD_CLIENT_ID);
+      return;
+    }
+
+    if (/^\d{17,20}$/.test(trimmed)) {
+      setApplicationId(trimmed);
+      setDraftAppId(trimmed);
+    } else {
+      setDraftAppId(applicationId);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      commitAppId();
+      (e.target as HTMLInputElement).blur();
+    } else if (e.key === "Escape") {
+      setDraftAppId(applicationId);
+      (e.target as HTMLInputElement).blur();
+    }
+  };
+
   const isCustomAppId = applicationId !== DEFAULT_DISCORD_CLIENT_ID;
 
   return (
@@ -296,7 +328,10 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={resetApplicationId}
+                onClick={() => {
+                  resetApplicationId();
+                  setDraftAppId(DEFAULT_DISCORD_CLIENT_ID);
+                }}
               >
                 <Refresh1Line size={13} />
                 <span>{t("settings.discord.client_id.reset") || "Reset"}</span>
@@ -306,8 +341,10 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
           <div className="w-full max-w-[420px] pt-1">
             <TextInput
               size="sm"
-              value={applicationId}
-              onChange={(e) => setApplicationId(e.target.value)}
+              value={draftAppId}
+              onChange={(e) => setDraftAppId(e.target.value)}
+              onBlur={commitAppId}
+              onKeyDown={handleKeyDown}
               placeholder={DEFAULT_DISCORD_CLIENT_ID}
               disabled={!enabled}
             />

@@ -149,7 +149,7 @@ export default function AppImage({
       style={containerStyle}
     >
       {/* Placeholder / Skeleton layer */}
-      {!isLoaded && !hasError && (
+      {Boolean(currentSrc) && !isLoaded && !hasError && (
         <div
           aria-hidden="true"
           className="absolute inset-0 pointer-events-none bg-bg-panel"

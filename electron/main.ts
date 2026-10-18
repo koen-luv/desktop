@@ -215,8 +215,6 @@ function createWindow() {
 
   // renderer ready, deliver any cold-start deeplink waiting in the queue
   mainWindow.webContents.on("did-finish-load", () => {
-    mainWindow?.show();
-    mainWindow?.focus();
     flushPendingDeeplink();
   });
 
