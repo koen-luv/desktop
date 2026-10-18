@@ -81,6 +81,11 @@ export const clientCatalog = {
     return preferClient("album", () => innertubeCatalog.getAlbum(id), server);
   },
 
+  async getArtistImage(id: string): Promise<string | undefined> {
+    if (!isClientCatalogId(id)) return undefined;
+    return innertubeCatalog.getArtistImage(id).catch(() => undefined);
+  },
+
   getArtist(id: string, server: () => Promise<ArtistDetails>): Promise<ArtistDetails> {
     if (!isClientCatalogId(id)) return server();
     return preferClient("artist", () => innertubeCatalog.getArtist(id), server);

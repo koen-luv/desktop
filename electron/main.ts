@@ -40,6 +40,7 @@ import { createBundleErrorStamp } from "./bundle-stamp.js";
 import { createSleepBlocker } from "./sleep-blocker.js";
 import { createShutdown } from "./shutdown.js";
 import { computeDragBounds } from "./window-drag.js";
+import { DiscordRpcManager } from "./discord.js";
 
 // root error handling for main process
 process.on("uncaughtException", (error) => {
@@ -73,6 +74,7 @@ let mainWindow: BrowserWindow | null = null;
 let touchBarManager: TouchBarManager | null = null;
 let overlayManager: OverlayManager | null = null;
 let bundleManager: BundleManager | null = null;
+let discordRpcManager: DiscordRpcManager | null = null;
 
 // every helper process we spawn (tracert, icon cache refresh, ...) is tracked so
 // quitting can kill whatever is still running instead of leaving orphans behind
@@ -91,6 +93,11 @@ const shutdown = createShutdown({
   cleanup: [
     () => touchBarManager?.unregisterShortcut(),
     () => overlayManager?.dispose(),
+    () => {
+      // drop the discord ipc socket so presence clears and nothing keeps the process alive
+      discordRpcManager?.destroy();
+      discordRpcManager = null;
+    },
     () => globalShortcut.unregisterAll(),
     () => {
       for (const child of spawnedChildren) {
@@ -267,6 +274,11 @@ function createWindow() {
     mainWindow.loadFile(bundleManager.getEffectiveIndexPath());
   }
 
+  mainWindow.once("ready-to-show", () => {
+    mainWindow?.show();
+    mainWindow?.focus();
+  });
+
   // renderer ready, deliver any cold-start deeplink waiting in the queue
   mainWindow.webContents.on("did-finish-load", () => {
     flushPendingDeeplink();
@@ -310,7 +322,7 @@ if (!gotTheLock) {
       createWindow();
     } else {
       if (mainWindow.isMinimized()) mainWindow.restore();
-      if (!mainWindow.isVisible()) mainWindow.show();
+      mainWindow.show();
       mainWindow.focus();
     }
     if (raw) deliverDeeplink(parseDeeplink(raw));
@@ -352,6 +364,8 @@ if (!gotTheLock) {
     );
     overlayManager.setMainWindow(mainWindow);
     overlayManager.registerShortcut();
+
+    discordRpcManager = new DiscordRpcManager();
 
     const isHyprland = Boolean(
       process.env.HYPRLAND_INSTANCE_SIGNATURE ||
