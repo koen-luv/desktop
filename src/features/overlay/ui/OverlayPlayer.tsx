@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useTranslation } from "@/languages";
 import { motion } from "framer-motion";
 import {
   SkipNext,
@@ -29,6 +30,7 @@ const OVERLAY_CARD_TRANSITION = {
 
 export function OverlayPlayer() {
   useDisableButtonFocus();
+  const { t } = useTranslation();
 
   const [state, setState] = useState<OverlayStatePayload>({
     status: "idle",

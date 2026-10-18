@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "@/languages";
 import { LuMinus, LuSquare, LuX } from "react-icons/lu";
 import { useIsContentTransparent } from "@/features/settings/store/customizationStore";
 import { useWindowAnimationStore } from "@/shared/ui";
@@ -16,6 +17,7 @@ export default function WindowControls({
   style,
   isFullscreen = false,
 }: WindowControlsProps) {
+  const { t } = useTranslation();
   const [isWindowFullScreen, setIsWindowFullScreen] = useState(false);
   const [isWindowMaximized, setIsWindowMaximized] = useState(false);
 
@@ -116,10 +118,10 @@ export default function WindowControls({
           }`}
           aria-label={
             isWindowFullScreen
-              ? "Exit Fullscreen"
+              ? t("common.exitFullscreen")
               : isWindowMaximized
-                ? "Restore"
-                : "Maximize"
+                ? t("common.restore")
+                : t("common.maximize")
           }
         >
           <LuSquare size={11} />
