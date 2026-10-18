@@ -31,6 +31,17 @@ export function getAuthSession(): AuthTokens | null {
   return session;
 }
 
+// another window of this app (or a previous launch that finished a refresh)
+// may rotate the tokens in storage; keep the in-memory copy in step so we never
+// refresh with a token that has already been used
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (event.key !== STORAGE_KEY) return;
+    session = load();
+    emit();
+  });
+}
+
 export function setAuthSession(next: AuthTokens | null): void {
   session = next;
   if (typeof window !== "undefined") {
@@ -118,32 +129,37 @@ export function refreshAuthSession(): Promise<AuthTokens | null> {
   // Synchronously assign the promise to immediately lock out any concurrent callers
   refreshPromise = (async () => {
     try {
-      const body = JSON.stringify({ refreshToken: current.refreshToken });
-      const signedHeaders = await signApiRequest("POST", "/v1/auth/refresh", body);
+      let response = await postRefresh(current.refreshToken);
 
-      const response = await fetch(`${getApiBaseUrl()}/v1/auth/refresh`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...signedHeaders,
-        },
-        body,
-      });
-
-      const dateHeader = response.headers?.get?.("date");
-      if (dateHeader) {
-        syncServerTime(dateHeader);
-      }
-
-      if (!response.ok) {
-        // If the server explicitly rejected the refresh token (401 / 403),
-        // only clear the stored session if it hasn't already been rotated by another process
+      if (response.status === 401 || response.status === 403) {
+        // 1) the token may already have been rotated elsewhere (another window,
+        //    or a refresh that finished just before a reload): adopt it
+        const rotated = rotatedElsewhere(current.refreshToken);
+        if (rotated) return rotated;
+        // 2) a rejected signature / timestamp is also a 401. postRefresh has just
+        //    re-synced the clock from this response's Date header, so one fresh,
+        //    re-signed attempt tells a bad signature apart from a dead token
+        const firstReason = await describeRejection(response);
+        response = await postRefresh(current.refreshToken);
         if (response.status === 401 || response.status === 403) {
+          const again = rotatedElsewhere(current.refreshToken);
+          if (again) return again;
+          const reason = await describeRejection(response);
+          // only now is the refresh token really dead: sign out, and say why in the log
+          console.warn(
+            `[Auth] signed out: refresh rejected twice (${firstReason}; ${reason})`,
+          );
           const latest = getAuthSession();
           if (latest?.refreshToken === current.refreshToken) {
             setAuthSession(null);
           }
+          return null;
         }
+      }
+
+      if (!response.ok) {
+        // 5xx / 429 / anything transient: keep the session, try again later
+        console.warn(`[Auth] refresh failed with ${response.status}, keeping the session`);
         return null;
       }
 
@@ -166,6 +182,47 @@ export function refreshAuthSession(): Promise<AuthTokens | null> {
   })();
 
   return refreshPromise;
+}
+
+async function postRefresh(refreshToken: string): Promise<Response> {
+  const body = JSON.stringify({ refreshToken });
+  const signedHeaders = await signApiRequest("POST", "/v1/auth/refresh", body);
+  const response = await fetch(`${getApiBaseUrl()}/v1/auth/refresh`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...signedHeaders,
+    },
+    body,
+  });
+  const dateHeader = response.headers?.get?.("date");
+  if (dateHeader) {
+    syncServerTime(dateHeader);
+  }
+  return response;
+}
+
+/** a newer session (different refresh token) saved by someone else, if any */
+function rotatedElsewhere(usedRefreshToken: string): AuthTokens | null {
+  const stored = load();
+  if (stored?.refreshToken && stored.refreshToken !== usedRefreshToken) {
+    session = stored;
+    emit();
+    return stored;
+  }
+  return null;
+}
+
+async function describeRejection(response: Response): Promise<string> {
+  try {
+    const data = (await response.clone?.().json?.()) as Record<string, unknown> | undefined;
+    const code = typeof data?.code === "string" ? data.code : "";
+    const message =
+      typeof data?.message === "string" ? data.message : typeof data?.error === "string" ? data.error : "";
+    return [String(response.status), code, message].filter(Boolean).join(" ");
+  } catch {
+    return String(response.status);
+  }
 }
 
 export async function clearAuthSession(): Promise<void> {
