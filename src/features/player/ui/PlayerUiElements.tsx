@@ -130,11 +130,10 @@ export function PlayerUiElements({
             )}
           </motion.div>
         </AnimatePresence>
-        {/* like button on the cover corner; data-tooltip uses the app-wide small tooltip */}
+        {/* like button on the cover corner (no tooltip; aria-label names it) */}
         <button
           type="button"
           aria-label={isLiked ? t("common.unlike") : t("common.like")}
-          data-tooltip={isLiked ? t("common.unlike") : t("common.like")}
           className={`absolute bottom-2.5 left-2.5 z-20 inline-flex h-[30px] w-[30px] items-center justify-center rounded-full transition-colors duration-200 ease-out active:scale-[0.92] bg-black/40 backdrop-blur-md border-none hover:bg-black/60 ${
             isLiked ? "text-white" : "text-white/70 hover:text-white"
           }`}
