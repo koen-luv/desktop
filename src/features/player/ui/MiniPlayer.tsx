@@ -400,12 +400,14 @@ function MiniPlayer({
     player.playbackContextCover,
   ]);
 
+  // off -> all (loop the whole queue/playlist) -> one (loop the track) -> off
   const repeatIcon = useMemo(() => {
     if (player.repeat === "one") {
-      return <RepeatOne size={18} weight="Outline" />;
+      return <RepeatOne size={18} weight="Bold" />;
     }
-    return <Repeat size={18} weight="Outline" />;
+    return <Repeat size={18} weight={player.repeat === "all" ? "Bold" : "Outline"} />;
   }, [player.repeat]);
+  const repeatLabel = t(`player.repeat_${player.repeat}`);
 
   const iconButtonClass =
     "inline-flex h-[30px] w-[30px] items-center justify-center rounded-md text-text-secondary transition-colors duration-150 hover:bg-black/[0.05] dark:hover:bg-white/[0.09] hover:text-text-primary active:scale-[0.96] border-none bg-transparent cursor-pointer";
@@ -820,15 +822,19 @@ function MiniPlayer({
               </button>
               <button
                 type="button"
-                aria-label={t("player.repeat")}
-                title={t("player.repeat")}
+                aria-label={repeatLabel}
+                title={repeatLabel}
                 className={`${iconButtonClass} ${
                   player.repeat !== "off" ? "bg-bg-toolbox-active text-text-primary" : ""
                 }`}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() =>
                   playerEngine.setRepeat(
-                    player.repeat === "one" ? "off" : "one",
+                    player.repeat === "off"
+                      ? "all"
+                      : player.repeat === "all"
+                        ? "one"
+                        : "off",
                   )
                 }
               >

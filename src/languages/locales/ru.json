@@ -344,6 +344,9 @@
     "error_wrong_password": "Неверный пароль"
   },
   "player": {
+    "repeat_off": "Повтор: выкл.",
+    "repeat_all": "Повтор: всё",
+    "repeat_one": "Повтор: трек",
     "nothing_playing": "Ничего не играет",
     "choose_track": "Выберите трек в поиске",
     "queue": "Очередь",

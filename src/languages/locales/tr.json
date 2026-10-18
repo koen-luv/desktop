@@ -342,6 +342,9 @@
     }
   },
   "player": {
+    "repeat_off": "Tekrar: kapalı",
+    "repeat_all": "Tekrar: tümü",
+    "repeat_one": "Tekrar: parça",
     "nothing_playing": "Çalan bir şey yok",
     "choose_track": "Aramadan bir parça seç",
     "queue": "Sıra",

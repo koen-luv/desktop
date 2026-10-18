@@ -342,6 +342,9 @@
     }
   },
   "player": {
+    "repeat_off": "Repetir: desativado",
+    "repeat_all": "Repetir: tudo",
+    "repeat_one": "Repetir: faixa",
     "nothing_playing": "Não há nada tocando",
     "choose_track": "Escolha uma faixa na pesquisa",
     "queue": "Fila",

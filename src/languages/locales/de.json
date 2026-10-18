@@ -342,6 +342,9 @@
     }
   },
   "player": {
+    "repeat_off": "Wiederholung: aus",
+    "repeat_all": "Wiederholung: alle",
+    "repeat_one": "Wiederholung: Titel",
     "nothing_playing": "Keine Wiedergabe",
     "choose_track": "Wähle in der Suche einen Titel aus",
     "queue": "Warteschlange",

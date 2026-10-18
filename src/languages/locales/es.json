@@ -344,6 +344,9 @@
     }
   },
   "player": {
+    "repeat_off": "Repetir: desactivado",
+    "repeat_all": "Repetir: todo",
+    "repeat_one": "Repetir: canción",
     "nothing_playing": "Nada en reproducción",
     "choose_track": "Elige una canción en la búsqueda",
     "queue": "Cola",

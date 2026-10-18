@@ -342,6 +342,9 @@
     }
   },
   "player": {
+    "repeat_off": "Ripeti: disattivato",
+    "repeat_all": "Ripeti: tutto",
+    "repeat_one": "Ripeti: brano",
     "nothing_playing": "Nessuna riproduzione",
     "choose_track": "Scegli un brano dalla ricerca",
     "queue": "Coda",

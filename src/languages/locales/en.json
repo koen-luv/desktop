@@ -344,6 +344,9 @@
     }
   },
   "player": {
+    "repeat_off": "Repeat: off",
+    "repeat_all": "Repeat: all",
+    "repeat_one": "Repeat: track",
     "nothing_playing": "Nothing playing",
     "choose_track": "Choose a track in search",
     "queue": "Queue",

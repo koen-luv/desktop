@@ -346,6 +346,9 @@
     }
   },
   "player": {
+    "repeat_off": "Powtarzanie: wył.",
+    "repeat_all": "Powtarzanie: wszystko",
+    "repeat_one": "Powtarzanie: utwór",
     "nothing_playing": "Nic nie jest odtwarzane",
     "choose_track": "Wybierz utwór w wyszukiwarce",
     "queue": "Kolejka",
