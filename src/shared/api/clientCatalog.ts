@@ -37,7 +37,10 @@ async function resolveSnapshot(id: string): Promise<Track | undefined> {
   try {
     const details = await innertubeCatalog.getTrack(id, controller.signal);
     return {
-      id: details.id,
+      // keep the id the caller asked for: the server files a like under the
+      // snapshot id, and the heart is looked up by the playing track's id, so
+      // a canonicalised id here makes the like vanish on the next refetch
+      id,
       title: details.title,
       artists: details.artists,
       durationMs: details.durationMs,
