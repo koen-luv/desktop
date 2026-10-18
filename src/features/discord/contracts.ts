@@ -7,7 +7,6 @@ export type DiscordStatusDisplayType =
 
 export interface DiscordRpcSettings {
   enabled: boolean;
-  applicationId: string;
   statusDisplayType: DiscordStatusDisplayType;
   showArtwork: boolean;
   showArtistSmallImage: boolean;
@@ -37,7 +36,6 @@ export interface DiscordRpcStatePayload {
 
 export const DEFAULT_DISCORD_SETTINGS: DiscordRpcSettings = {
   enabled: true,
-  applicationId: "",
   statusDisplayType: "artist",
   showArtwork: true,
   showArtistSmallImage: true,

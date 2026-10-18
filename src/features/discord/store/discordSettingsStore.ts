@@ -9,8 +9,6 @@ import {
 
 interface DiscordSettingsState extends DiscordRpcSettings {
   setEnabled: (enabled: boolean) => void;
-  setApplicationId: (applicationId: string) => void;
-  resetApplicationId: () => void;
   setStatusDisplayType: (statusDisplayType: DiscordStatusDisplayType) => void;
   setShowArtwork: (showArtwork: boolean) => void;
   setShowArtistSmallImage: (showArtistSmallImage: boolean) => void;
@@ -34,8 +32,6 @@ const VALID_STATUS_DISPLAY_TYPES: readonly DiscordStatusDisplayType[] = [
   "app",
 ] as const;
 
-const RETIRED_APPLICATION_IDS = ["1165957668758900787", "1560629184605323385"];
-
 export const useDiscordSettingsStore = create<DiscordSettingsState>()(
   persist(
     (set) => ({
@@ -43,27 +39,6 @@ export const useDiscordSettingsStore = create<DiscordSettingsState>()(
       setEnabled: (enabled) => {
         set({ enabled });
         notifyElectron({ enabled });
-      },
-      setApplicationId: (rawId) => {
-        if (typeof rawId !== "string") {
-          set({ applicationId: "" });
-          notifyElectron({ applicationId: "" });
-          return;
-        }
-        const trimmed = rawId.trim();
-        if (!trimmed) {
-          set({ applicationId: "" });
-          notifyElectron({ applicationId: "" });
-          return;
-        }
-        if (/^\d{17,20}$/.test(trimmed)) {
-          set({ applicationId: trimmed });
-          notifyElectron({ applicationId: trimmed });
-        }
-      },
-      resetApplicationId: () => {
-        set({ applicationId: "" });
-        notifyElectron({ applicationId: "" });
       },
       setStatusDisplayType: (statusDisplayType) => {
         set({ statusDisplayType });
@@ -99,7 +74,6 @@ export const useDiscordSettingsStore = create<DiscordSettingsState>()(
       storage: createJSONStorage(() => debouncedStorage),
       partialize: (state): DiscordRpcSettings => ({
         enabled: state.enabled,
-        applicationId: state.applicationId,
         statusDisplayType: state.statusDisplayType,
         showArtwork: state.showArtwork,
         showArtistSmallImage: state.showArtistSmallImage,
@@ -112,13 +86,6 @@ export const useDiscordSettingsStore = create<DiscordSettingsState>()(
         if (!state) return;
         if (typeof state.enabled !== "boolean") {
           state.setEnabled(DEFAULT_DISCORD_SETTINGS.enabled);
-        }
-        if (
-          typeof state.applicationId !== "string" ||
-          RETIRED_APPLICATION_IDS.includes(state.applicationId.trim()) ||
-          (state.applicationId.trim() !== "" && !/^\d{17,20}$/.test(state.applicationId.trim()))
-        ) {
-          state.resetApplicationId();
         }
         if (!VALID_STATUS_DISPLAY_TYPES.includes(state.statusDisplayType)) {
           state.setStatusDisplayType(DEFAULT_DISCORD_SETTINGS.statusDisplayType);

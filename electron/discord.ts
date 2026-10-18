@@ -10,7 +10,6 @@ export type DiscordStatusDisplayType =
 
 export interface DiscordRpcSettings {
   enabled: boolean;
-  applicationId: string;
   statusDisplayType: DiscordStatusDisplayType;
   showArtwork: boolean;
   showArtistSmallImage: boolean;
@@ -46,7 +45,6 @@ function builtInApplicationId(): string {
 
 const DEFAULT_SETTINGS: DiscordRpcSettings = {
   enabled: true,
-  applicationId: "",
   statusDisplayType: "artist",
   showArtwork: true,
   showArtistSmallImage: true,
@@ -149,7 +147,7 @@ export class DiscordRpcManager {
       return;
     }
 
-    const clientId = this.settings.applicationId || builtInApplicationId();
+    const clientId = builtInApplicationId();
     if (!clientId) return;
     this.isConnecting = true;
 
@@ -227,33 +225,9 @@ export class DiscordRpcManager {
       validatedPatch.statusDisplayType = patch.statusDisplayType;
     }
 
-    if (typeof patch.applicationId === "string") {
-      const trimmed = patch.applicationId.trim();
-      if (trimmed === "" || /^\d{17,20}$/.test(trimmed)) {
-        validatedPatch.applicationId = trimmed;
-      }
-    }
-
     const oldEnabled = this.settings.enabled;
-    const oldAppId = this.settings.applicationId;
-    const oldEffectiveClientId = oldAppId || builtInApplicationId();
 
     this.settings = { ...this.settings, ...validatedPatch };
-
-    const newEffectiveClientId = this.settings.applicationId || builtInApplicationId();
-
-    // If app ID changed, disconnect and reconnect with the new client ID
-    if (newEffectiveClientId !== oldEffectiveClientId && this.settings.enabled) {
-      this.isConnected = false;
-      this.isConnecting = false;
-      this.clearReconnectTimer();
-      try {
-        this.client?.destroy();
-      } catch {}
-      this.client = null;
-      this.connect();
-      return;
-    }
 
     // If enabled state toggled
     if (this.settings.enabled !== oldEnabled) {

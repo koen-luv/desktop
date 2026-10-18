@@ -4,9 +4,8 @@ import {
   useDiscordSettingsStore,
   type DiscordStatusDisplayType,
 } from "@/features/discord";
-import { ToggleSwitch, Button, TextInput, Select } from "@/shared/ui";
+import { ToggleSwitch, Select } from "@/shared/ui";
 import { SettingRow, SettingSection } from "../controls";
-import { Refresh1Line } from "@mingcute/react";
 
 export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
   const { t } = useTranslation();
@@ -18,10 +17,6 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
 
   const enabled = useDiscordSettingsStore((s) => s.enabled);
   const setEnabled = useDiscordSettingsStore((s) => s.setEnabled);
-
-  const applicationId = useDiscordSettingsStore((s) => s.applicationId);
-  const setApplicationId = useDiscordSettingsStore((s) => s.setApplicationId);
-  const resetApplicationId = useDiscordSettingsStore((s) => s.resetApplicationId);
 
   const statusDisplayType = useDiscordSettingsStore((s) => s.statusDisplayType);
   const setStatusDisplayType = useDiscordSettingsStore((s) => s.setStatusDisplayType);
@@ -59,40 +54,6 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
     const interval = setInterval(checkStatus, 4000);
     return () => clearInterval(interval);
   }, []);
-
-  const [draftAppId, setDraftAppId] = useState(applicationId);
-
-  useEffect(() => {
-    setDraftAppId(applicationId);
-  }, [applicationId]);
-
-  const commitAppId = () => {
-    const trimmed = draftAppId.trim();
-    if (!trimmed) {
-      resetApplicationId();
-      setDraftAppId("");
-      return;
-    }
-
-    if (/^\d{17,20}$/.test(trimmed)) {
-      setApplicationId(trimmed);
-      setDraftAppId(trimmed);
-    } else {
-      setDraftAppId(applicationId);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      commitAppId();
-      (e.target as HTMLInputElement).blur();
-    } else if (e.key === "Escape") {
-      setDraftAppId(applicationId);
-      (e.target as HTMLInputElement).blur();
-    }
-  };
-
-  const isCustomAppId = applicationId !== "";
 
   return (
     <div className="flex flex-col gap-[18px]">
@@ -308,47 +269,6 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
             />
           }
         />
-      </SettingSection>
-
-      {/* Custom Application ID */}
-      <SettingSection label={t("settings.discord.section_advanced") || "Advanced"}>
-        <div className="flex flex-col gap-2 py-[13px]">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex flex-col gap-[2px] min-w-0 max-w-[380px]">
-              <span className="text-[13px] font-[500] text-text-primary">
-                {t("settings.discord.client_id.title") || "Discord Application ID"}
-              </span>
-              <span className="text-[12.5px] text-text-tertiary leading-relaxed">
-                {t("settings.discord.client_id.description") ||
-                  "Configure a custom Discord Client ID created in Discord Developer Portal to customize the app title."}
-              </span>
-            </div>
-            {isCustomAppId && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  resetApplicationId();
-                  setDraftAppId("");
-                }}
-              >
-                <Refresh1Line size={13} />
-                <span>{t("settings.discord.client_id.reset") || "Reset"}</span>
-              </Button>
-            )}
-          </div>
-          <div className="w-full max-w-[420px] pt-1">
-            <TextInput
-              size="sm"
-              value={draftAppId}
-              onChange={(e) => setDraftAppId(e.target.value)}
-              onBlur={commitAppId}
-              onKeyDown={handleKeyDown}
-              placeholder={t("settings.discord.client_id.placeholder")}
-              disabled={!enabled}
-            />
-          </div>
-        </div>
       </SettingSection>
     </div>
   );

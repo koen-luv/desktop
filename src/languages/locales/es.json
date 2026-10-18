@@ -487,7 +487,6 @@
       "description": "Muestra lo que estás escuchando en Discord con carátula, foto del artista y barra de progreso.",
       "section_display": "Opciones de visualización",
       "section_buttons": "Botones de perfil",
-      "section_advanced": "Avanzado",
       "enable": {
         "title": "Discord Rich Presence",
         "description": "Transmite tu música en reproducción activa a tu perfil de Discord."
@@ -524,12 +523,6 @@
       "show_download_button": {
         "title": "Botón 'Descargar Liner'",
         "description": "Añade un botón interactivo que enlaza a tryliner.fun para descargar la aplicación."
-      },
-      "client_id": {
-        "title": "ID de aplicación de Discord",
-        "description": "ID de aplicación personalizado de Discord. Déjalo por defecto o crea tu propia app en el Discord Developer Portal.",
-        "reset": "Restablecer por defecto",
-        "placeholder": "Liner (predeterminado)"
       },
       "status": {
         "connected": "Conectado a Discord ({user})",

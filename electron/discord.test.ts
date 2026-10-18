@@ -70,12 +70,13 @@ describe("DiscordRpcManager", () => {
     manager.destroy();
   });
 
-  it("uses a custom application id from settings instead", async () => {
+  it("ignores an application id sent in a settings patch", async () => {
     delete process.env.LINER_DISCORD_CLIENT_ID;
     const manager = new DiscordRpcManager();
-    manager.updateSettings({ applicationId: "987654321098765432" });
+    const legacyPatch: Record<string, unknown> = { applicationId: "987654321098765432" };
+    manager.updateSettings(legacyPatch);
     await vi.advanceTimersByTimeAsync(1_000);
-    expect(mocks.clients.at(-1)).toBe("987654321098765432");
+    expect(mocks.clients).toEqual(["1561339119617974362"]);
     manager.destroy();
   });
 

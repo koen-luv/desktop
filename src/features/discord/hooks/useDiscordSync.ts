@@ -42,7 +42,6 @@ export function useDiscordSync() {
     const s = useDiscordSettingsStore.getState();
     window.linerElectron?.discordUpdateSettings?.({
       enabled: s.enabled,
-      applicationId: s.applicationId,
       statusDisplayType: s.statusDisplayType,
       showArtwork: s.showArtwork,
       showArtistSmallImage: s.showArtistSmallImage,
