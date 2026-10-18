@@ -1,5 +1,8 @@
 import { InnertubeError, postInnertube, type InnertubeProfile } from "./innertubeClient";
+import { PLAYBACK_PROFILES } from "./playbackProfiles";
 import { resetClientVisitorData } from "@/shared/api/visitorSession";
+import { log } from "@/shared/utils/logger";
+import { resetWebRemixSession, resolveWebRemixAudioStream } from "./webRemixAudio";
 import {
   extractAudioFormats,
   playabilityError,
@@ -11,46 +14,14 @@ import {
 
 export type { ResolvedAudioStream } from "./innertubeAudioFormats";
 
-export const VISIONOS_PROFILE: InnertubeProfile = {
-  clientName: "VISIONOS",
-  clientVersion: "1.04",
-  clientIdHeader: "101",
-  origin: "https://music.youtube.com",
-  userAgent: "com.google.visionos.youtube/1.04(RealityDevice17,1; U; CPU visionOS 26_6_0 like Mac OS X; en_US)",
-  extraContext: {
-    osName: "visionOS",
-    osVersion: "26.6.0.23O770",
-    deviceMake: "Apple",
-    deviceModel: "RealityDevice17,1",
-    platform: "MOBILE",
-  },
-};
-
-export const ANDROID_VR_PROFILE: InnertubeProfile = {
-  clientName: "ANDROID_VR",
-  clientVersion: "1.65.10",
-  clientIdHeader: "28",
-  origin: "https://www.youtube.com",
-  userAgent:
-    "com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip",
-  includeUserAgentInContext: true,
-  extraContext: {
-    osName: "Android",
-    osVersion: "12L",
-    deviceMake: "Oculus",
-    deviceModel: "Quest 3",
-    androidSdkVersion: 32,
-    buildId: "SQ3A.220605.009.A1",
-    packageName: "com.google.android.apps.youtube.vr.oculus",
-  },
-};
-
-export const PLAYBACK_PROFILES: readonly InnertubeProfile[] = [VISIONOS_PROFILE, ANDROID_VR_PROFILE];
+export { ANDROID_VR_PROFILE, PLAYBACK_PROFILES, VISIONOS_PROFILE } from "./playbackProfiles";
 
 let lastWorkingProfile: InnertubeProfile | null = null;
 
 export function resetPlaybackProfilePreference(): void {
   lastWorkingProfile = null;
+  webRemixRetryAt = 0;
+  webRemixFailures = 0;
 }
 
 function orderedProfiles(profiles: readonly InnertubeProfile[]): readonly InnertubeProfile[] {
@@ -58,12 +29,50 @@ function orderedProfiles(profiles: readonly InnertubeProfile[]): readonly Innert
   return [lastWorkingProfile, ...profiles.filter((profile) => profile !== lastWorkingProfile)];
 }
 
-async function assertStreamReachable(url: string, signal?: AbortSignal): Promise<void> {
+const PROBE_OFFSET = 1_048_576 + 4096;
+const WEB_REMIX_COOLDOWN_MS = 5 * 60 * 1000;
+
+const WEB_REMIX_ATTEMPTS = 2;
+const WEB_REMIX_FAILURES_BEFORE_COOLDOWN = 3;
+
+let webRemixRetryAt = 0;
+let webRemixFailures = 0;
+
+async function assertStreamReachable(url: string, contentLength: number | undefined, signal?: AbortSignal): Promise<void> {
   const probe = new URL(url);
-  probe.searchParams.set("range", "0-0");
+  const offset = contentLength && contentLength > PROBE_OFFSET ? PROBE_OFFSET : 0;
+  probe.searchParams.set("range", `${offset}-${offset}`);
   const response = await fetch(probe.toString(), { signal });
   await response.body?.cancel().catch(() => undefined);
   if (!response.ok) throw new InnertubeError(`stream url rejected with ${response.status}`, response.status);
+}
+
+async function resolveViaWebRemix(
+  videoId: string,
+  options: ResolveAudioOptions,
+  failures: string[],
+): Promise<ResolvedAudioStream | null> {
+  for (let attempt = 0; attempt < WEB_REMIX_ATTEMPTS; attempt += 1) {
+    try {
+      const stream = await resolveWebRemixAudioStream(videoId, options);
+      await assertStreamReachable(stream.url, stream.contentLength, options.signal);
+      webRemixFailures = 0;
+      return stream;
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      resetWebRemixSession();
+      const message = error instanceof Error ? error.message : String(error);
+      failures.push(`WEB_REMIX: ${message}`);
+      log("yellow", "playback", `WEB_REMIX attempt ${attempt + 1} failed: ${message}`);
+    }
+  }
+  webRemixFailures += 1;
+  if (webRemixFailures >= WEB_REMIX_FAILURES_BEFORE_COOLDOWN) {
+    webRemixRetryAt = Date.now() + WEB_REMIX_COOLDOWN_MS;
+    webRemixFailures = 0;
+    log("yellow", "playback", "WEB_REMIX keeps failing, using app profiles for 5 min");
+  }
+  return null;
 }
 
 export interface ResolveAudioOptions {
@@ -94,7 +103,7 @@ async function resolveWithProfile(
   const best = selectBestAudioFormat(extractAudioFormats(response), options.preferredCodec);
   if (!best) throw new InnertubeError(`${profile.clientName} returned no direct audio formats.`, 502);
   const stream = toResolvedStream(best);
-  await assertStreamReachable(stream.url, options.signal);
+  await assertStreamReachable(stream.url, stream.contentLength, options.signal);
   return stream;
 }
 
@@ -105,6 +114,10 @@ export async function resolveDirectAudioStream(
   const videoId = toVideoId(trackId);
   if (!videoId) throw new InnertubeError(`Track ${trackId} is not a YouTube video.`, 400);
   const failures: string[] = [];
+  if (!options.profiles && Date.now() >= webRemixRetryAt) {
+    const stream = await resolveViaWebRemix(videoId, options, failures);
+    if (stream) return stream;
+  }
   for (const profile of orderedProfiles(options.profiles ?? PLAYBACK_PROFILES)) {
     try {
       const stream = await resolveWithProfile(videoId, profile, options);

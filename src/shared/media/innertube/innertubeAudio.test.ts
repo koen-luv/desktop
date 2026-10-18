@@ -1,6 +1,14 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { resetClientVisitorData } = vi.hoisted(() => ({ resetClientVisitorData: vi.fn() }));
+const { resetClientVisitorData, webRemix } = vi.hoisted(() => ({
+  resetClientVisitorData: vi.fn(),
+  webRemix: { resolve: vi.fn(), reset: vi.fn() },
+}));
+
+vi.mock("./webRemixAudio", () => ({
+  resolveWebRemixAudioStream: webRemix.resolve,
+  resetWebRemixSession: webRemix.reset,
+}));
 
 vi.mock("@/shared/api/visitorSession", () => ({
   getClientVisitorData: async () => "CgtVISITOR123",
@@ -42,9 +50,15 @@ function playerCalls(fetchSpy: ReturnType<typeof mockPlayerApi>) {
   return fetchSpy.mock.calls.filter(([input]) => !isStreamProbe(input));
 }
 
+beforeEach(() => {
+  webRemix.resolve.mockRejectedValue(new Error("WEB_REMIX unavailable in tests"));
+});
+
 afterEach(() => {
   vi.restoreAllMocks();
   resetClientVisitorData.mockClear();
+  webRemix.resolve.mockReset();
+  webRemix.reset.mockClear();
   resetPlaybackProfilePreference();
 });
 
@@ -121,6 +135,43 @@ describe("resolveDirectAudioStream", () => {
   it("reports every profile failure when nothing is playable", async () => {
     mockPlayerApi([playerResponse([], "UNPLAYABLE")]);
     await expect(resolveDirectAudioStream("dQw4w9WgXcQ")).rejects.toThrow(/VISIONOS.*ANDROID_VR/);
+  });
+
+  it("plays the WEB_REMIX stream with its po token when googlevideo accepts it past the first megabyte", async () => {
+    const webUrl = "https://rr1.googlevideo.com/videoplayback?itag=251&c=WEB_REMIX&pot=token";
+    webRemix.resolve.mockResolvedValue({ url: webUrl, mimeType: "audio/webm", codec: "opus", bitrate: 140_000, itag: 251, expiresAt: null, contentLength: 3_000_000 });
+    const fetchSpy = mockPlayerApi([playerResponse([opus])]);
+
+    const stream = await resolveDirectAudioStream("dQw4w9WgXcQ");
+
+    expect(stream.url).toBe(webUrl);
+    expect(playerCalls(fetchSpy)).toHaveLength(0);
+    const probeRange = new URL(String(fetchSpy.mock.calls[0][0])).searchParams.get("range");
+    expect(Number(probeRange?.split("-")[0])).toBeGreaterThan(1_048_576);
+  });
+
+  it("retries WEB_REMIX with a fresh token, falls back to the app profiles, and only pauses it after repeated failures", async () => {
+    webRemix.resolve.mockRejectedValue(new Error("Sign in to confirm you're not a bot"));
+    mockPlayerApi([playerResponse([opus])]);
+
+    await expect(resolveDirectAudioStream("dQw4w9WgXcQ")).resolves.toMatchObject({ itag: 251 });
+    expect(webRemix.resolve).toHaveBeenCalledTimes(2);
+    expect(webRemix.reset).toHaveBeenCalledTimes(2);
+
+    await resolveDirectAudioStream("dQw4w9WgXcQ");
+    await resolveDirectAudioStream("dQw4w9WgXcQ");
+    expect(webRemix.resolve).toHaveBeenCalledTimes(6);
+
+    await resolveDirectAudioStream("dQw4w9WgXcQ");
+    expect(webRemix.resolve).toHaveBeenCalledTimes(6);
+  });
+
+  it("falls back when googlevideo rejects the WEB_REMIX stream", async () => {
+    const webUrl = "https://rr1.googlevideo.com/videoplayback?itag=251&c=WEB_REMIX";
+    webRemix.resolve.mockResolvedValue({ url: webUrl, mimeType: "audio/webm", codec: "opus", bitrate: 140_000, itag: 251, expiresAt: null, contentLength: 3_000_000 });
+    mockPlayerApi([playerResponse([aac])], (url) => (url.includes("c=WEB_REMIX") ? 403 : 206));
+
+    await expect(resolveDirectAudioStream("dQw4w9WgXcQ")).resolves.toMatchObject({ itag: 140 });
   });
 
   it("rejects non-youtube ids without any network call", async () => {
