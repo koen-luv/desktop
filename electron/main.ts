@@ -36,6 +36,7 @@ import {
 import { TouchBarManager } from "./touchbar.js";
 import { OverlayManager } from "./overlay.js";
 import { BundleManager } from "./bundle-manager.js";
+import { createBundleErrorStamp } from "./bundle-stamp.js";
 import { createSleepBlocker } from "./sleep-blocker.js";
 
 // root error handling for main process
@@ -185,6 +186,25 @@ function createWindow() {
       console.log(`\x1b[44;37m renderer \x1b[0m ${cleanMsg}`);
     }
   });
+
+  const bundleErrorStamp = createBundleErrorStamp(
+    {
+      getVersionInfo: () => {
+        const active = bundleManager?.getActiveState();
+        return {
+          version: active?.bundleVersion || app.getVersion(),
+          isOta: Boolean(active),
+          sha256: active?.sha256 || null,
+        };
+      },
+      peekUpdate: async () => (bundleManager ? bundleManager.peekUpdate() : { kind: "inactive" }),
+    },
+    { emit: (line) => mainWindow?.webContents.send("bundle:stamp", line) },
+  );
+  mainWindow.webContents.on("console-message", (_event, level) => {
+    if (level >= 3) bundleErrorStamp.onRendererError();
+  });
+  mainWindow.on("closed", () => bundleErrorStamp.dispose());
 
   mainWindow.webContents.on("before-input-event", (_event, input) => {
     if (input.type === "keyDown") {

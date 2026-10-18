@@ -3,6 +3,7 @@ import path from "node:path";
 import fs from "node:fs";
 import crypto from "node:crypto";
 import * as tar from "tar";
+import type { BundleUpdateState } from "./bundle-stamp";
 
 export interface BundleManifest {
   bundleVersion: string;
@@ -145,6 +146,25 @@ export class BundleManager {
   /**
    * Queries /updates/manifest.json for a new bundle
    */
+  public async peekUpdate(): Promise<BundleUpdateState> {
+    try {
+      const res = await fetch(`${this.updaterUrl}/updates/manifest.json?t=${Date.now()}`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) return { kind: "unknown" };
+      const manifest = (await res.json()) as BundleManifest;
+      if (!this.isVersionCompatible(app.getVersion(), manifest.minAppVersion)) {
+        return { kind: "needs-app-update" };
+      }
+      const isSameVersion = this.activeState?.bundleVersion === manifest.bundleVersion;
+      const isSameHash = this.activeState?.sha256?.toLowerCase() === manifest.sha256.toLowerCase();
+      return isSameVersion && isSameHash ? { kind: "latest" } : { kind: "available", version: manifest.bundleVersion };
+    } catch {
+      return { kind: "unknown" };
+    }
+  }
+
   public async checkForUpdates(): Promise<{
     available: boolean;
     manifest?: BundleManifest;

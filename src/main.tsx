@@ -6,12 +6,14 @@ import { initGlobalErrorHandlers } from "@/shared/utils/globalErrorHandlers";
 import { initTelemetry } from "@/shared/telemetry";
 import { initBackgroundStorageAnalytics } from "@/shared/utils/cacheManager";
 import { initClientVisitorSession } from "@/shared/api/visitorSession";
+import { initBundleStampLog } from "@/shared/utils/bundleStampLog";
 
 // Initialize global uncaught error, telemetry listeners, background storage tracker and visitor session
 initGlobalErrorHandlers();
 initTelemetry();
 initBackgroundStorageAnalytics();
 initClientVisitorSession();
+initBundleStampLog();
 
 const rootElement = document.getElementById("root");
 
