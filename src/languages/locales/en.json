@@ -90,6 +90,7 @@
     "confirm": "Confirm",
     "are_you_sure": "Are you sure?",
     "delete_playlist_desc": "This playlist will be permanently deleted.",
+    "add_to_library_desc": "This item will be added to your library.",
     "remove_from_library_desc": "This item will be removed from your library.",
     "remove_track_from_playlist_desc": "This track will be removed from this playlist.",
     "close": "Close",
@@ -138,6 +139,7 @@
     "removed_from_library": "Removed {type} from library",
     "removed_from_library_success": "Removed from library",
     "failed_remove_from_library": "Failed to remove from library",
+    "failed_to_remove_library": "Failed to remove from library",
     "failed_to_load_track": "Failed to load track",
     "failed_to_resolve_link": "Failed to resolve link",
     "unsupported_link": "Unrecognized or unsupported link",
@@ -411,7 +413,8 @@
     "min": "min",
     "sec": "sec",
     "empty_title": "This playlist is empty",
-    "empty_subtitle": "Search for songs to add"
+    "empty_subtitle": "Search for songs to add",
+    "likes_empty": "No liked songs yet"
   },
   "search": {
     "placeholder": "Search tracks, artists, albums...",

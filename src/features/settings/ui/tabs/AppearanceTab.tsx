@@ -204,6 +204,7 @@ export function AppearanceTab({ searchQuery }: { searchQuery?: string }) {
               value={locale}
               onChange={setLocale}
               align="bottom-right"
+              className="min-w-[130px]"
               aria-label={t("settings.language.label")}
             />
           ) : (
