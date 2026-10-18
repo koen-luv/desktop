@@ -14,6 +14,7 @@ import {
   VolumeSmall,
   VolumeLoud,
   Repeat,
+  RepeatOne,
   Shuffle,
 } from "@solar-icons/react";
 import { HeartFill, HeartLine } from "@mingcute/react";
@@ -34,7 +35,6 @@ import { usePlayerStore } from "../store/playerStore";
 import { toVolumeGain, toVolumeLevel } from "../engine/volume";
 import { VolumePicker } from "./VolumePicker";
 import { SpeedPitchPicker } from "./SpeedPitchPicker";
-import { RepeatOneTile, RepeatTile } from "./RepeatTileIcons";
 import { TimelineSlider } from "./TimelineSlider";
 import { useTheme } from "next-themes";
 import { useCoverReady, CoverImage } from "@/features/covers";
@@ -400,14 +400,16 @@ function MiniPlayer({
     player.playbackContextCover,
   ]);
 
-  // off -> all (loop the whole queue/playlist) -> one (loop the track) -> off;
-  // "on" states use filled tiles so they read like the shuffle Bold tile
+  // off -> all (loop the whole queue/playlist) -> one (loop the track) -> off
   const repeatIcon = useMemo(() => {
-    if (player.repeat === "one") return <RepeatOneTile size={18} />;
-    if (player.repeat === "all") return <RepeatTile size={18} />;
+    if (player.repeat === "one") return <RepeatOne size={18} weight="Outline" />;
     return <Repeat size={18} weight="Outline" />;
   }, [player.repeat]);
   const repeatLabel = t(`player.repeat_${player.repeat}`);
+
+  // "on" state for the shuffle / repeat toggles: solid white tile, dark icon
+  // (inverted tokens, so it flips to a dark tile in the light theme)
+  const activeToggleClass = "!bg-text-primary !text-bg-primary";
 
   const iconButtonClass =
     "inline-flex h-[30px] w-[30px] items-center justify-center rounded-md text-text-secondary transition-colors duration-150 hover:bg-black/[0.05] dark:hover:bg-white/[0.09] hover:text-text-primary active:scale-[0.96] border-none bg-transparent cursor-pointer";
@@ -813,19 +815,19 @@ function MiniPlayer({
                 aria-label="Shuffle"
                 title={player.shuffle ? t("player.shuffle_on") : t("player.shuffle_off")}
                 className={`${iconButtonClass} ${
-                  player.shuffle ? "bg-bg-toolbox-active text-text-primary" : ""
+                  player.shuffle ? activeToggleClass : ""
                 }`}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => playerEngine.setShuffle(!player.shuffle)}
               >
-                <Shuffle size={18} weight={player.shuffle ? "Bold" : "Outline"} />
+                <Shuffle size={18} weight="Outline" />
               </button>
               <button
                 type="button"
                 aria-label={repeatLabel}
                 title={repeatLabel}
                 className={`${iconButtonClass} ${
-                  player.repeat !== "off" ? "bg-bg-toolbox-active text-text-primary" : ""
+                  player.repeat !== "off" ? activeToggleClass : ""
                 }`}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() =>
