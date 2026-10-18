@@ -65,6 +65,8 @@ export class OverlayManager {
   private alwaysOnTop = true;
   private wasAutoOpened = false;
   private isAuthenticated = false;
+  // set once the app is quitting: nothing may create a window or grab a shortcut again
+  private disposed = false;
 
   private moveAnimationTimer: NodeJS.Timeout | null = null;
   private currentAnimatedX: number | null = null;
@@ -179,6 +181,12 @@ export class OverlayManager {
     this.mainWindow = null;
   }
 
+  /** permanent teardown for app quit; unlike destroy() nothing can revive the overlay afterwards */
+  public dispose() {
+    this.disposed = true;
+    this.destroy();
+  }
+
   public pauseShortcuts(paused: boolean) {
     this.shortcutsPaused = paused;
     if (paused) {
@@ -194,6 +202,7 @@ export class OverlayManager {
   }
 
   public registerShortcut(newShortcut?: string) {
+    if (this.disposed) return;
     if (newShortcut) {
       this.shortcut = normalizeShortcut(newShortcut);
     } else if (this.shortcut) {
@@ -237,6 +246,7 @@ export class OverlayManager {
   }
 
   public registerLikeShortcut(newShortcut?: string) {
+    if (this.disposed) return;
     if (newShortcut) {
       this.likeShortcut = normalizeShortcut(newShortcut);
     } else if (this.likeShortcut) {
@@ -496,7 +506,7 @@ export class OverlayManager {
   }
 
   private createOverlayWindow() {
-    if (!this.isAuthenticated || !this.enabled) return;
+    if (this.disposed || !this.isAuthenticated || !this.enabled) return;
     const bounds = this.getWindowBounds();
 
     this.overlayWindow = new BrowserWindow({

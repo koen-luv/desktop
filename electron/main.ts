@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, screen, dialog, session, nativeImage, powerSaveBlocker } from "electron";
+import { app, BrowserWindow, globalShortcut, ipcMain, shell, screen, dialog, session, nativeImage, powerSaveBlocker } from "electron";
 import { autoUpdater } from "electron-updater";
 import path from "node:path";
 import fs from "node:fs";
@@ -7,7 +7,7 @@ import dns from "node:dns";
 import net from "node:net";
 import tls from "node:tls";
 import https from "node:https";
-import { execFile } from "node:child_process";
+import { execFile as nodeExecFile, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   signCoverUrl,
@@ -38,6 +38,7 @@ import { OverlayManager } from "./overlay.js";
 import { BundleManager } from "./bundle-manager.js";
 import { createBundleErrorStamp } from "./bundle-stamp.js";
 import { createSleepBlocker } from "./sleep-blocker.js";
+import { createShutdown } from "./shutdown.js";
 
 // root error handling for main process
 process.on("uncaughtException", (error) => {
@@ -71,6 +72,44 @@ let mainWindow: BrowserWindow | null = null;
 let touchBarManager: TouchBarManager | null = null;
 let overlayManager: OverlayManager | null = null;
 let bundleManager: BundleManager | null = null;
+
+// every helper process we spawn (tracert, icon cache refresh, ...) is tracked so
+// quitting can kill whatever is still running instead of leaving orphans behind
+const spawnedChildren = new Set<ChildProcess>();
+const execFile = ((...args: Parameters<typeof nodeExecFile>) => {
+  const child = nodeExecFile(...args);
+  spawnedChildren.add(child);
+  child.once("exit", () => spawnedChildren.delete(child));
+  child.once("error", () => spawnedChildren.delete(child));
+  return child;
+}) as typeof nodeExecFile;
+
+// single owner of "the app is going away": releases the overlay, shortcuts,
+// helper processes and every window, then quits and force-exits if that stalls
+const shutdown = createShutdown({
+  cleanup: [
+    () => touchBarManager?.unregisterShortcut(),
+    () => overlayManager?.dispose(),
+    () => globalShortcut.unregisterAll(),
+    () => {
+      for (const child of spawnedChildren) {
+        try {
+          child.kill();
+        } catch {}
+      }
+      spawnedChildren.clear();
+    },
+    () => {
+      // destroy() skips close handlers, so a hidden or stuck window cannot veto the quit
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) win.destroy();
+      }
+    },
+  ],
+  quit: () => app.quit(),
+  forceExit: () => app.exit(0),
+  watchdogMs: 4000,
+});
 
 // liner:// deeplink support (share links bounce here from link.tryliner.fun)
 
@@ -234,9 +273,12 @@ function createWindow() {
 
   mainWindow.on("closed", () => {
     mainWindow = null;
-    overlayManager?.destroy();
-    if (process.platform !== "darwin") {
-      app.quit();
+    if (process.platform === "darwin") {
+      // macOS keeps the app alive without windows; the overlay can be rebuilt on activate
+      overlayManager?.destroy();
+    } else {
+      // closing the main window (title bar button, taskbar, alt+f4) ends the whole app
+      shutdown.quit();
     }
   });
 
@@ -255,10 +297,19 @@ if (!gotTheLock) {
   app.on("second-instance", (_event, argv) => {
     // running instance gets here when xdg-open / os launches liner:// again
     const raw = findDeeplinkArg(argv);
+    if (shutdown.isQuitting()) {
+      // this process is on its way out and can no longer show a window; the new
+      // launch already handed over to us and exited, so start a fresh instance
+      // once we are gone instead of swallowing the launch
+      app.relaunch({ args: process.argv.slice(1).filter((a) => !a.startsWith("--inspect")) });
+      app.exit(0);
+      return;
+    }
     if (!mainWindow || mainWindow.isDestroyed()) {
       createWindow();
     } else {
       if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
       mainWindow.focus();
     }
     if (raw) deliverDeeplink(parseDeeplink(raw));
@@ -1214,7 +1265,7 @@ if (!gotTheLock) {
     }
 
     app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
+      if (!shutdown.isQuitting() && BrowserWindow.getAllWindows().length === 0) {
         createWindow();
       }
     });
@@ -1223,12 +1274,10 @@ if (!gotTheLock) {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
-    app.quit();
+    shutdown.quit();
   }
 });
 
-app.on("will-quit", () => {
-  touchBarManager?.unregisterShortcut();
-  overlayManager?.unregisterShortcut();
-  overlayManager?.destroy();
-});
+// covers every other way out: cmd+q, the updater's quitAndInstall, os shutdown
+app.on("before-quit", () => shutdown.begin());
+app.on("will-quit", () => shutdown.begin());
