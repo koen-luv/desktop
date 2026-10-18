@@ -212,7 +212,7 @@ export function PlayerUiElements({
             player.shuffle ? "!text-white !opacity-100" : "!text-white/40"
           }`}
         >
-          <Shuffle size={18} weight={player.shuffle ? "Bold" : "Outline"} />
+          <Shuffle size={18} weight="Outline" />
         </button>
 
         <button
