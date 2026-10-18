@@ -29,4 +29,49 @@ export const LOCALE_OPTIONS: SelectOption<Locale>[] = [
     label: "Deutsch",
     icon: <Emoji name="flag-germany" width={16} />,
   },
+  {
+    value: "it",
+    label: "Italiano",
+    icon: <Emoji name="flag-italy" width={16} />,
+  },
+  {
+    value: "fr",
+    label: "Français",
+    icon: <Emoji name="flag-france" width={16} />,
+  },
+  {
+    value: "pl",
+    label: "Polski",
+    icon: <Emoji name="flag-poland" width={16} />,
+  },
+  {
+    value: "tr",
+    label: "Türkçe",
+    icon: <Emoji name="flag-turkey" width={16} />,
+  },
+  {
+    value: "ja",
+    label: "日本語",
+    icon: <Emoji name="flag-japan" width={16} />,
+  },
+  {
+    value: "ko",
+    label: "한국어",
+    icon: <Emoji name="flag-south-korea" width={16} />,
+  },
+  {
+    value: "zh",
+    label: "简体中文",
+    icon: <Emoji name="flag-china" width={16} />,
+  },
+  {
+    value: "vi",
+    label: "Tiếng Việt",
+    icon: <Emoji name="flag-vietnam" width={16} />,
+  },
+  {
+    value: "pt",
+    label: "Português (Brasil)",
+    icon: <Emoji name="flag-brazil" width={16} />,
+  },
 ];

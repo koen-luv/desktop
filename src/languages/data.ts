@@ -3,6 +3,15 @@ import ru from "./locales/ru.json";
 import uk from "./locales/uk.json";
 import es from "./locales/es.json";
 import de from "./locales/de.json";
+import it from "./locales/it.json";
+import fr from "./locales/fr.json";
+import pl from "./locales/pl.json";
+import tr from "./locales/tr.json";
+import ja from "./locales/ja.json";
+import ko from "./locales/ko.json";
+import zh from "./locales/zh.json";
+import vi from "./locales/vi.json";
+import pt from "./locales/pt.json";
 import type { Locale } from "./locale";
 
 export const translations: Record<Locale, Record<string, unknown>> = {
@@ -11,4 +20,13 @@ export const translations: Record<Locale, Record<string, unknown>> = {
   uk,
   es,
   de,
+  it,
+  fr,
+  pl,
+  tr,
+  ja,
+  ko,
+  zh,
+  vi,
+  pt,
 };

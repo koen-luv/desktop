@@ -759,7 +759,7 @@
       },
       "show_history": {
         "title": "Dinleme geçmişini paylaş",
-        "description": "Başkalarının profilinde son dinlediğin şarkıları görmesine izin ver."
+        "description": "Başkalarının son dinlediğin şarkıları profilinde görmesine izin ver."
       },
       "show_liked_tracks": {
         "title": "Beğenilen şarkıları paylaş",

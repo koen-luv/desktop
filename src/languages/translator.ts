@@ -1,4 +1,4 @@
-import type { Locale } from "./locale";
+import { SUPPORTED_LOCALES, type Locale } from "./locale";
 import { translations } from "./data";
 
 export type TranslationDict = Record<string, string>;
@@ -37,11 +37,9 @@ function getFlatDict(locale: Locale): Record<string, string> {
   return flat;
 }
 
-const ALL_LOCALES: Locale[] = ["en", "ru", "uk", "es", "de"];
-
 export function getTranslationsForAllLocales(key: string): string[] {
   const results: string[] = [];
-  for (const loc of ALL_LOCALES) {
+  for (const loc of SUPPORTED_LOCALES) {
     const dict = getFlatDict(loc);
     if (dict[key]) {
       results.push(dict[key]);
