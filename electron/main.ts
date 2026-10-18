@@ -378,7 +378,7 @@ if (!gotTheLock) {
     overlayManager.registerShortcut();
 
     discordRpcManager = new DiscordRpcManager();
-    poTokenService = new PoTokenService(path.join(__dirname, "potoken-preload.cjs"));
+    poTokenService = new PoTokenService(path.join(__dirname, "preload.cjs"));
 
     const isHyprland = Boolean(
       process.env.HYPRLAND_INSTANCE_SIGNATURE ||

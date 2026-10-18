@@ -82,15 +82,17 @@ async function getMinter(): Promise<MinterEntry> {
   return pending;
 }
 
-ipcRenderer.on("potoken:mint", async (_event, request: MintRequest) => {
-  try {
-    const entry = await getMinter();
-    const token = await entry.minter.mintAsWebsafeString(request.identifier);
-    ipcRenderer.send("potoken:result", { id: request.id, token });
-  } catch (error) {
-    current = null;
-    ipcRenderer.send("potoken:result", { id: request.id, error: error instanceof Error ? error.message : String(error) });
-  }
-});
+export function startPoTokenWorker(): void {
+  ipcRenderer.on("potoken:mint", async (_event, request: MintRequest) => {
+    try {
+      const entry = await getMinter();
+      const token = await entry.minter.mintAsWebsafeString(request.identifier);
+      ipcRenderer.send("potoken:result", { id: request.id, token });
+    } catch (error) {
+      current = null;
+      ipcRenderer.send("potoken:result", { id: request.id, error: error instanceof Error ? error.message : String(error) });
+    }
+  });
 
-window.addEventListener("DOMContentLoaded", () => ipcRenderer.send("potoken:ready"));
+  window.addEventListener("DOMContentLoaded", () => ipcRenderer.send("potoken:ready"));
+}

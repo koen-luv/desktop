@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import { startPoTokenWorker } from "./potoken-preload";
 import type { MainNetResult } from "./netdiag";
 
 export interface DeeplinkTarget {
@@ -349,4 +350,8 @@ const api: LinerElectronApi = {
   mintPoToken: (identifier) => ipcRenderer.invoke("potoken:mint", identifier),
 };
 
-contextBridge.exposeInMainWorld("linerElectron", api);
+if (location.hostname === "www.youtube.com") {
+  startPoTokenWorker();
+} else {
+  contextBridge.exposeInMainWorld("linerElectron", api);
+}

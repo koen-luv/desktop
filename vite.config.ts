@@ -23,16 +23,13 @@ export default defineConfig(({ command, mode }) => {
         entry: "electron/main.ts",
       },
       preload: {
-        input: {
-          preload: "electron/preload.ts",
-          "potoken-preload": "electron/potoken-preload.ts",
-        },
+        input: "electron/preload.ts",
         vite: {
           build: {
             rollupOptions: {
               output: {
                 format: "cjs",
-                entryFileNames: "[name].cjs",
+                entryFileNames: "preload.cjs",
               },
             },
           },
