@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { debouncedStorage } from "@/shared/utils/storage";
 import {
   DEFAULT_DISCORD_SETTINGS,
   DEFAULT_DISCORD_CLIENT_ID,
@@ -26,6 +27,14 @@ function notifyElectron(patch: Partial<DiscordRpcSettings>) {
   }
 }
 
+const VALID_STATUS_DISPLAY_TYPES: readonly DiscordStatusDisplayType[] = [
+  "artist",
+  "title",
+  "artist_title",
+  "title_artist",
+  "app",
+] as const;
+
 export const useDiscordSettingsStore = create<DiscordSettingsState>()(
   persist(
     (set) => ({
@@ -35,7 +44,7 @@ export const useDiscordSettingsStore = create<DiscordSettingsState>()(
         notifyElectron({ enabled });
       },
       setApplicationId: (rawId) => {
-        const applicationId = rawId.trim() || DEFAULT_DISCORD_CLIENT_ID;
+        const applicationId = typeof rawId === "string" ? rawId.trim() || DEFAULT_DISCORD_CLIENT_ID : DEFAULT_DISCORD_CLIENT_ID;
         set({ applicationId });
         notifyElectron({ applicationId });
       },
@@ -74,18 +83,50 @@ export const useDiscordSettingsStore = create<DiscordSettingsState>()(
     }),
     {
       name: "liner_discord_settings_v1",
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => debouncedStorage),
+      partialize: (state): DiscordRpcSettings => ({
+        enabled: state.enabled,
+        applicationId: state.applicationId,
+        statusDisplayType: state.statusDisplayType,
+        showArtwork: state.showArtwork,
+        showArtistSmallImage: state.showArtistSmallImage,
+        showTime: state.showTime,
+        showPaused: state.showPaused,
+        showButton: state.showButton,
+        showDownloadButton: state.showDownloadButton,
+      }),
       onRehydrateStorage: () => (state) => {
-        if (state) {
-          if (state.applicationId === "1165957668758900787" || !state.applicationId) {
-            state.setApplicationId(DEFAULT_DISCORD_CLIENT_ID);
-          }
-          if (typeof state.showDownloadButton !== "boolean") {
-            state.setShowDownloadButton(true);
-          }
-          if (!state.statusDisplayType) {
-            state.setStatusDisplayType("artist");
-          }
+        if (!state) return;
+        if (typeof state.enabled !== "boolean") {
+          state.setEnabled(DEFAULT_DISCORD_SETTINGS.enabled);
+        }
+        if (
+          typeof state.applicationId !== "string" ||
+          !state.applicationId.trim() ||
+          state.applicationId === "1165957668758900787"
+        ) {
+          state.setApplicationId(DEFAULT_DISCORD_CLIENT_ID);
+        }
+        if (!VALID_STATUS_DISPLAY_TYPES.includes(state.statusDisplayType)) {
+          state.setStatusDisplayType(DEFAULT_DISCORD_SETTINGS.statusDisplayType);
+        }
+        if (typeof state.showArtwork !== "boolean") {
+          state.setShowArtwork(DEFAULT_DISCORD_SETTINGS.showArtwork);
+        }
+        if (typeof state.showArtistSmallImage !== "boolean") {
+          state.setShowArtistSmallImage(DEFAULT_DISCORD_SETTINGS.showArtistSmallImage);
+        }
+        if (typeof state.showTime !== "boolean") {
+          state.setShowTime(DEFAULT_DISCORD_SETTINGS.showTime);
+        }
+        if (typeof state.showPaused !== "boolean") {
+          state.setShowPaused(DEFAULT_DISCORD_SETTINGS.showPaused);
+        }
+        if (typeof state.showButton !== "boolean") {
+          state.setShowButton(DEFAULT_DISCORD_SETTINGS.showButton);
+        }
+        if (typeof state.showDownloadButton !== "boolean") {
+          state.setShowDownloadButton(DEFAULT_DISCORD_SETTINGS.showDownloadButton);
         }
       },
     }

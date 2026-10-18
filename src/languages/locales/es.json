@@ -529,7 +529,10 @@
       },
       "status": {
         "connected": "Conectado a Discord ({user})",
-        "disconnected": "Discord no conectado"
+        "disconnected": "Discord no conectado",
+        "ready": "Listo",
+        "waiting": "Esperando a Discord",
+        "disabled": "Desactivado"
       }
     },
     "customization": {

@@ -587,7 +587,10 @@
       },
       "status": {
         "connected": "Підключено до Discord ({user})",
-        "disconnected": "Discord не підключено"
+        "disconnected": "Discord не підключено",
+        "ready": "Готово",
+        "waiting": "Очікування Discord",
+        "disabled": "Вимкнено"
       }
     },
     "miniplayer": {

@@ -90,4 +90,14 @@ describe("discordSettingsStore", () => {
 
     expect(notifySpy).toHaveBeenCalledWith({ showTime: true });
   });
+
+  it("handles empty or non-string application ID safely", () => {
+    const store = useDiscordSettingsStore.getState();
+    store.setApplicationId("   ");
+    expect(useDiscordSettingsStore.getState().applicationId).toBe(DEFAULT_DISCORD_CLIENT_ID);
+
+    // @ts-expect-error test non-string runtime guard
+    store.setApplicationId(null);
+    expect(useDiscordSettingsStore.getState().applicationId).toBe(DEFAULT_DISCORD_CLIENT_ID);
+  });
 });

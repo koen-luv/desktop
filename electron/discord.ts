@@ -287,12 +287,13 @@ export class DiscordRpcManager {
           break;
       }
 
-      const activity: SetActivity = {
+      const activity: SetActivity & { status_display_type?: number } = {
         name: sanitizeText(activityName) || "Liner",
         type: 2, // 2 = ActivityType.Listening -> renders "Listening to" + live progress bar
         details: sanitizeText(detailsText),
         state: sanitizeText(stateText),
         statusDisplayType: rpcStatusDisplayType,
+        status_display_type: rpcStatusDisplayType,
       };
 
       // Timestamps (media timeline / live progress bar like Spotify)

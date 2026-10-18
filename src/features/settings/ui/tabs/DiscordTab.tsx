@@ -84,7 +84,11 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
           </span>
         </div>
         <span className="text-[12px] text-text-tertiary font-mono">
-          {enabled ? (discordStatus.connected ? "Ready" : "Waiting for Discord") : "Disabled"}
+          {enabled
+            ? discordStatus.connected
+              ? t("settings.discord.status.ready") || "Ready"
+              : t("settings.discord.status.waiting") || "Waiting for Discord"
+            : t("settings.discord.status.disabled") || "Disabled"}
         </span>
       </div>
 

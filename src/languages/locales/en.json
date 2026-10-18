@@ -583,7 +583,10 @@
       },
       "status": {
         "connected": "Connected to Discord ({user})",
-        "disconnected": "Discord not connected"
+        "disconnected": "Discord not connected",
+        "ready": "Ready",
+        "waiting": "Waiting for Discord",
+        "disabled": "Disabled"
       }
     },
     "customization": {
