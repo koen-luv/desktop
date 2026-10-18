@@ -410,6 +410,7 @@ function MiniPlayer({
   // "on" state for the shuffle / repeat toggles: the hover tint, but opaque, so the
   // progress fill sliding underneath never changes it. Values are the hover tint
   // pre-composited over the toolbox on bg-primary (dark #0a0a0a, light #f5f5f7).
+  // The toolbox pill itself is the opaque bg-toolbox equivalent for the same reason.
   const activeToggleClass = "!bg-[#dfdfe1] dark:!bg-[#292929] !text-text-primary";
 
   const iconButtonClass =
@@ -808,7 +809,7 @@ function MiniPlayer({
             }`}
           >
             <div
-              className="ml-auto flex items-center gap-[2px] rounded-lg bg-bg-toolbox p-[3px] pointer-events-auto prevent-seek cursor-default"
+              className="ml-auto flex items-center gap-[2px] rounded-lg bg-[#ebebed] dark:bg-[#141414] p-[3px] pointer-events-auto prevent-seek cursor-default"
               onPointerDown={(e) => e.stopPropagation()}
             >
               <button
