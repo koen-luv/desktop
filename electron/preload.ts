@@ -131,6 +131,7 @@ export interface LinerElectronApi {
   discordUpdateState: (state: any) => void;
   discordUpdateSettings: (settings: any) => void;
   getDiscordStatus: () => Promise<{ connected: boolean; username?: string }>;
+  mintPoToken: (identifier: string) => Promise<string>;
 }
 
 const isHyprland = Boolean(
@@ -345,6 +346,7 @@ const api: LinerElectronApi = {
     ipcRenderer.send("discord:update-settings", settings);
   },
   getDiscordStatus: () => ipcRenderer.invoke("discord:get-status"),
+  mintPoToken: (identifier) => ipcRenderer.invoke("potoken:mint", identifier),
 };
 
 contextBridge.exposeInMainWorld("linerElectron", api);

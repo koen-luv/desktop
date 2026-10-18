@@ -2,7 +2,6 @@ import { Innertube, Platform } from "youtubei.js/web";
 import { getClientVisitorData } from "@/shared/api/visitorSession";
 import { InnertubeError } from "./innertubeClient";
 import { selectBestAudioFormat, toResolvedStream, type AudioFormat, type ResolvedAudioStream } from "./innertubeAudioFormats";
-import { mintContentPoToken, resetPoTokenMinter } from "./poTokenMinter";
 
 interface WebRemixSession {
   visitorData: string;
@@ -32,8 +31,7 @@ async function createSession(visitorData: string): Promise<WebRemixSession> {
   return { visitorData, innertube };
 }
 
-async function getSession(): Promise<WebRemixSession> {
-  const visitorData = await getClientVisitorData();
+async function getSession(visitorData: string): Promise<WebRemixSession> {
   const existing = sessionPromise ? await sessionPromise.catch(() => null) : null;
   if (existing && existing.visitorData === visitorData) return existing;
   sessionPromise = createSession(visitorData);
@@ -45,7 +43,12 @@ async function getSession(): Promise<WebRemixSession> {
 
 export function resetWebRemixSession(): void {
   sessionPromise = null;
-  resetPoTokenMinter();
+}
+
+async function mintContentPoToken(videoId: string): Promise<string> {
+  const mint = typeof window === "undefined" ? undefined : window.linerElectron?.mintPoToken;
+  if (!mint) throw new InnertubeError("PO tokens need a newer Liner app version.", 501);
+  return mint(videoId);
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
@@ -57,10 +60,9 @@ export async function resolveWebRemixAudioStream(
   options: { signal?: AbortSignal; preferredCodec?: "opus" | "aac" } = {},
 ): Promise<ResolvedAudioStream> {
   installPlayerEvaluator();
-  const { innertube, visitorData } = await getSession();
+  const [poToken, visitorData] = await Promise.all([mintContentPoToken(videoId), getClientVisitorData()]);
   throwIfAborted(options.signal);
-
-  const poToken = await mintContentPoToken(innertube, visitorData, videoId);
+  const { innertube } = await getSession(visitorData);
   throwIfAborted(options.signal);
   const info = await innertube.getBasicInfo(videoId, { client: "YTMUSIC", po_token: poToken });
   throwIfAborted(options.signal);

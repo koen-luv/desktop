@@ -37,6 +37,7 @@ const WEB_REMIX_FAILURES_BEFORE_COOLDOWN = 3;
 
 let webRemixRetryAt = 0;
 let webRemixFailures = 0;
+let lastWebRemixError = "";
 
 async function assertStreamReachable(url: string, contentLength: number | undefined, signal?: AbortSignal): Promise<void> {
   const probe = new URL(url);
@@ -62,6 +63,7 @@ async function resolveViaWebRemix(
       if (options.signal?.aborted) throw error;
       resetWebRemixSession();
       const message = error instanceof Error ? error.message : String(error);
+      lastWebRemixError = message;
       failures.push(`WEB_REMIX: ${message}`);
       log("yellow", "playback", `WEB_REMIX attempt ${attempt + 1} failed: ${message}`);
     }
@@ -117,6 +119,8 @@ export async function resolveDirectAudioStream(
   if (!options.profiles && Date.now() >= webRemixRetryAt) {
     const stream = await resolveViaWebRemix(videoId, options, failures);
     if (stream) return stream;
+  } else if (!options.profiles) {
+    failures.push(`WEB_REMIX paused: ${lastWebRemixError}`);
   }
   for (const profile of orderedProfiles(options.profiles ?? PLAYBACK_PROFILES)) {
     try {

@@ -41,6 +41,7 @@ import { createSleepBlocker } from "./sleep-blocker.js";
 import { createShutdown } from "./shutdown.js";
 import { computeDragBounds } from "./window-drag.js";
 import { DiscordRpcManager } from "./discord.js";
+import { PoTokenService } from "./potoken.js";
 
 // root error handling for main process
 process.on("uncaughtException", (error) => {
@@ -75,6 +76,7 @@ let touchBarManager: TouchBarManager | null = null;
 let overlayManager: OverlayManager | null = null;
 let bundleManager: BundleManager | null = null;
 let discordRpcManager: DiscordRpcManager | null = null;
+let poTokenService: PoTokenService | null = null;
 
 // every helper process we spawn (tracert, icon cache refresh, ...) is tracked so
 // quitting can kill whatever is still running instead of leaving orphans behind
@@ -97,6 +99,10 @@ const shutdown = createShutdown({
       // drop the discord ipc socket so presence clears and nothing keeps the process alive
       discordRpcManager?.destroy();
       discordRpcManager = null;
+    },
+    () => {
+      poTokenService?.destroy();
+      poTokenService = null;
     },
     () => globalShortcut.unregisterAll(),
     () => {
@@ -290,6 +296,7 @@ function createWindow() {
   });
 
   mainWindow.on("closed", () => {
+    poTokenService?.destroy();
     mainWindow = null;
     if (process.platform === "darwin") {
       // macOS keeps the app alive without windows; the overlay can be rebuilt on activate
@@ -371,6 +378,7 @@ if (!gotTheLock) {
     overlayManager.registerShortcut();
 
     discordRpcManager = new DiscordRpcManager();
+    poTokenService = new PoTokenService(path.join(__dirname, "potoken-preload.cjs"));
 
     const isHyprland = Boolean(
       process.env.HYPRLAND_INSTANCE_SIGNATURE ||
