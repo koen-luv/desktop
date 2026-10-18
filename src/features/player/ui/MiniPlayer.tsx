@@ -825,7 +825,9 @@ function MiniPlayer({
                 aria-label={repeatLabel}
                 title={repeatLabel}
                 className={`${iconButtonClass} ${
-                  player.repeat !== "off" ? "bg-bg-toolbox-active text-text-primary" : ""
+                  // important so the active fill always beats the base transparent bg,
+                  // giving the same highlight the shuffle button has
+                  player.repeat !== "off" ? "!bg-bg-toolbox-active !text-text-primary" : ""
                 }`}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() =>
