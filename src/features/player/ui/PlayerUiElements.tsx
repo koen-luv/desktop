@@ -140,10 +140,10 @@ export function PlayerUiElements({
           onClick={handleLikeToggle}
           style={{ cursor: "pointer" }}
         >
-          {/* outline heart fades out while the filled one pops in (and back) */}
+          {/* subtle crossfade: outline heart out, filled heart in with a slight scale */}
           <motion.div
             initial={false}
-            animate={{ scale: isLiked ? 0.6 : 1, opacity: isLiked ? 0 : 1 }}
+            animate={{ scale: isLiked ? 0.85 : 1, opacity: isLiked ? 0 : 1 }}
             transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             className="absolute inset-0 flex items-center justify-center"
           >
@@ -151,10 +151,10 @@ export function PlayerUiElements({
           </motion.div>
           <motion.div
             initial={false}
-            animate={{ scale: isLiked ? 1 : 0.4, opacity: isLiked ? 1 : 0 }}
+            animate={{ scale: isLiked ? 1 : 0.75, opacity: isLiked ? 1 : 0 }}
             transition={
               isLiked
-                ? { type: "spring", stiffness: 520, damping: 17, mass: 0.6 }
+                ? { type: "spring", stiffness: 500, damping: 30, mass: 0.6 }
                 : { duration: 0.16, ease: "easeOut" }
             }
             className="absolute inset-0 flex items-center justify-center"
