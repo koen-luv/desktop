@@ -325,9 +325,9 @@ function CollectionContent() {
         />
         <span className="relative -left-[1.5px] top-[1px]">{t("common.back")}</span>
       </button>
-      {/* track search sits in the top bar, aligned with the track list */}
+      {/* track search sits centred in the page header */}
       {data && isReady && (
-        <div className="absolute top-[12px] left-[336px] right-[24px] z-20 flex justify-center pointer-events-none">
+        <div className="absolute top-[12px] left-0 right-0 z-20 flex justify-center pointer-events-none">
           <TrackSearchField
             search={search}
             totalCount={data.tracks.length}
