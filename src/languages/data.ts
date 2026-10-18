@@ -7,10 +7,6 @@ import it from "./locales/it.json";
 import fr from "./locales/fr.json";
 import pl from "./locales/pl.json";
 import tr from "./locales/tr.json";
-import ja from "./locales/ja.json";
-import ko from "./locales/ko.json";
-import zh from "./locales/zh.json";
-import vi from "./locales/vi.json";
 import pt from "./locales/pt.json";
 import type { Locale } from "./locale";
 
@@ -24,9 +20,5 @@ export const translations: Record<Locale, Record<string, unknown>> = {
   fr,
   pl,
   tr,
-  ja,
-  ko,
-  zh,
-  vi,
   pt,
 };

@@ -50,26 +50,6 @@ export const LOCALE_OPTIONS: SelectOption<Locale>[] = [
     icon: <Emoji name="flag-turkey" width={16} />,
   },
   {
-    value: "ja",
-    label: "日本語",
-    icon: <Emoji name="flag-japan" width={16} />,
-  },
-  {
-    value: "ko",
-    label: "한국어",
-    icon: <Emoji name="flag-south-korea" width={16} />,
-  },
-  {
-    value: "zh",
-    label: "简体中文",
-    icon: <Emoji name="flag-china" width={16} />,
-  },
-  {
-    value: "vi",
-    label: "Tiếng Việt",
-    icon: <Emoji name="flag-vietnam" width={16} />,
-  },
-  {
     value: "pt",
     label: "Português (Brasil)",
     icon: <Emoji name="flag-brazil" width={16} />,
