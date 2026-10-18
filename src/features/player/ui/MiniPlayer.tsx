@@ -14,7 +14,6 @@ import {
   VolumeSmall,
   VolumeLoud,
   Repeat,
-  RepeatOne,
   Shuffle,
 } from "@solar-icons/react";
 import { HeartFill, HeartLine } from "@mingcute/react";
@@ -35,6 +34,7 @@ import { usePlayerStore } from "../store/playerStore";
 import { toVolumeGain, toVolumeLevel } from "../engine/volume";
 import { VolumePicker } from "./VolumePicker";
 import { SpeedPitchPicker } from "./SpeedPitchPicker";
+import { RepeatOneTile, RepeatTile } from "./RepeatTileIcons";
 import { TimelineSlider } from "./TimelineSlider";
 import { useTheme } from "next-themes";
 import { useCoverReady, CoverImage } from "@/features/covers";
@@ -400,12 +400,12 @@ function MiniPlayer({
     player.playbackContextCover,
   ]);
 
-  // off -> all (loop the whole queue/playlist) -> one (loop the track) -> off
+  // off -> all (loop the whole queue/playlist) -> one (loop the track) -> off;
+  // "on" states use filled tiles so they read like the shuffle Bold tile
   const repeatIcon = useMemo(() => {
-    if (player.repeat === "one") {
-      return <RepeatOne size={18} weight="Bold" />;
-    }
-    return <Repeat size={18} weight={player.repeat === "all" ? "Bold" : "Outline"} />;
+    if (player.repeat === "one") return <RepeatOneTile size={18} />;
+    if (player.repeat === "all") return <RepeatTile size={18} />;
+    return <Repeat size={18} weight="Outline" />;
   }, [player.repeat]);
   const repeatLabel = t(`player.repeat_${player.repeat}`);
 
