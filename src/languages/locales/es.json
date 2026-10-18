@@ -528,7 +528,8 @@
       "client_id": {
         "title": "ID de aplicación de Discord",
         "description": "ID de aplicación personalizado de Discord. Déjalo por defecto o crea tu propia app en el Discord Developer Portal.",
-        "reset": "Restablecer por defecto"
+        "reset": "Restablecer por defecto",
+        "placeholder": "Liner (predeterminado)"
       },
       "status": {
         "connected": "Conectado a Discord ({user})",

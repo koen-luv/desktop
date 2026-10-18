@@ -3,7 +3,6 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { debouncedStorage } from "@/shared/utils/storage";
 import {
   DEFAULT_DISCORD_SETTINGS,
-  DEFAULT_DISCORD_CLIENT_ID,
   type DiscordRpcSettings,
   type DiscordStatusDisplayType,
 } from "../contracts";
@@ -35,6 +34,8 @@ const VALID_STATUS_DISPLAY_TYPES: readonly DiscordStatusDisplayType[] = [
   "app",
 ] as const;
 
+const RETIRED_APPLICATION_IDS = ["1165957668758900787", "1560629184605323385"];
+
 export const useDiscordSettingsStore = create<DiscordSettingsState>()(
   persist(
     (set) => ({
@@ -45,14 +46,14 @@ export const useDiscordSettingsStore = create<DiscordSettingsState>()(
       },
       setApplicationId: (rawId) => {
         if (typeof rawId !== "string") {
-          set({ applicationId: DEFAULT_DISCORD_CLIENT_ID });
-          notifyElectron({ applicationId: DEFAULT_DISCORD_CLIENT_ID });
+          set({ applicationId: "" });
+          notifyElectron({ applicationId: "" });
           return;
         }
         const trimmed = rawId.trim();
-        if (!trimmed || trimmed === DEFAULT_DISCORD_CLIENT_ID) {
-          set({ applicationId: DEFAULT_DISCORD_CLIENT_ID });
-          notifyElectron({ applicationId: DEFAULT_DISCORD_CLIENT_ID });
+        if (!trimmed) {
+          set({ applicationId: "" });
+          notifyElectron({ applicationId: "" });
           return;
         }
         if (/^\d{17,20}$/.test(trimmed)) {
@@ -61,8 +62,8 @@ export const useDiscordSettingsStore = create<DiscordSettingsState>()(
         }
       },
       resetApplicationId: () => {
-        set({ applicationId: DEFAULT_DISCORD_CLIENT_ID });
-        notifyElectron({ applicationId: DEFAULT_DISCORD_CLIENT_ID });
+        set({ applicationId: "" });
+        notifyElectron({ applicationId: "" });
       },
       setStatusDisplayType: (statusDisplayType) => {
         set({ statusDisplayType });
@@ -114,11 +115,10 @@ export const useDiscordSettingsStore = create<DiscordSettingsState>()(
         }
         if (
           typeof state.applicationId !== "string" ||
-          !state.applicationId.trim() ||
-          state.applicationId === "1165957668758900787" ||
-          !/^\d{17,20}$/.test(state.applicationId.trim())
+          RETIRED_APPLICATION_IDS.includes(state.applicationId.trim()) ||
+          (state.applicationId.trim() !== "" && !/^\d{17,20}$/.test(state.applicationId.trim()))
         ) {
-          state.setApplicationId(DEFAULT_DISCORD_CLIENT_ID);
+          state.resetApplicationId();
         }
         if (!VALID_STATUS_DISPLAY_TYPES.includes(state.statusDisplayType)) {
           state.setStatusDisplayType(DEFAULT_DISCORD_SETTINGS.statusDisplayType);

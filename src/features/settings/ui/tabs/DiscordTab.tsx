@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "@/languages";
 import {
   useDiscordSettingsStore,
-  DEFAULT_DISCORD_CLIENT_ID,
   type DiscordStatusDisplayType,
 } from "@/features/discord";
 import { ToggleSwitch, Button, TextInput, Select } from "@/shared/ui";
@@ -69,9 +68,9 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
 
   const commitAppId = () => {
     const trimmed = draftAppId.trim();
-    if (!trimmed || trimmed === DEFAULT_DISCORD_CLIENT_ID) {
+    if (!trimmed) {
       resetApplicationId();
-      setDraftAppId(DEFAULT_DISCORD_CLIENT_ID);
+      setDraftAppId("");
       return;
     }
 
@@ -93,7 +92,7 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
     }
   };
 
-  const isCustomAppId = applicationId !== DEFAULT_DISCORD_CLIENT_ID;
+  const isCustomAppId = applicationId !== "";
 
   return (
     <div className="flex flex-col gap-[18px]">
@@ -330,7 +329,7 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
                 variant="outline"
                 onClick={() => {
                   resetApplicationId();
-                  setDraftAppId(DEFAULT_DISCORD_CLIENT_ID);
+                  setDraftAppId("");
                 }}
               >
                 <Refresh1Line size={13} />
@@ -345,7 +344,7 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
               onChange={(e) => setDraftAppId(e.target.value)}
               onBlur={commitAppId}
               onKeyDown={handleKeyDown}
-              placeholder={DEFAULT_DISCORD_CLIENT_ID}
+              placeholder={t("settings.discord.client_id.placeholder")}
               disabled={!enabled}
             />
           </div>

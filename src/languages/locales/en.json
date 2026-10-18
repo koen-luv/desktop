@@ -591,7 +591,8 @@
       "client_id": {
         "title": "Discord Application ID",
         "description": "Custom Discord Application ID. Leave default or set your own application from Discord Developer Portal.",
-        "reset": "Reset Default"
+        "reset": "Reset Default",
+        "placeholder": "Liner (default)"
       },
       "status": {
         "connected": "Connected to Discord ({user})",

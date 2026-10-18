@@ -689,6 +689,10 @@ export const api = {
     );
   },
 
+  getArtistImage(id: string): Promise<string | undefined> {
+    return clientCatalog.getArtistImage(id);
+  },
+
   getArtist(id: string): Promise<ApiArtistDetails> {
     return clientCatalog.getArtist(id, () =>
       request<ApiArtistDetails>(`/v1/artists/${encodeURIComponent(id)}`),

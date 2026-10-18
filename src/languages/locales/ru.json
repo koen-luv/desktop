@@ -586,7 +586,8 @@
       "client_id": {
         "title": "ID приложения Discord",
         "description": "Пользовательский Application ID из Discord Developer Portal для кастомного названия.",
-        "reset": "По умолчанию"
+        "reset": "По умолчанию",
+        "placeholder": "Liner (по умолчанию)"
       },
       "status": {
         "connected": "Подключено к Discord ({user})",

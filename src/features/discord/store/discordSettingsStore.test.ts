@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useDiscordSettingsStore } from "./discordSettingsStore";
-import { DEFAULT_DISCORD_CLIENT_ID } from "../contracts";
+const BUILT_IN_APPLICATION_ID = "";
 
 describe("discordSettingsStore", () => {
   beforeEach(() => {
@@ -20,7 +20,7 @@ describe("discordSettingsStore", () => {
   it("initializes with expected default values", () => {
     const state = useDiscordSettingsStore.getState();
     expect(state.enabled).toBe(true);
-    expect(state.applicationId).toBe(DEFAULT_DISCORD_CLIENT_ID);
+    expect(state.applicationId).toBe(BUILT_IN_APPLICATION_ID);
     expect(state.statusDisplayType).toBe("artist");
     expect(state.showArtwork).toBe(true);
     expect(state.showArtistSmallImage).toBe(true);
@@ -51,7 +51,7 @@ describe("discordSettingsStore", () => {
     expect(useDiscordSettingsStore.getState().applicationId).toBe("123456789012345678");
 
     store.resetApplicationId();
-    expect(useDiscordSettingsStore.getState().applicationId).toBe(DEFAULT_DISCORD_CLIENT_ID);
+    expect(useDiscordSettingsStore.getState().applicationId).toBe(BUILT_IN_APPLICATION_ID);
   });
 
   it("updates individual toggle flags", () => {
@@ -94,24 +94,24 @@ describe("discordSettingsStore", () => {
   it("handles empty or non-string application ID safely", () => {
     const store = useDiscordSettingsStore.getState();
     store.setApplicationId("   ");
-    expect(useDiscordSettingsStore.getState().applicationId).toBe(DEFAULT_DISCORD_CLIENT_ID);
+    expect(useDiscordSettingsStore.getState().applicationId).toBe(BUILT_IN_APPLICATION_ID);
 
     // @ts-expect-error test non-string runtime guard
     store.setApplicationId(null);
-    expect(useDiscordSettingsStore.getState().applicationId).toBe(DEFAULT_DISCORD_CLIENT_ID);
+    expect(useDiscordSettingsStore.getState().applicationId).toBe(BUILT_IN_APPLICATION_ID);
   });
 
   it("ignores invalid custom application ID format (non-snowflake)", () => {
     const store = useDiscordSettingsStore.getState();
     store.resetApplicationId();
-    expect(useDiscordSettingsStore.getState().applicationId).toBe(DEFAULT_DISCORD_CLIENT_ID);
+    expect(useDiscordSettingsStore.getState().applicationId).toBe(BUILT_IN_APPLICATION_ID);
 
     // Too short (not 17-20 digits)
     store.setApplicationId("12345");
-    expect(useDiscordSettingsStore.getState().applicationId).toBe(DEFAULT_DISCORD_CLIENT_ID);
+    expect(useDiscordSettingsStore.getState().applicationId).toBe(BUILT_IN_APPLICATION_ID);
 
     // Non-numeric characters
     store.setApplicationId("abcdef123456789012");
-    expect(useDiscordSettingsStore.getState().applicationId).toBe(DEFAULT_DISCORD_CLIENT_ID);
+    expect(useDiscordSettingsStore.getState().applicationId).toBe(BUILT_IN_APPLICATION_ID);
   });
 });

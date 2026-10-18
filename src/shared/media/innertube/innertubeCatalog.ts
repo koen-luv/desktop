@@ -92,6 +92,10 @@ async function loadArtist(artistId: string, signal?: AbortSignal): Promise<Artis
   return allTracks.length > 0 ? { ...artist, tracks: allTracks } : artist;
 }
 
+async function getArtistImage(artistId: string, signal?: AbortSignal): Promise<string | undefined> {
+  return mapInnertubeArtistDetails(artistId, await browse(artistId, undefined, signal))?.cover?.url;
+}
+
 async function getArtist(artistId: string, signal?: AbortSignal): Promise<ArtistDetails> {
   const direct = await loadArtist(artistId, signal).catch(() => null);
   if (direct) return direct;
@@ -111,6 +115,7 @@ function search(query: string, type: SearchType = "all", signal?: AbortSignal): 
 export const innertubeCatalog = {
   search,
   getArtist,
+  getArtistImage,
   getAlbum,
   getPlaylist,
   getTrack,

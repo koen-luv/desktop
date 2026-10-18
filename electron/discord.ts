@@ -38,11 +38,15 @@ export interface DiscordRpcStatePayload {
   artistImageUrl?: string;
 }
 
-export const DEFAULT_DISCORD_CLIENT_ID = "1560629184605323385";
+export const LINER_DISCORD_APPLICATION_ID = "";
+
+function builtInApplicationId(): string {
+  return process.env.LINER_DISCORD_CLIENT_ID?.trim() || LINER_DISCORD_APPLICATION_ID;
+}
 
 const DEFAULT_SETTINGS: DiscordRpcSettings = {
   enabled: true,
-  applicationId: DEFAULT_DISCORD_CLIENT_ID,
+  applicationId: "",
   statusDisplayType: "artist",
   showArtwork: true,
   showArtistSmallImage: true,
@@ -53,6 +57,18 @@ const DEFAULT_SETTINGS: DiscordRpcSettings = {
 };
 
 const RECONNECT_INTERVAL_MS = 15_000;
+const SYNC_DEBOUNCE_MS = 1_000;
+const MIN_SYNC_INTERVAL_MS = 4_000;
+const MAX_IMAGE_URL_LENGTH = 256;
+
+export function toDiscordImageUrl(url: string | undefined): string | undefined {
+  if (!url || url.length > MAX_IMAGE_URL_LENGTH) return undefined;
+  try {
+    return new URL(url).protocol === "https:" ? url : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function sanitizeText(text: string | undefined | null, maxLen = 128): string | undefined {
   if (!text) return undefined;
@@ -70,6 +86,8 @@ export class DiscordRpcManager {
   private isConnecting = false;
   private isConnected = false;
   private reconnectTimer: NodeJS.Timeout | null = null;
+  private syncTimer: NodeJS.Timeout | null = null;
+  private lastSyncAt = 0;
   private isDestroyed = false;
 
   constructor() {
@@ -94,6 +112,21 @@ export class DiscordRpcManager {
     });
   }
 
+  private scheduleSync(): void {
+    if (this.syncTimer) clearTimeout(this.syncTimer);
+    const wait = Math.max(SYNC_DEBOUNCE_MS, MIN_SYNC_INTERVAL_MS - (Date.now() - this.lastSyncAt));
+    this.syncTimer = setTimeout(() => {
+      this.syncTimer = null;
+      this.lastSyncAt = Date.now();
+      void this.syncActivity();
+    }, wait);
+  }
+
+  private clearSyncTimer(): void {
+    if (this.syncTimer) clearTimeout(this.syncTimer);
+    this.syncTimer = null;
+  }
+
   private clearReconnectTimer(): void {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -116,8 +149,9 @@ export class DiscordRpcManager {
       return;
     }
 
+    const clientId = this.settings.applicationId || builtInApplicationId();
+    if (!clientId) return;
     this.isConnecting = true;
-    const clientId = this.settings.applicationId || DEFAULT_DISCORD_CLIENT_ID;
 
     try {
       if (this.client) {
@@ -138,7 +172,7 @@ export class DiscordRpcManager {
 
         // Push latest state if available
         if (this.latestPayload) {
-          this.syncActivity();
+          this.scheduleSync();
         }
       });
 
@@ -202,11 +236,11 @@ export class DiscordRpcManager {
 
     const oldEnabled = this.settings.enabled;
     const oldAppId = this.settings.applicationId;
-    const oldEffectiveClientId = oldAppId || DEFAULT_DISCORD_CLIENT_ID;
+    const oldEffectiveClientId = oldAppId || builtInApplicationId();
 
     this.settings = { ...this.settings, ...validatedPatch };
 
-    const newEffectiveClientId = this.settings.applicationId || DEFAULT_DISCORD_CLIENT_ID;
+    const newEffectiveClientId = this.settings.applicationId || builtInApplicationId();
 
     // If app ID changed, disconnect and reconnect with the new client ID
     if (newEffectiveClientId !== oldEffectiveClientId && this.settings.enabled) {
@@ -227,6 +261,7 @@ export class DiscordRpcManager {
         this.connect();
       } else {
         this.clearReconnectTimer();
+        this.clearSyncTimer();
         this.clearActivity();
         try {
           this.client?.destroy();
@@ -240,7 +275,7 @@ export class DiscordRpcManager {
 
     // If flags like showTime, showArtwork changed, refresh current activity
     if (this.isConnected && this.latestPayload) {
-      this.syncActivity();
+      this.scheduleSync();
     }
   }
 
@@ -258,7 +293,7 @@ export class DiscordRpcManager {
     }
 
     if (this.isConnected) {
-      this.syncActivity();
+      this.scheduleSync();
     }
   }
 
@@ -346,14 +381,16 @@ export class DiscordRpcManager {
       }
 
       // Large artwork (Album/Track cover)
-      if (this.settings.showArtwork && track.coverUrl) {
-        activity.largeImageKey = track.coverUrl;
+      const coverImage = toDiscordImageUrl(track.coverUrl);
+      if (this.settings.showArtwork && coverImage) {
+        activity.largeImageKey = coverImage;
         activity.largeImageText = sanitizeText(track.album || track.title) || "Liner";
       }
 
       // Small artwork (Artist photo badge)
-      if (this.settings.showArtistSmallImage && payload.artistImageUrl) {
-        activity.smallImageKey = payload.artistImageUrl;
+      const artistImage = toDiscordImageUrl(payload.artistImageUrl);
+      if (this.settings.showArtistSmallImage && artistImage) {
+        activity.smallImageKey = artistImage;
         activity.smallImageText = sanitizeText(track.artist) || "Artist";
       }
 
@@ -395,6 +432,7 @@ export class DiscordRpcManager {
   public destroy(): void {
     this.isDestroyed = true;
     this.clearReconnectTimer();
+    this.clearSyncTimer();
     this.clearActivity();
     try {
       this.client?.destroy();

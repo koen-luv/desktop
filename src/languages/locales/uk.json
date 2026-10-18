@@ -586,7 +586,8 @@
       "client_id": {
         "title": "ID додатку Discord",
         "description": "Користувацький Application ID з Discord Developer Portal для власної назви.",
-        "reset": "За замовчуванням"
+        "reset": "За замовчуванням",
+        "placeholder": "Liner (за замовчуванням)"
       },
       "status": {
         "connected": "Підключено до Discord ({user})",

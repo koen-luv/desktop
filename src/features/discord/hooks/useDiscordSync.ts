@@ -6,13 +6,30 @@ import { getAuthSession } from "@/shared/api/auth-session";
 import type { DiscordRpcStatePayload } from "../contracts";
 import { useDiscordSettingsStore } from "../store/discordSettingsStore";
 
-const artistAvatarCache = new Map<string, string>();
+const artistAvatarCache = new Map<string, string | null>();
+const pendingArtistAvatars = new Map<string, Promise<string | null>>();
+
+function loadArtistAvatar(artistId: string): Promise<string | null> {
+  const pending = pendingArtistAvatars.get(artistId);
+  if (pending) return pending;
+  const request = api
+    .getArtistImage(artistId)
+    .then((url) => (url ? toMaxQualityAvatarUrl(mediaUrl(url)) || null : null))
+    .catch(() => null)
+    .then((url) => {
+      artistAvatarCache.set(artistId, url);
+      pendingArtistAvatars.delete(artistId);
+      return url;
+    });
+  pendingArtistAvatars.set(artistId, request);
+  return request;
+}
 
 export function useDiscordSync() {
   const player = usePlayerState();
   const currentTrack = player.currentTrack;
   const effectiveCover = useCoverSrc(currentTrack?.coverUrl);
-  const [artistAvatar, setArtistAvatar] = useState<string | undefined>();
+  const [loadedAvatar, setLoadedAvatar] = useState<{ artistId: string; url: string | null } | null>(null);
 
   const primaryArtistId =
     currentTrack?.artistId ||
@@ -55,49 +72,21 @@ export function useDiscordSync() {
     };
   }, []);
 
-  // Fetch / cache artist avatar for the small image badge
   useEffect(() => {
-    if (!primaryArtistId || primaryArtistId === "unknown") {
-      setArtistAvatar(undefined);
-      return;
-    }
-
-    if (artistAvatarCache.has(primaryArtistId)) {
-      setArtistAvatar(artistAvatarCache.get(primaryArtistId));
-      return;
-    }
-
+    if (!primaryArtistId || primaryArtistId === "unknown" || artistAvatarCache.has(primaryArtistId)) return;
     let active = true;
-
-    void api
-      .getArtist(primaryArtistId)
-      .then((artist) => {
-        if (!active) return;
-        let rawUrl = "";
-        if (artist.cover?.url) {
-          rawUrl = mediaUrl(artist.cover.url);
-        } else if (artist.geniusImageUrl) {
-          rawUrl = mediaUrl(artist.geniusImageUrl);
-        }
-
-        const highResUrl = rawUrl ? toMaxQualityAvatarUrl(rawUrl) : "";
-        if (highResUrl) {
-          artistAvatarCache.set(primaryArtistId, highResUrl);
-          setArtistAvatar(highResUrl);
-        } else {
-          setArtistAvatar(undefined);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setArtistAvatar(undefined);
-        }
-      });
-
+    void loadArtistAvatar(primaryArtistId).then((url) => {
+      if (active) setLoadedAvatar({ artistId: primaryArtistId, url });
+    });
     return () => {
       active = false;
     };
   }, [primaryArtistId]);
+
+  const artistAvatar =
+    (primaryArtistId &&
+      (loadedAvatar?.artistId === primaryArtistId ? loadedAvatar.url : artistAvatarCache.get(primaryArtistId))) ||
+    undefined;
 
   // Track position prediction for seek detection
   const lastStateRef = useRef<{

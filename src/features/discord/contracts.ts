@@ -35,11 +35,9 @@ export interface DiscordRpcStatePayload {
   artistImageUrl?: string;
 }
 
-export const DEFAULT_DISCORD_CLIENT_ID = "1560629184605323385";
-
 export const DEFAULT_DISCORD_SETTINGS: DiscordRpcSettings = {
   enabled: true,
-  applicationId: DEFAULT_DISCORD_CLIENT_ID,
+  applicationId: "",
   statusDisplayType: "artist",
   showArtwork: true,
   showArtistSmallImage: true,
