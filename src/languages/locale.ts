@@ -30,6 +30,7 @@ export function getBrowserLocale(): Locale {
     if (code === "ru") return "ru";
     if (code === "de") return "de";
     if (code === "uk" || code === "ua") return "uk";
+    if (code === "it") return "it";
   }
   return "ru";
 }
