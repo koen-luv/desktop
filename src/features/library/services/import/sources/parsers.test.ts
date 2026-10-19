@@ -105,6 +105,20 @@ describe("soundcloud parsers", () => {
     expect(soundCloudCanonicalId("5")).toBe("sc:5");
     expect(soundCloudCanonicalId("sc:5")).toBe("sc:5");
   });
+
+  it("falls back to set artwork, then uploader avatar, when a track has no artwork", () => {
+    const base = { id: 6, title: "Rainy Day People", duration: 1000, artwork_url: null, user: { id: 7, username: "uploader", avatar_url: "https://i1.sndcdn.com/avatars-a-large.jpg" } };
+    expect(mapSoundCloudTrack(base, "https://i1.sndcdn.com/artworks-set-large.jpg")?.coverUrl).toBe("https://i1.sndcdn.com/artworks-set-t500x500.jpg");
+    expect(mapSoundCloudTrack(base)?.coverUrl).toBe("https://i1.sndcdn.com/avatars-a-t500x500.jpg");
+    expect(mapSoundCloudTrack({ ...base, user: { id: 7, username: "uploader" } })).not.toHaveProperty("coverUrl");
+  });
+
+  it("captures set artwork from hydration", () => {
+    const hydration = [{ hydratable: "playlist", data: { title: "Set", artwork_url: "https://i1.sndcdn.com/artworks-set-large.jpg", tracks: [] } }];
+    const collection = createSoundCloudCollection();
+    applySoundCloudHydration(`<script>window.__sc_hydration = ${JSON.stringify(hydration)};</script>`, collection);
+    expect(collection.artworkUrl).toBe("https://i1.sndcdn.com/artworks-set-large.jpg");
+  });
 });
 
 describe("youtube continuation", () => {

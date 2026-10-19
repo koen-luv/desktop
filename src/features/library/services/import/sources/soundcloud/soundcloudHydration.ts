@@ -13,8 +13,10 @@ export function applySoundCloudHydration(html: string, collection: SoundCloudCol
   if (!data) return;
   const title = trimmedString(data.title);
   const description = trimmedString(data.description);
+  const artworkUrl = trimmedString(data.artwork_url);
   if (title) collection.title = title;
   if (description) collection.description = description;
+  if (artworkUrl) collection.artworkUrl = artworkUrl;
   collection.rawTracks.push(...asArray(data.tracks).filter(isRecord));
 }
 

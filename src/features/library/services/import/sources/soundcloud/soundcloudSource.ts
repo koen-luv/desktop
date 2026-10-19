@@ -29,7 +29,7 @@ export async function importSoundCloud(
 
   const rawTracks = await hydrateSoundCloudStubs(collection.rawTracks, signal);
   const tracks = rawTracks
-    .map(mapSoundCloudTrack)
+    .map((raw) => mapSoundCloudTrack(raw, collection.artworkUrl))
     .filter((track): track is ClientImportedTrack => Boolean(track));
 
   if (tracks.length === 0) {
