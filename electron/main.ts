@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, shell, screen, dialog, session, nativeImage, powerSaveBlocker } from "electron";
+import { app, BaseWindow, BrowserWindow, globalShortcut, ipcMain, shell, screen, dialog, session, nativeImage, powerSaveBlocker } from "electron";
 import type { Display, Rectangle } from "electron";
 import { autoUpdater } from "electron-updater";
 import path from "node:path";
@@ -92,7 +92,7 @@ const execFile = ((...args: Parameters<typeof nodeExecFile>) => {
 
 // single owner of "the app is going away": releases the overlay, shortcuts,
 // translucent "drop to maximize" preview shown while dragging to the top edge
-let snapPreview: BrowserWindow | null = null;
+let snapPreview: BaseWindow | null = null;
 
 function syncResizable() {
   if (process.platform !== "win32" || !mainWindow || mainWindow.isDestroyed()) return;
@@ -905,8 +905,8 @@ if (!gotTheLock) {
     const SNAP_RELEASE_PX = 24; // armed snap holds until the cursor is this far below the edge
     const SNAP_INSET = 8; // gap between the preview and the work area edges
     const SNAP_TUCK_INSET = 20; // start / end inside the window, hidden behind the app body
-    const SNAP_GROW_MS = 200;
-    const SNAP_COLLAPSE_MS = 220;
+    const SNAP_GROW_MS = 180;
+    const SNAP_COLLAPSE_MS = 200;
 
     let snapReady = false;
     let snapArmed = false;
@@ -914,17 +914,15 @@ if (!gotTheLock) {
     let previewVisible = false;
     let previewTopmost = false;
     let mainWasOnTop = false;
-    let previewTimer: ReturnType<typeof setInterval> | null = null;
+    let previewTimer: ReturnType<typeof setTimeout> | null = null;
     let previewHideTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const SNAP_PREVIEW_HTML =
-      "<!doctype html><html><head><meta charset='utf-8'><style>html,body{margin:0;height:100%;overflow:hidden}" +
-      (acrylicSupported ? "body{background:rgba(128,128,128,.16)}" : "body{background:rgba(118,118,118,.6)}") +
-      "</style></head><body></body></html>";
 
     const createSnapPreview = () => {
       if (snapPreview && !snapPreview.isDestroyed()) return;
-      const preview = new BrowserWindow({
+      // a bare native window (no web contents): resizing it every frame costs almost
+      // nothing, unlike a BrowserWindow whose renderer reallocates and repaints on
+      // every resize. the tint is its background colour (#AARRGGBB) over the acrylic.
+      const preview = new BaseWindow({
         show: false,
         frame: false,
         resizable: false,
@@ -935,24 +933,20 @@ if (!gotTheLock) {
         skipTaskbar: true,
         hasShadow: false,
         ...(acrylicSupported
-          ? { backgroundMaterial: "acrylic" as const, backgroundColor: "#00000000" }
-          : { transparent: true, backgroundColor: "#00000000" }),
-        webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
+          ? { backgroundMaterial: "acrylic" as const, backgroundColor: "#29808080" }
+          : { transparent: true, backgroundColor: "#9a767676" }),
       });
       snapPreview = preview;
       preview.setIgnoreMouseEvents(true);
-      preview.webContents.once("did-finish-load", () => {
-        snapReady = true;
-      });
+      snapReady = true;
       preview.on("closed", () => {
         snapReady = false;
         previewVisible = false;
         previewTopmost = false;
       });
-      void preview.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(SNAP_PREVIEW_HTML)}`);
     };
 
-    // one-time cost (a new window + renderer), paid in the background, never in a drag
+    // one-time cost (creating the window), paid in the background, never in a drag
     if (snapEnabled) {
       const warmUp = () => {
         if (dragStartCursor) {
@@ -987,30 +981,47 @@ if (!gotTheLock) {
     };
 
     const stopPreviewAnim = () => {
-      if (previewTimer) clearInterval(previewTimer);
+      if (previewTimer) clearTimeout(previewTimer);
       previewTimer = null;
     };
 
-    // `to` is re-read every tick, so a collapse follows the window while it is dragged
+    // `to` is re-read every frame, so a collapse follows the window while it is
+    // dragged. frames are paced to the display refresh and progress comes from the
+    // clock, so a late timer only drops a frame, it never slows the motion down
     const animatePreview = (to: () => Rectangle | null, ms: number, ease: (t: number) => number, done?: () => void) => {
       const preview = snapPreview;
       if (!preview || preview.isDestroyed()) return;
       stopPreviewAnim();
       const from = preview.getBounds();
-      const start = Date.now();
-      const tick = () => {
-        if (preview.isDestroyed()) return stopPreviewAnim();
+      const hz = Math.min(
+        240,
+        Math.max(60, screen.getDisplayMatching(from).displayFrequency || 60),
+      );
+      const frameMs = 1000 / hz;
+      const start = performance.now();
+      let last: Rectangle | null = null;
+      const frame = () => {
+        previewTimer = null;
+        if (preview.isDestroyed()) return;
         const target = to();
-        if (!target) return stopPreviewAnim();
-        const t = Math.min(1, (Date.now() - start) / ms);
-        preview.setBounds(lerpRect(from, target, ease(t)));
-        if (t >= 1) {
-          stopPreviewAnim();
-          done?.();
+        if (!target) return;
+        const now = performance.now();
+        const t = Math.min(1, (now - start) / ms);
+        const next = lerpRect(from, target, ease(t));
+        if (!last || next.x !== last.x || next.y !== last.y || next.width !== last.width || next.height !== last.height) {
+          preview.setBounds(next);
+          last = next;
         }
+        if (t >= 1) {
+          done?.();
+          return;
+        }
+        // aim at the next frame boundary
+        const elapsed = now - start;
+        const wait = Math.max(1, Math.ceil(frameMs - (elapsed % frameMs)));
+        previewTimer = setTimeout(frame, wait);
       };
-      previewTimer = setInterval(tick, 8);
-      tick();
+      frame();
     };
 
     // stack while visible: preview above other apps (they end up under the blur), ours above it
