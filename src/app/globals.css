@@ -438,3 +438,8 @@ button.apple-glass-action:hover,
 body[data-edge-to-edge="true"] {
   padding: 0 !important;
 }
+
+/* window controls after minimize: no stale hover highlight (see WindowControls) */
+html[data-hover-reset] [data-window-controls] button:hover {
+  background-color: transparent !important;
+}
