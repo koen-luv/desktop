@@ -892,36 +892,47 @@ if (!gotTheLock) {
     };
 
     // drag-to-top snap (windows only). the custom drag bypasses aero snap, so we
-    // mirror it: windows' own acrylic blur grows out of the window over everything on
-    // screen, collapses back into it on cancel, and on drop the app fills the screen.
+    // mirror it: touching the top edge shows windows' own acrylic blur over the work
+    // area (over every other app, under ours); pulling away hides it; dropping
+    // maximizes instantly.
     //
-    // the drag must never pay for this. so: no screen capture at all (dwm draws the
-    // blur, live), the preview window is created once in the background after
-    // startup, it stays hidden (free for dwm) until the snap arms, and per drag move
-    // only a couple of cheap checks run.
+    // why there is no js animation: a backdrop window resized from js can't be smooth
+    // (dwm recomputes the acrylic per resize and main-process timers aren't vsync), so
+    // the preview is placed at its final size once and shown / hidden; windows itself
+    // draws the transition. nothing runs per frame, so nothing can stutter.
+    // the drag never pays for it either: no screen capture, the preview is a bare
+    // native window created (and primed) in the background after startup, and per
+    // drag move only a couple of cheap checks run.
     const snapEnabled = process.platform === "win32";
     // acrylic needs windows 11 22h2 (build 22621)+; older builds get a flat tint
     const acrylicSupported = snapEnabled && Number(os.release().split(".")[2] ?? 0) >= 22621;
     const SNAP_RELEASE_PX = 24; // armed snap holds until the cursor is this far below the edge
     const SNAP_INSET = 8; // gap between the preview and the work area edges
-    const SNAP_TUCK_INSET = 20; // start / end inside the window, hidden behind the app body
-    const SNAP_GROW_MS = 180;
-    const SNAP_COLLAPSE_MS = 200;
 
     let snapReady = false;
     let snapArmed = false;
     let snapDisplay: Display | null = null;
     let previewVisible = false;
-    let previewTopmost = false;
+    let mainRaised = false;
     let mainWasOnTop = false;
-    let previewTimer: ReturnType<typeof setTimeout> | null = null;
     let previewHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const previewRectFor = (display: Display): Rectangle => {
+      const area = display.workArea;
+      return {
+        x: area.x + SNAP_INSET,
+        y: area.y + SNAP_INSET,
+        width: area.width - SNAP_INSET * 2,
+        height: area.height - SNAP_INSET * 2,
+      };
+    };
 
     const createSnapPreview = () => {
       if (snapPreview && !snapPreview.isDestroyed()) return;
-      // a bare native window (no web contents): resizing it every frame costs almost
-      // nothing, unlike a BrowserWindow whose renderer reallocates and repaints on
-      // every resize. the tint is its background colour (#AARRGGBB) over the acrylic.
+      // a bare native window (no web contents); the tint is its background colour
+      // (#AARRGGBB) over the acrylic. it is NOT always-on-top: shown, it lands at the
+      // top of the normal band (above every other app) while ours is raised above it,
+      // so it can never cover us, not even for a frame
       const preview = new BaseWindow({
         show: false,
         frame: false,
@@ -938,15 +949,24 @@ if (!gotTheLock) {
       });
       snapPreview = preview;
       preview.setIgnoreMouseEvents(true);
-      snapReady = true;
       preview.on("closed", () => {
         snapReady = false;
         previewVisible = false;
-        previewTopmost = false;
       });
+      // prime: show it once off-screen at full size so dwm sets up the backdrop now,
+      // not on the first real snap
+      const primary = screen.getPrimaryDisplay();
+      const rect = previewRectFor(primary);
+      preview.setBounds({ x: -32000, y: -32000, width: rect.width, height: rect.height });
+      preview.showInactive();
+      setTimeout(() => {
+        if (preview.isDestroyed()) return;
+        preview.hide();
+        snapReady = true;
+      }, 300);
     };
 
-    // one-time cost (creating the window), paid in the background, never in a drag
+    // one-time cost (creating + priming the window), paid in the background, never in a drag
     if (snapEnabled) {
       const warmUp = () => {
         if (dragStartCursor) {
@@ -962,138 +982,53 @@ if (!gotTheLock) {
       app.whenReady().then(() => setTimeout(warmUp, 2500));
     }
 
-    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-    const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-    const lerpRect = (a: Rectangle, b: Rectangle, t: number): Rectangle => ({
-      x: Math.round(a.x + (b.x - a.x) * t),
-      y: Math.round(a.y + (b.y - a.y) * t),
-      width: Math.max(1, Math.round(a.width + (b.width - a.width) * t)),
-      height: Math.max(1, Math.round(a.height + (b.height - a.height) * t)),
-    });
-
-    // inside the window, far enough in to stay behind the app body (the window has
-    // transparent padding and big rounded corners)
-    const tuckedRect = (): Rectangle | null => {
-      if (!mainWindow || mainWindow.isDestroyed()) return null;
-      const b = mainWindow.getBounds();
-      const i = Math.min(SNAP_TUCK_INSET, Math.floor(b.width / 4), Math.floor(b.height / 4));
-      return { x: b.x + i, y: b.y + i, width: b.width - i * 2, height: b.height - i * 2 };
-    };
-
-    const stopPreviewAnim = () => {
-      if (previewTimer) clearTimeout(previewTimer);
-      previewTimer = null;
-    };
-
-    // `to` is re-read every frame, so a collapse follows the window while it is
-    // dragged. frames are paced to the display refresh and progress comes from the
-    // clock, so a late timer only drops a frame, it never slows the motion down
-    const animatePreview = (to: () => Rectangle | null, ms: number, ease: (t: number) => number, done?: () => void) => {
-      const preview = snapPreview;
-      if (!preview || preview.isDestroyed()) return;
-      stopPreviewAnim();
-      const from = preview.getBounds();
-      const hz = Math.min(
-        240,
-        Math.max(60, screen.getDisplayMatching(from).displayFrequency || 60),
-      );
-      const frameMs = 1000 / hz;
-      const start = performance.now();
-      let last: Rectangle | null = null;
-      const frame = () => {
-        previewTimer = null;
-        if (preview.isDestroyed()) return;
-        const target = to();
-        if (!target) return;
-        const now = performance.now();
-        const t = Math.min(1, (now - start) / ms);
-        const next = lerpRect(from, target, ease(t));
-        if (!last || next.x !== last.x || next.y !== last.y || next.width !== last.width || next.height !== last.height) {
-          preview.setBounds(next);
-          last = next;
-        }
-        if (t >= 1) {
-          done?.();
-          return;
-        }
-        // aim at the next frame boundary
-        const elapsed = now - start;
-        const wait = Math.max(1, Math.ceil(frameMs - (elapsed % frameMs)));
-        previewTimer = setTimeout(frame, wait);
-      };
-      frame();
-    };
-
-    // stack while visible: preview above other apps (they end up under the blur), ours above it
-    const raiseForSnap = () => {
-      if (!mainWindow || !snapPreview || snapPreview.isDestroyed() || previewTopmost) return;
-      previewTopmost = true;
+    const raiseMain = () => {
+      if (!mainWindow || mainWindow.isDestroyed() || mainRaised) return;
+      mainRaised = true;
       mainWasOnTop = mainWindow.isAlwaysOnTop();
-      snapPreview.setAlwaysOnTop(true, "floating");
       mainWindow.setAlwaysOnTop(true, "pop-up-menu");
-      mainWindow.moveTop();
     };
 
-    const lowerAfterSnap = () => {
-      if (!previewTopmost) return;
-      previewTopmost = false;
+    const lowerMain = () => {
+      if (!mainRaised) return;
+      mainRaised = false;
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setAlwaysOnTop(mainWasOnTop);
-      if (snapPreview && !snapPreview.isDestroyed()) snapPreview.setAlwaysOnTop(false);
     };
 
     const hidePreview = () => {
-      stopPreviewAnim();
       if (previewHideTimer) {
         clearTimeout(previewHideTimer);
         previewHideTimer = null;
       }
       if (previewVisible && snapPreview && !snapPreview.isDestroyed()) snapPreview.hide();
       previewVisible = false;
-      lowerAfterSnap();
+      lowerMain();
     };
 
     const armSnap = (display: Display) => {
       snapArmed = true;
       snapDisplay = display;
       const preview = snapPreview;
-      // not warmed up yet: still armed for drop-to-maximize, just no preview this time
+      // not ready yet: still armed for drop-to-maximize, just no preview this time
       if (!snapReady || !preview || preview.isDestroyed()) return;
       if (previewHideTimer) {
         clearTimeout(previewHideTimer);
         previewHideTimer = null;
       }
-      const area = display.workArea;
-      const target: Rectangle = {
-        x: area.x + SNAP_INSET,
-        y: area.y + SNAP_INSET,
-        width: area.width - SNAP_INSET * 2,
-        height: area.height - SNAP_INSET * 2,
-      };
+      raiseMain(); // first, so the preview can only ever appear below us
+      preview.setBounds(previewRectFor(display));
       if (!previewVisible) {
-        const tucked = tuckedRect();
-        if (!tucked) return;
-        // shown as a 1px dot under the app, raised, then grown from behind the app,
-        // so no frame ever shows the blur on top of us
-        preview.setBounds({
-          x: tucked.x + Math.floor(tucked.width / 2),
-          y: tucked.y + Math.floor(tucked.height / 2),
-          width: 1,
-          height: 1,
-        });
         preview.showInactive();
+        // top of the normal band: above every other app, still below our raised window
+        preview.moveTop();
         previewVisible = true;
-        raiseForSnap();
-        preview.setBounds(tucked);
       }
-      // (mid-collapse it simply turns around from where it is)
-      animatePreview(() => target, SNAP_GROW_MS, easeOutCubic);
     };
 
     const disarmSnap = () => {
       snapArmed = false;
       snapDisplay = null;
-      if (!previewVisible) return;
-      animatePreview(tuckedRect, SNAP_COLLAPSE_MS, easeInOutCubic, hidePreview);
+      hidePreview();
     };
 
     const settleSnap = () => {
@@ -1116,10 +1051,10 @@ if (!gotTheLock) {
       if (parked.x !== from.x || parked.y !== from.y) mainWindow.setBounds(parked);
       // the app fills the screen at once (like windows); the blur stays under it for a
       // beat so the resize never flashes the desktop through
-      stopPreviewAnim();
       mainWindow.maximize();
       syncResizable();
-      if (previewVisible) previewHideTimer = setTimeout(hidePreview, 140);
+      if (previewVisible) previewHideTimer = setTimeout(hidePreview, 120);
+      else lowerMain();
     };
 
     const trackSnap = (cursor: { x: number; y: number }) => {
