@@ -21,6 +21,10 @@ export class PlayerRuntime {
   private ttfbMs = 0;
   private activePlayPromise: Promise<void> | null = null;
   private activeBlobUrl: string | null = null;
+  // track whose audio is attached to the element right now. During a skip the old
+  // source stays attached (paused) until the next one is ready, so this can lag
+  // currentTrackId for a moment.
+  private attachedTrackId: string | null = null;
   private preloadingTrackId: string | null = null;
   private preloadingPromise: Promise<void> | null = null;
   private preloadAbortController: AbortController | null = null;
@@ -54,6 +58,9 @@ export class PlayerRuntime {
     log("cyan", "boot", `volume ${initialVolume}`);
 
     usePlayerStore.subscribe((state, prevState) => {
+      if (state.status !== prevState.status) {
+        this.syncMediaSessionState(state.status);
+      }
       if (state.volume !== prevState.volume) {
         this.cancelFade();
         if (!this.audio.paused) {
@@ -119,6 +126,21 @@ export class PlayerRuntime {
       navigator.mediaSession.setActionHandler("nexttrack", () => {
         usePlayerStore.getState().dispatch({ type: "SKIP_NEXT" });
       });
+      navigator.mediaSession.setActionHandler("stop", () => {
+        usePlayerStore.getState().dispatch({ type: "PAUSE_REQUESTED" });
+      });
+      const seekBy = (deltaSeconds: number) => {
+        const st = usePlayerStore.getState();
+        const max = st.durationMs > 0 ? st.durationMs : Number.POSITIVE_INFINITY;
+        const next = Math.min(max, Math.max(0, st.positionMs + deltaSeconds * 1000));
+        st.dispatch({ type: "SEEK_COMMITTED", positionMs: Math.round(next) });
+      };
+      navigator.mediaSession.setActionHandler("seekbackward", (details) => {
+        seekBy(-(details.seekOffset ?? 10));
+      });
+      navigator.mediaSession.setActionHandler("seekforward", (details) => {
+        seekBy(details.seekOffset ?? 10);
+      });
       navigator.mediaSession.setActionHandler("seekto", (details) => {
         if (details.seekTime !== undefined && !Number.isNaN(details.seekTime)) {
           usePlayerStore.getState().dispatch({
@@ -129,6 +151,44 @@ export class PlayerRuntime {
       });
     } catch {
       // ignore unsupported media session actions
+    }
+  }
+
+  // windows' media controls (and apps built on them, like FluentFlyout) read this.
+  // "loading" between tracks still reports playing so the session never looks finished.
+  private syncMediaSessionState(status: string) {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    try {
+      navigator.mediaSession.playbackState =
+        status === "playing" || status === "loading"
+          ? "playing"
+          : status === "paused"
+            ? "paused"
+            : "none";
+      if (status === "idle") navigator.mediaSession.metadata = null;
+    } catch {
+      // ignore unsupported environments
+    }
+  }
+
+  // progress / seek bar in the system controls
+  private syncMediaSessionPosition() {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    const ms = navigator.mediaSession as MediaSession & {
+      setPositionState?: (state?: MediaPositionState) => void;
+    };
+    if (typeof ms.setPositionState !== "function") return;
+    if (this.attachedTrackId !== this.currentTrackId) return;
+    const duration = this.audio.duration;
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    try {
+      ms.setPositionState({
+        duration,
+        playbackRate: this.audio.playbackRate > 0 ? this.audio.playbackRate : 1,
+        position: Math.min(duration, Math.max(0, this.audio.currentTime || 0)),
+      });
+    } catch {
+      // ignore invalid transient states
     }
   }
 
@@ -174,7 +234,15 @@ export class PlayerRuntime {
       if (Number.isNaN(audioEl.duration) || audioEl.duration <= 0) return;
 
       usePlayerStore.getState().setDuration(Math.round(audioEl.duration * 1000));
+      this.syncMediaSessionPosition();
     });
+
+    for (const type of ["seeked", "ratechange", "play", "pause", "loadedmetadata"]) {
+      audioEl.addEventListener(type, () => {
+        if (this.isResetting || audioEl !== this.audio) return;
+        this.syncMediaSessionPosition();
+      });
+    }
 
     audioEl.addEventListener("waiting", () => {
       if (this.isResetting || audioEl !== this.audio) return;
@@ -188,6 +256,7 @@ export class PlayerRuntime {
     audioEl.addEventListener("ended", () => {
       if (this.isResetting || audioEl !== this.audio) return;
       if (!this.currentTrackId) return;
+      if (this.attachedTrackId !== this.currentTrackId) return;
 
       // Ensure the track truly finished playing (not an empty media load or teardown artefact)
       const duration = audioEl.duration;
@@ -236,6 +305,8 @@ export class PlayerRuntime {
     audioEl.addEventListener("error", () => {
       if (this.isResetting || audioEl !== this.audio) return;
       if (!this.currentTrackId || !audioEl.src || audioEl.src === window.location.href) return;
+      // the previous track's source is still attached while the next one loads
+      if (this.attachedTrackId !== this.currentTrackId) return;
 
       const message = audioEl.error?.message || "Audio playback error";
       const code = audioEl.error?.code;
@@ -290,6 +361,7 @@ export class PlayerRuntime {
       Date.now() >= this.currentSessionExpiresAt - 15_000;
     return (
       this.currentTrackId === trackId &&
+      this.attachedTrackId === trackId &&
       Boolean(this.audio.currentSrc || this.audio.src) &&
       this.audio.src !== window.location.href &&
       !this.audio.error &&
@@ -389,10 +461,34 @@ export class PlayerRuntime {
       }
       this.audio.removeAttribute("src");
       this.audio.load();
+      this.attachedTrackId = null;
     } catch {
     } finally {
       this.isResetting = false;
     }
+  }
+
+  // between tracks: silence the old source but keep it attached until the next one
+  // is ready. Emptying the element here made Chromium drop the system media session
+  // during every skip, so Windows controls / FluentFlyout lost Liner after a track change.
+  private pauseForTransition() {
+    this.isResetting = true;
+    this.currentSessionExpiresAt = null;
+    try {
+      this.cancelFade();
+      this.audio.pause();
+    } catch {
+    } finally {
+      this.isResetting = false;
+    }
+  }
+
+  private attachSource(url: string, isBlob: boolean, trackId: string) {
+    const previousBlob = this.activeBlobUrl;
+    this.audio.src = url;
+    this.activeBlobUrl = isBlob ? url : null;
+    this.attachedTrackId = trackId;
+    if (previousBlob && previousBlob !== url) URL.revokeObjectURL(previousBlob);
   }
 
   public cancelPendingLoad(): void {
@@ -514,7 +610,7 @@ export class PlayerRuntime {
     store.setStatus("loading", null);
     store.setPosition(startPositionMs > 0 ? startPositionMs : 0);
 
-    this.safeResetAudioElement();
+    this.pauseForTransition();
 
     try {
       const cachedAudio = bypassCache ? null : await linerDb.getAudio(track.id);
@@ -536,8 +632,7 @@ export class PlayerRuntime {
         this.currentSessionExpiresAt = null;
         void linerDb.putTrack(track);
         const blobUrl = URL.createObjectURL(cachedAudio.blob);
-        this.activeBlobUrl = blobUrl;
-        this.audio.src = blobUrl;
+        this.attachSource(blobUrl, true, track.id);
         this.audio.volume = 0;
         this.audio.load();
         this.applyPlaybackRateAndPitch();
@@ -601,13 +696,8 @@ export class PlayerRuntime {
       const streamBitrate = stream.bitrate;
       this.currentSessionExpiresAt = stream.expiresAtMs;
       log("cyan", "playback", `resolved stream for ${track.title}`);
-      if (this.activeBlobUrl) {
-        URL.revokeObjectURL(this.activeBlobUrl);
-        this.activeBlobUrl = null;
-      }
       const url = stream.blob ? URL.createObjectURL(stream.blob) : stream.url;
-      if (stream.blob) this.activeBlobUrl = url;
-      this.audio.src = url;
+      this.attachSource(url, Boolean(stream.blob), track.id);
       this.audio.volume = 0;
       this.audio.load();
       this.applyPlaybackRateAndPitch();
