@@ -732,10 +732,16 @@ export const api = {
     return request<{ items: unknown[] }>(`/v1/me/library/${type}`);
   },
 
-  saveCollection(type: "albums" | "artists" | "playlists", id: string): Promise<void> {
+  // the catalog lives on the client now, so the server can't look a collection up by
+  // id any more: send what we know (name / title, cover) or the library shows a blank tile
+  saveCollection(
+    type: "albums" | "artists" | "playlists",
+    id: string,
+    snapshot?: Record<string, unknown>,
+  ): Promise<void> {
     return request<void>(
       `/v1/me/library/${type}/${encodeURIComponent(id)}`,
-      { method: "PUT" },
+      { method: "PUT", ...(snapshot ? { body: JSON.stringify({ snapshot }) } : {}) },
     );
   },
 
