@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeDragBounds } from "./window-drag";
+import { computeDragBounds, isInTopSnapZone, restoreUnderCursor } from "./window-drag";
 
 describe("computeDragBounds", () => {
   const start = { x: 100, y: 50, width: 1200, height: 780 };
@@ -26,5 +26,45 @@ describe("computeDragBounds", () => {
   it("rounds fractional positions to whole pixels", () => {
     const b = computeDragBounds(start, { x: 0, y: 0 }, { x: 0.6, y: 0.4 });
     expect([b.x, b.y]).toEqual([101, 50]);
+  });
+});
+
+describe("isInTopSnapZone", () => {
+  const display = { x: 0, y: 0, width: 1920, height: 1080 };
+
+  it("arms on the top edge", () => {
+    expect(isInTopSnapZone({ x: 900, y: 0 }, display)).toBe(true);
+    expect(isInTopSnapZone({ x: 900, y: 2 }, display)).toBe(true);
+  });
+
+  it("stays off below the edge", () => {
+    expect(isInTopSnapZone({ x: 900, y: 3 }, display)).toBe(false);
+    expect(isInTopSnapZone({ x: 900, y: 400 }, display)).toBe(false);
+  });
+
+  it("only counts the display the cursor is on", () => {
+    const second = { x: 1920, y: 200, width: 1920, height: 1080 };
+    expect(isInTopSnapZone({ x: 2500, y: 200 }, second)).toBe(true);
+    expect(isInTopSnapZone({ x: 900, y: 0 }, second)).toBe(false);
+  });
+});
+
+describe("restoreUnderCursor", () => {
+  const maximized = { x: 0, y: 0, width: 1920, height: 1040 };
+  const size = { width: 1200, height: 780 };
+
+  it("keeps the cursor at the same relative x", () => {
+    const r = restoreUnderCursor(maximized, size, { x: 960, y: 12 });
+    expect(r).toEqual({ x: 360, y: 0, width: 1200, height: 780 });
+  });
+
+  it("works at the far right", () => {
+    const r = restoreUnderCursor(maximized, size, { x: 1920, y: 12 });
+    expect(r.x + r.width).toBe(1920);
+  });
+
+  it("clamps the vertical offset into the restored height", () => {
+    const r = restoreUnderCursor(maximized, { width: 400, height: 300 }, { x: 960, y: 900 });
+    expect(r.y).toBe(900 - 299);
   });
 });
