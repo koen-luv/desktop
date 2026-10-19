@@ -6,6 +6,7 @@ import TextInput from "@/shared/ui/TextInput";
 import Select from "@/shared/ui/Select";
 import { EyeLine, EyeCloseLine, ArrowLeftLine } from "@mingcute/react";
 import WindowControls from "@/features/navigation/ui/WindowControls";
+import { useWindowState } from "@/features/navigation/hooks/useWindowState";
 import logo from "@/assets/logo.svg";
 import cloudsBanner from "@/assets/wallhaven-5g1yz8.jpg";
 import CircleDitherCanvas from "@/shared/ui/CircleDitherCanvas";
@@ -22,6 +23,9 @@ const USERNAME_RE = /^[a-z0-9_]{3,30}$/;
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  // maximized / fullscreen: square, borderless, edge to edge (same as the main app frame)
+  const { isEdgeToEdge } = useWindowState();
+  const frameShape = isEdgeToEdge ? "rounded-none" : "rounded-5xl";
   const login = useAuthStore((state) => state.login);
   const register = useAuthStore((state) => state.register);
   const { locale, setLocale, t } = useTranslation();
@@ -171,8 +175,12 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-5xl border border-border-primary bg-bg-primary">
-      <div className="absolute inset-0 z-0 select-none overflow-hidden rounded-5xl">
+    <main
+      className={`relative flex h-full w-full items-center justify-center overflow-hidden ${frameShape} ${
+        isEdgeToEdge ? "border-0" : "border border-border-primary"
+      } bg-bg-primary`}
+    >
+      <div className={`absolute inset-0 z-0 select-none overflow-hidden ${frameShape}`}>
         <CircleDitherCanvas
           src={cloudsBanner}
           alt="Clouds Dither Background"
@@ -182,7 +190,7 @@ export default function LoginPage() {
           cornerRadius={12}
           gridType="square"
           objectFit="cover"
-          className="h-full w-full rounded-5xl overflow-hidden"
+          className={`h-full w-full ${frameShape} overflow-hidden`}
         />
       </div>
 
