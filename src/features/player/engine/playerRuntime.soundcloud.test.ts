@@ -103,5 +103,6 @@ describe("PlayerRuntime with soundcloud streams", () => {
     expect(audio.getAttribute("src")).toBe("blob:second");
     expect(playerRuntime!.hasLoadedSourceFor("sc:202")).toBe(true);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:first");
-  });
+    // two full loads; each waits up to 3s for a canplay jsdom never fires
+  }, 20_000);
 });
