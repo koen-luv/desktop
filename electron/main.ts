@@ -41,7 +41,7 @@ import { createBundleErrorStamp } from "./bundle-stamp.js";
 import { createSleepBlocker } from "./sleep-blocker.js";
 import { createShutdown } from "./shutdown.js";
 import { computeDragBounds, isInTopSnapZone, restoreUnderCursor } from "./window-drag.js";
-import { loadSnapPreviewAddon, NativeSnapPreview } from "./snap-native.js";
+import { isWindows11, loadSnapPreviewAddon, NativeSnapPreview } from "./snap-native.js";
 import { DiscordRpcManager } from "./discord.js";
 import { PoTokenService } from "./potoken.js";
 
@@ -103,16 +103,26 @@ function syncResizable() {
   if (mainWindow.isResizable() === locked) mainWindow.setResizable(!locked);
 }
 
+// maximize / restore: on windows 11 with the native add-on, a vsync-paced morph of a
+// live thumbnail (see NativeSnapPreview.morph); otherwise instant
 function maximizeWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  mainWindow.maximize();
-  syncResizable();
+  const resize = () => {
+    mainWindow?.maximize();
+    syncResizable();
+  };
+  if (nativeSnap) nativeSnap.morph(resize);
+  else resize();
 }
 
 function unmaximizeWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  mainWindow.unmaximize();
-  syncResizable();
+  const resize = () => {
+    mainWindow?.unmaximize();
+    syncResizable();
+  };
+  if (nativeSnap) nativeSnap.morph(resize);
+  else resize();
 }
 
 // single owner of "the app is going away": releases the overlay, shortcuts,
@@ -420,6 +430,14 @@ if (!gotTheLock) {
       RENDERER_DIST,
     );
     overlayManager.setMainWindow(mainWindow);
+    // F in the overlay: the window grows back out of the pill (windows 11 + add-on)
+    overlayManager.setFocusMainHandler((restore) => {
+      const overlay = overlayManager;
+      if (nativeSnap && overlay) {
+        overlay.holdForTransition(); // it is closed (hidden) once the transform lands
+        void nativeSnap.fromOverlay(overlay.getWindow(), restore, () => overlay.closeOverlay());
+      } else restore();
+    });
     overlayManager.registerShortcut();
 
     discordRpcManager = new DiscordRpcManager();
@@ -435,6 +453,15 @@ if (!gotTheLock) {
     ipcMain.handle("window:minimize", () => {
       // cannot minimize a native fullscreen window or under hyprland tiling wm
       if (!mainWindow || mainWindow.isFullScreen() || isHyprland) return;
+      // windows 11 + add-on: the window flies into the overlay pill it is about to become
+      if (nativeSnap && overlayManager?.willShowOnMinimize()) {
+        const overlay = overlayManager;
+        void nativeSnap.toOverlay(
+          (beforeShow) => overlay.openForTransition(beforeShow),
+          () => mainWindow?.minimize(),
+        );
+        return;
+      }
       mainWindow.minimize();
     });
 
@@ -890,6 +917,7 @@ if (!gotTheLock) {
     // on scaled / mixed-dpi windows displays rounds the size and grows the window
     // (see window-drag.ts)
     let dragStartCursor: { x: number; y: number } | null = null;
+    let dragging = false; // between the renderer's drag-start and drag-end
     let dragStartBounds: { x: number; y: number; width: number; height: number } | null = null;
 
     const beginDrag = () => {
@@ -910,7 +938,8 @@ if (!gotTheLock) {
     // the drag never pays for it either: no screen capture, the preview is a bare
     // native window created (and primed) in the background after startup, and per
     // drag move only a couple of cheap checks run.
-    const snapEnabled = process.platform === "win32";
+    // a windows 11 exclusive (elsewhere dragging to the top just moves the window)
+    const snapEnabled = isWindows11();
     // acrylic needs windows 11 22h2 (build 22621)+; older builds get a flat tint
     const acrylicSupported = snapEnabled && Number(os.release().split(".")[2] ?? 0) >= 22621;
     const SNAP_RELEASE_PX = 24; // armed snap holds until the cursor is this far below the edge
@@ -994,9 +1023,11 @@ if (!gotTheLock) {
           });
           if (nativeSnap) {
             nativeSnap.prime(screen.getPrimaryDisplay());
+            overlayManager?.enablePrewarm(); // the first hand-off to the overlay starts at once
             return;
           }
         }
+        if (!addon) console.warn("[snap-preview] native add-on not available (using the plain preview)");
         // fallback: a plain acrylic window, shown / hidden without animation
         try {
           createSnapPreview();
@@ -1083,12 +1114,18 @@ if (!gotTheLock) {
         y: Math.max(from.y, area.y),
       };
       if (parked.x !== from.x || parked.y !== from.y) mainWindow.setBounds(parked);
-      // the app fills the screen at once (like windows); the blur stays under it for a
-      // beat so the resize never flashes the desktop through
+      // the window morphs into the screen over the blur (native add-on), or fills it at
+      // once with the plain fallback preview
+      if (nativeSnap) {
+        nativeSnap.morph(() => {
+          mainWindow?.maximize();
+          syncResizable();
+        });
+        return;
+      }
       mainWindow.maximize();
       syncResizable();
-      if (nativeSnap) nativeSnap.dropped();
-      else if (previewVisible) previewHideTimer = setTimeout(hidePreview, 120);
+      if (previewVisible) previewHideTimer = setTimeout(hidePreview, 120);
       else lowerMain();
     };
 
@@ -1112,24 +1149,36 @@ if (!gotTheLock) {
     const restoreForDrag = () => {
       if (!mainWindow) return;
       const maximized = mainWindow.getBounds();
-      const cursor = screen.getCursorScreenPoint();
       const normal = mainWindow.getNormalBounds();
-      mainWindow.unmaximize();
-      const size =
+      const restoredSize =
         normal.width > 0 && normal.height > 0 && (normal.width < maximized.width || normal.height < maximized.height)
           ? normal
-          : mainWindow.getBounds();
-      mainWindow.setBounds(restoreUnderCursor(maximized, size, cursor));
-      syncResizable();
+          : null;
+      const targetUnderCursor = (size: { width: number; height: number }) =>
+        restoreUnderCursor(maximized, size, screen.getCursorScreenPoint());
+      const resize = () => {
+        if (!mainWindow) return;
+        mainWindow.unmaximize();
+        mainWindow.setBounds(targetUnderCursor(restoredSize ?? mainWindow.getBounds()));
+        syncResizable();
+        // the drag continues from where the window landed
+        if (dragging) beginDrag();
+      };
+      // windows 11 + add-on: the window shrinks down into place under the cursor and
+      // keeps following it (see followMorph in drag-move)
+      if (nativeSnap) nativeSnap.morphDragOut(resize);
+      else resize();
     };
 
     ipcMain.on("window:drag-start", () => {
       if (!mainWindow || mainWindow.isFullScreen()) return;
+      dragging = true;
       if (mainWindow.isMaximized()) restoreForDrag();
       beginDrag();
     });
 
     ipcMain.on("window:drag-end", () => {
+      dragging = false;
       dragStartCursor = null;
       dragStartBounds = null;
       if (snapEnabled) settleSnap();
@@ -1155,6 +1204,7 @@ if (!gotTheLock) {
       ) {
         mainWindow.setBounds(next);
       }
+      nativeSnap?.followMorph(); // restoring from maximize: keep the morph on the window
       if (snapEnabled) trackSnap(cursor);
     });
 
