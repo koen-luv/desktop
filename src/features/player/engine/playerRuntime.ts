@@ -9,6 +9,10 @@ import { pitchShifter } from "./pitchShifter";
 import { resolvePlaybackStream, type PlaybackStream } from "./streamResolver";
 import { downloadAudioBytes } from "@/shared/media/innertube";
 
+
+// error recovery tuning (see the audio "error" handler)
+const RECOVERY_HOLD_MS = 3000; // must play this far past a recovery before it may retry again
+
 export class PlayerRuntime {
   private audio: HTMLAudioElement;
   private currentTrackId: string | null = null;
@@ -31,6 +35,10 @@ export class PlayerRuntime {
   private backgroundCacheAbortController: AbortController | null = null;
   private currentSessionExpiresAt: number | null = null;
   private recoveryAttempts = 0;
+  // after a recovery, the retry budget only refills once playback gets past this
+  // position: a "playing" event alone is not proof (a bad frame further on would
+  // otherwise error -> recover -> play -> error forever, reloading every time)
+  private recoveryHoldUntilMs: number | null = null;
   public onEnded?: () => void;
   public onError?: (info: { trackId: string; message: string }) => void;
 
@@ -226,6 +234,10 @@ export class PlayerRuntime {
 
       const posMs = Math.round(audioEl.currentTime * 1000);
       usePlayerStore.getState().setPosition(posMs);
+      if (this.recoveryHoldUntilMs !== null && posMs >= this.recoveryHoldUntilMs) {
+        this.recoveryHoldUntilMs = null;
+        this.recoveryAttempts = 0;
+      }
     });
 
     audioEl.addEventListener("durationchange", () => {
@@ -272,7 +284,7 @@ export class PlayerRuntime {
     audioEl.addEventListener("playing", () => {
       if (this.isResetting || audioEl !== this.audio) return;
       log("green", "audio", "playing");
-      this.recoveryAttempts = 0;
+      if (this.recoveryHoldUntilMs === null) this.recoveryAttempts = 0;
       this.applyPlaybackRateAndPitch();
 
       if (this.stallStartTime !== null) {
@@ -334,13 +346,17 @@ export class PlayerRuntime {
 
       const store = usePlayerStore.getState();
       const currentTrack = store.currentTrack;
+      const posMs = Number.isFinite(audioEl.currentTime) && audioEl.currentTime > 0
+        ? Math.round(audioEl.currentTime * 1000)
+        : store.positionMs;
+
       if (
         currentTrack &&
         currentTrack.id === this.currentTrackId &&
         this.recoveryAttempts < 1
       ) {
         this.recoveryAttempts++;
-        const posMs = store.positionMs;
+        this.recoveryHoldUntilMs = posMs + RECOVERY_HOLD_MS;
         log("yellow", "playback", `audio error encountered — recovering via cache/stream at ${posMs}ms`);
         void this.loadAndPlay(currentTrack, posMs, true);
         return;
@@ -500,6 +516,7 @@ export class PlayerRuntime {
     this.currentTrackId = null;
     this.currentSessionExpiresAt = null;
     this.recoveryAttempts = 0;
+    this.recoveryHoldUntilMs = null;
     this.safeResetAudioElement();
     usePlayerStore.getState().setStatus("paused");
     log("cyan", "playback", "pending load cancelled");
@@ -580,6 +597,7 @@ export class PlayerRuntime {
 
     if (this.currentTrackId !== track.id) {
       this.recoveryAttempts = 0;
+      this.recoveryHoldUntilMs = null;
     }
 
     if (this.preloadingTrackId === track.id && this.preloadingPromise) {
