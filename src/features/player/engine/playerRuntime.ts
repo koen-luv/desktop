@@ -11,7 +11,8 @@ import { downloadAudioBytes } from "@/shared/media/innertube";
 
 
 // error recovery tuning (see the audio "error" handler)
-const RECOVERY_HOLD_MS = 3000; // must play this far past a recovery before it may retry again
+const RECOVERY_HOLD_MS = 3000;
+const WAITING_GRACE_MS = 300; // a buffering hiccup shorter than this never shows // must play this far past a recovery before it may retry again
 
 export class PlayerRuntime {
   private audio: HTMLAudioElement;
@@ -39,6 +40,10 @@ export class PlayerRuntime {
   // position: a "playing" event alone is not proof (a bad frame further on would
   // otherwise error -> recover -> play -> error forever, reloading every time)
   private recoveryHoldUntilMs: number | null = null;
+  // a "waiting" only becomes the loading state if it lasts: a seek inside an already
+  // loaded / cached track fires waiting -> playing within milliseconds, and flipping
+  // the status for that re-animated the play / pause button on every seek
+  private waitingTimer: ReturnType<typeof setTimeout> | null = null;
   public onEnded?: () => void;
   public onError?: (info: { trackId: string; message: string }) => void;
 
@@ -260,10 +265,26 @@ export class PlayerRuntime {
       if (this.isResetting || audioEl !== this.audio) return;
       log("yellow", "audio", "buffering (waiting)");
       this.stallStartTime = performance.now();
-      if (usePlayerStore.getState().status === "playing") {
-        usePlayerStore.getState().setStatus("loading");
-      }
+      if (this.waitingTimer) clearTimeout(this.waitingTimer);
+      this.waitingTimer = setTimeout(() => {
+        this.waitingTimer = null;
+        // still stuck: a real stall, show it
+        if (audioEl !== this.audio || audioEl.paused || audioEl.readyState >= 3) return;
+        if (usePlayerStore.getState().status === "playing") {
+          usePlayerStore.getState().setStatus("loading");
+        }
+      }, WAITING_GRACE_MS);
     });
+
+    // resumed (or never really stalled): drop a pending "loading"
+    for (const type of ["playing", "seeked", "canplay", "pause", "emptied"]) {
+      audioEl.addEventListener(type, () => {
+        if (audioEl !== this.audio || !this.waitingTimer) return;
+        if (type === "seeked" && audioEl.readyState < 3) return; // seeked but still no data
+        clearTimeout(this.waitingTimer);
+        this.waitingTimer = null;
+      });
+    }
 
     audioEl.addEventListener("ended", () => {
       if (this.isResetting || audioEl !== this.audio) return;
