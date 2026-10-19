@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeDragBounds, isInTopSnapZone, restoreUnderCursor } from "./window-drag";
+import { computeDragBounds, cubicBezier, isInTopSnapZone, lerpEdges, restoreUnderCursor, toEdges } from "./window-drag";
 
 describe("computeDragBounds", () => {
   const start = { x: 100, y: 50, width: 1200, height: 780 };
@@ -66,5 +66,32 @@ describe("restoreUnderCursor", () => {
   it("clamps the vertical offset into the restored height", () => {
     const r = restoreUnderCursor(maximized, { width: 400, height: 300 }, { x: 960, y: 900 });
     expect(r.y).toBe(900 - 299);
+  });
+});
+
+describe("snap preview geometry", () => {
+  it("converts rects to edges and interpolates them", () => {
+    const a = toEdges({ x: 10, y: 20, width: 100, height: 50 });
+    expect(a).toEqual([10, 20, 110, 70]);
+    expect(lerpEdges(a, [0, 0, 200, 100], 0.5)).toEqual([5, 10, 155, 85]);
+  });
+
+  it("cubicBezier matches the endpoints and the linear curve", () => {
+    const linear = cubicBezier(0, 0, 1, 1);
+    expect(linear(0)).toBe(0);
+    expect(linear(1)).toBe(1);
+    expect(linear(0.37)).toBeCloseTo(0.37, 4);
+  });
+
+  it("cubicBezier ease-out is ahead of linear and monotonic", () => {
+    const easeOut = cubicBezier(0.33, 1, 0.68, 1);
+    let prev = 0;
+    for (let i = 1; i <= 20; i++) {
+      const t = i / 20;
+      const v = easeOut(t);
+      expect(v).toBeGreaterThanOrEqual(prev);
+      if (t < 1) expect(v).toBeGreaterThan(t);
+      prev = v;
+    }
   });
 });

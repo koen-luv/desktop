@@ -41,6 +41,7 @@ import { createBundleErrorStamp } from "./bundle-stamp.js";
 import { createSleepBlocker } from "./sleep-blocker.js";
 import { createShutdown } from "./shutdown.js";
 import { computeDragBounds, isInTopSnapZone, restoreUnderCursor } from "./window-drag.js";
+import { loadSnapPreviewAddon, NativeSnapPreview } from "./snap-native.js";
 import { DiscordRpcManager } from "./discord.js";
 import { PoTokenService } from "./potoken.js";
 
@@ -93,6 +94,8 @@ const execFile = ((...args: Parameters<typeof nodeExecFile>) => {
 // single owner of "the app is going away": releases the overlay, shortcuts,
 // translucent "drop to maximize" preview shown while dragging to the top edge
 let snapPreview: BaseWindow | null = null;
+// compositor-driven preview (native add-on); preferred over snapPreview when built
+let nativeSnap: NativeSnapPreview | null = null;
 
 function syncResizable() {
   if (process.platform !== "win32" || !mainWindow || mainWindow.isDestroyed()) return;
@@ -126,6 +129,8 @@ const shutdown = createShutdown({
     () => {
       if (snapPreview && !snapPreview.isDestroyed()) snapPreview.destroy();
       snapPreview = null;
+      nativeSnap?.destroy();
+      nativeSnap = null;
     },
     () => {
       poTokenService?.destroy();
@@ -334,6 +339,8 @@ function createWindow() {
     // a hidden drag-snap preview would otherwise keep window-all-closed from firing
     if (snapPreview && !snapPreview.isDestroyed()) snapPreview.destroy();
     snapPreview = null;
+    nativeSnap?.destroy();
+    nativeSnap = null;
     poTokenService?.destroy();
     mainWindow = null;
     if (process.platform === "darwin") {
@@ -973,6 +980,24 @@ if (!gotTheLock) {
           setTimeout(warmUp, 1000);
           return;
         }
+        // preferred: the compositor-driven native preview (smooth, no per-frame work)
+        const addon = loadSnapPreviewAddon(process.env.APP_ROOT ?? path.join(__dirname, ".."));
+        if (addon) {
+          nativeSnap = NativeSnapPreview.create(addon, () => mainWindow, {
+            insetDip: SNAP_INSET,
+            tuckInsetDip: 20,
+            radiusDip: 8,
+            growMs: 220,
+            collapseMs: 240,
+            tint: 0x29808080,
+            tintNoBlur: 0x9a767676,
+          });
+          if (nativeSnap) {
+            nativeSnap.prime(screen.getPrimaryDisplay());
+            return;
+          }
+        }
+        // fallback: a plain acrylic window, shown / hidden without animation
         try {
           createSnapPreview();
         } catch {
@@ -1008,6 +1033,10 @@ if (!gotTheLock) {
     const armSnap = (display: Display) => {
       snapArmed = true;
       snapDisplay = display;
+      if (nativeSnap) {
+        nativeSnap.arm(display);
+        return;
+      }
       const preview = snapPreview;
       // not ready yet: still armed for drop-to-maximize, just no preview this time
       if (!snapReady || !preview || preview.isDestroyed()) return;
@@ -1028,6 +1057,10 @@ if (!gotTheLock) {
     const disarmSnap = () => {
       snapArmed = false;
       snapDisplay = null;
+      if (nativeSnap) {
+        nativeSnap.collapse();
+        return;
+      }
       hidePreview();
     };
 
@@ -1035,6 +1068,7 @@ if (!gotTheLock) {
       const display = snapEnabled && snapArmed ? snapDisplay : null;
       if (!display || !mainWindow || mainWindow.isDestroyed() || mainWindow.isMaximized()) {
         if (snapArmed || previewVisible) disarmSnap();
+        else nativeSnap?.follow();
         return;
       }
       snapArmed = false;
@@ -1053,7 +1087,8 @@ if (!gotTheLock) {
       // beat so the resize never flashes the desktop through
       mainWindow.maximize();
       syncResizable();
-      if (previewVisible) previewHideTimer = setTimeout(hidePreview, 120);
+      if (nativeSnap) nativeSnap.dropped();
+      else if (previewVisible) previewHideTimer = setTimeout(hidePreview, 120);
       else lowerMain();
     };
 
@@ -1067,6 +1102,8 @@ if (!gotTheLock) {
         if (!snapArmed || snapDisplay?.id !== display.id) armSnap(display);
       } else if (snapArmed) {
         disarmSnap();
+      } else {
+        nativeSnap?.follow(); // collapsing: keep the box on the window
       }
     };
 
