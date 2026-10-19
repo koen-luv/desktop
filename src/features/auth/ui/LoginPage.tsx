@@ -290,7 +290,7 @@ export default function LoginPage() {
                     : t("login.profile_setup_subtitle")}
               </p>
 
-              <form onSubmit={submit} className="mt-[20px] flex flex-col">
+              <form noValidate onSubmit={submit} className="mt-[20px] flex flex-col">
                 <AnimatePresence initial={false}>
                   {mode === "login" || registerStep === 1 ? (
                     <motion.div
