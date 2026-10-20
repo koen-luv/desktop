@@ -52,12 +52,6 @@ export interface LinerElectronApi {
   dragStart: () => void;
   dragMove: (deltaX: number, deltaY: number) => void;
   dragEnd: () => void;
-  signRequest: (input: { method: string; path: string; body?: string | null; timestamp?: number }) => Promise<{
-    signature?: string;
-    timestamp?: number;
-    nonce?: string;
-    error?: string;
-  }>;
   signMonitorRequest: (input: { method: string; path: string; body?: string | null; timestamp?: number }) => Promise<{
     signature?: string;
     timestamp?: number;
@@ -180,7 +174,6 @@ const api: LinerElectronApi = {
   dragEnd: () => {
     ipcRenderer.send("window:drag-end");
   },
-  signRequest: (input) => ipcRenderer.invoke("signer:sign-request", input),
   signMonitorRequest: (input) => ipcRenderer.invoke("signer:sign-monitor-request", input),
   syncServerTime: (dateHeaderOrMs) => ipcRenderer.invoke("signer:sync-time", dateHeaderOrMs),
   getServerTimeOffset: () => ipcRenderer.invoke("signer:get-time-offset"),
