@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, toClientTrack } from "@/shared/api";
+import { api, toClientTrack, getAuthSession } from "@/shared/api";
 import type { PopularItem } from "./usePopularTracks";
 
 export const recentlyPlayedKeys = {
@@ -9,16 +9,21 @@ export const recentlyPlayedKeys = {
 const cache = new Map<string, { data: PopularItem[]; timestamp: number }>();
 const CACHE_TTL = 60_000;
 
+function cacheKey(limit: number): string {
+  return `recent_${getAuthSession()?.user?.id ?? ""}_${limit}`;
+}
+
 export function useRecentlyPlayed(limit = 20) {
   const [data, setData] = useState<PopularItem[]>(
-    () => cache.get(`recent_${limit}`)?.data ?? [],
+    () => cache.get(cacheKey(limit))?.data ?? [],
   );
   const [isLoading, setIsLoading] = useState(
-    () => !cache.has(`recent_${limit}`),
+    () => !cache.has(cacheKey(limit)),
   );
 
   useEffect(() => {
-    const cached = cache.get(`recent_${limit}`);
+    const key = cacheKey(limit);
+    const cached = cache.get(key);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
       setData(cached.data);
       setIsLoading(false);
@@ -74,7 +79,7 @@ export function useRecentlyPlayed(limit = 20) {
             break;
           }
         }
-        cache.set(`recent_${limit}`, { data: items, timestamp: Date.now() });
+        cache.set(key, { data: items, timestamp: Date.now() });
         setData(items);
       })
       .catch(() => {
