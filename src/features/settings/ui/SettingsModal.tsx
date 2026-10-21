@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef, type ComponentType } from "react";
 import { motion } from "framer-motion";
-import { CloseLine, Search2Line, CloseCircleFill, ExitLine, ArrowLeftLine, RightLine, DiscordFill, KeyboardLine } from "@mingcute/react";
+import { CloseLine, Search2Line, CloseCircleFill, ExitLine, ArrowLeftLine, RightLine, DiscordFill, KeyboardLine, MusicLine } from "@mingcute/react";
 import {
   Play,
   Palette,
@@ -28,6 +28,7 @@ import {
   AboutTab,
   OverlayTab,
   DiscordTab,
+  LastFmTab,
 } from "./tabs";
 
 /**
@@ -43,6 +44,7 @@ type SectionId =
   | "Shortcuts"
   | "Overlay"
   | "Discord"
+  | "LastFm"
   | "Appearance"
   | "Customization"
   | "Audio"
@@ -56,6 +58,7 @@ const SECTION_ICONS: Record<SectionId, typeof Play> = {
   Shortcuts: KeyboardLine,
   Overlay: Widget5,
   Discord: DiscordFill,
+  LastFm: MusicLine,
   Appearance: Palette,
   Customization: Gallery,
   Audio: HeadphonesRound,
@@ -68,6 +71,7 @@ const SECTION_COMPONENTS: Record<SectionId, ComponentType<{ searchQuery?: string
   Shortcuts: ShortcutsTab,
   Overlay: OverlayTab,
   Discord: DiscordTab,
+  LastFm: LastFmTab,
   Appearance: AppearanceTab,
   Customization: CustomizationTab,
   Audio: AudioTab,
@@ -76,7 +80,7 @@ const SECTION_COMPONENTS: Record<SectionId, ComponentType<{ searchQuery?: string
 };
 
 const CATEGORIES: { id: CategoryId; group: GroupId; sections: SectionId[] }[] = [
-  { id: "playback", group: "preferences", sections: ["Playback", "Shortcuts", "Audio"] },
+  { id: "playback", group: "preferences", sections: ["Playback", "Shortcuts", "Audio", "LastFm"] },
   { id: "appearance", group: "preferences", sections: ["Appearance", "Customization"] },
   { id: "overlay", group: "preferences", sections: ["Overlay", "Discord"] },
   { id: "storage", group: "application", sections: ["Storage"] },
@@ -121,6 +125,12 @@ const SETTING_ITEMS: { sectionId: SectionId; titleKey: string; descKey?: string;
   { sectionId: "Discord", titleKey: "settings.discord.show_button.title", descKey: "settings.discord.show_button.description" },
   { sectionId: "Discord", titleKey: "settings.discord.show_download_button.title", descKey: "settings.discord.show_download_button.description" },
 
+  // Last.fm
+  { sectionId: "LastFm", titleKey: "settings.lastfm.enable.title", descKey: "settings.lastfm.enable.description" },
+  { sectionId: "LastFm", titleKey: "settings.lastfm.api_key.title", descKey: "settings.lastfm.api_key.description" },
+  { sectionId: "LastFm", titleKey: "settings.lastfm.api_secret.title", descKey: "settings.lastfm.api_secret.description" },
+  { sectionId: "LastFm", titleKey: "settings.lastfm.account.title", descKey: "settings.lastfm.account.description" },
+
   // Appearance
   { sectionId: "Appearance", titleKey: "settings.language.label", descKey: "settings.language.description" },
   { sectionId: "Appearance", titleKey: "settings.theme.title", descKey: "settings.theme.description" },
@@ -150,6 +160,7 @@ const SECTION_LABEL_KEYS: Record<SectionId, string> = {
   Shortcuts: "settings.tabs.shortcuts",
   Overlay: "settings.tabs.overlay",
   Discord: "settings.tabs.discord",
+  LastFm: "settings.tabs.lastfm",
   Appearance: "settings.theme.title",
   Customization: "settings.tabs.customization",
   Audio: "settings.tabs.audio",
@@ -162,6 +173,7 @@ const SECTION_DESC_KEYS: Record<SectionId, string> = {
   Shortcuts: "settings.shortcuts.description",
   Overlay: "settings.overlay.description",
   Discord: "settings.discord.description",
+  LastFm: "settings.lastfm.description",
   Appearance: "settings.theme.description",
   Customization: "settings.customization.description",
   Audio: "settings.audio.description",
@@ -223,6 +235,7 @@ export default function SettingsModal() {
     Shortcuts: t("settings.tabs.shortcuts") || "Shortcuts",
     Overlay: t("settings.tabs.overlay") || "Overlay",
     Discord: t("settings.tabs.discord") || "Discord RPC",
+    LastFm: t("settings.tabs.lastfm") || "Last.fm",
     Appearance: t("settings.tabs.appearance"),
     Customization: t("settings.tabs.customization") || "Customization",
     Audio: t("settings.tabs.audio"),
@@ -235,6 +248,7 @@ export default function SettingsModal() {
     Shortcuts: t("settings.shortcuts.description") || "System-wide and player keyboard shortcuts.",
     Overlay: t("settings.overlay.description") || "Desktop overlay behavior, position and lyrics display.",
     Discord: t("settings.discord.description") || "Show what you're listening to on Discord with artwork, artist badge and progress bar.",
+    LastFm: t("settings.lastfm.description") || "Scrobble what you listen to to your Last.fm profile.",
     Appearance: t("settings.theme.description"),
     Customization: t("settings.customization.description") || "Window background wallpaper, transparency and block blur effects.",
     Audio: t("settings.audio.description"),

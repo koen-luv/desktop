@@ -4,7 +4,6 @@ import {
   signCoverUrl as wasmSignCoverUrl,
   signMonitorRequest as wasmSignMonitorRequest,
   signRawPayload as wasmSignRawPayload,
-  signRequest as wasmSignRequest,
   syncServerTime as wasmSyncServerTime,
 } from "./signerWasm";
 
@@ -41,6 +40,13 @@ export interface LinerAndroidBridge {
    * { id, success, filePath?, error? }.
    */
   downloadAudio(requestId: string, url: string, filename: string, mimeType: string): void;
+  /**
+   * Answers a pending Android Auto browse query. The native side emits an
+   * `autoBrowseQuery` event carrying { id, kind, arg }; the renderer replies
+   * through this method with { items: [{ id, title, subtitle, artwork,
+   * playable }] }.
+   */
+  autoBrowseResponse(requestId: string, payloadJson: string): void;
   openAppStorageSettings(): void;
   openDownloads(): void;
   clearCoversCache(): boolean;
@@ -68,14 +74,16 @@ export interface LinerAndroidBridge {
   requestNotificationPermission(): void;
   setKeepScreenOn(on: boolean): void;
   /**
-   * Configures Discord Rich Presence (application id + master switch).
-   * Kotlin talks WebSocket to the signed-in Discord client's local RPC
-   * endpoint — the Android counterpart of the Electron main-process client.
+   * Discord Rich Presence state updates (the renderer sends raw state payloads;
+   * the native side builds the activity). Kotlin talks WebSocket to the
+   * signed-in Discord client's local RPC endpoint — the Android counterpart of
+   * the Electron main-process client (electron/discord.ts).
    */
-  discordRpcConfigure(clientId: string, enabled: boolean): void;
-  /** Sets the profile activity from its JSON string (a serialized DiscordActivity). */
-  discordRpcSetPresence(activityJson: string): void;
-  discordRpcClear(): void;
+  discordUpdateState(payloadJson: string): void;
+  /** Settings patch (JSON-serialized Partial<DiscordRpcSettings>). */
+  discordUpdateSettings(settingsJson: string): void;
+  /** Current RPC connection status as JSON: `{ connected, username? }`. */
+  discordGetStatus(): string;
 }
 
 export type NativeMediaCommand =
@@ -244,14 +252,6 @@ export function installAndroidPlatform(): void {
   const compatibility: Partial<LinerElectronApi> = {
     platform: "android",
     isHyprland: false,
-    signRequest: async (input) => {
-      try {
-        return wasmSignRequest(input);
-      } catch (err) {
-        console.error("[Signer] Android signer error:", err);
-        return { error: String(err instanceof Error ? err.message : err) };
-      }
-    },
     signMonitorRequest: async (input) => {
       try {
         return wasmSignMonitorRequest(input);
@@ -322,15 +322,18 @@ export function installAndroidPlatform(): void {
       deeplinkListeners.add(cb);
       return () => deeplinkListeners.delete(cb);
     },
-    // Discord Rich Presence: same contract as the Electron preload, served by
-    // the Kotlin WebSocket client (DiscordRpc.kt). The activity object is
+    // Discord Rich Presence: same contract as the Electron preload (discord.ts),
+    // served by the Kotlin WebSocket client (DiscordRpc.kt). Payloads are
     // stringified here because @JavascriptInterface methods take plain types.
-    discordRpcConfigure: (clientId, enabled) => bridge.discordRpcConfigure(clientId, enabled),
-    discordRpcSetPresence: (activity) => {
-      if (activity) bridge.discordRpcSetPresence(JSON.stringify(activity));
-      else bridge.discordRpcClear();
+    discordUpdateState: (state) => bridge.discordUpdateState(JSON.stringify(state ?? null)),
+    discordUpdateSettings: (settings) => bridge.discordUpdateSettings(JSON.stringify(settings ?? null)),
+    getDiscordStatus: async () => {
+      try {
+        return JSON.parse(bridge.discordGetStatus()) as { connected: boolean; username?: string };
+      } catch {
+        return { connected: false };
+      }
     },
-    discordRpcClear: () => bridge.discordRpcClear(),
   };
 
   window.linerElectron = compatibility as LinerElectronApi;

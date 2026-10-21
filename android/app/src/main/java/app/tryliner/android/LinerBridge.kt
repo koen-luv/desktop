@@ -100,6 +100,16 @@ class LinerBridge(private val activity: MainActivity) {
         }
     }
 
+    /**
+     * Answers a pending Android Auto browse query (see AutoBrowse.query). The
+     * WebView replies on its JavaScript thread; the future completion is
+     * thread-safe.
+     */
+    @JavascriptInterface
+    fun autoBrowseResponse(requestId: String, payloadJson: String) {
+        AutoBrowse.deliver(requestId, payloadJson)
+    }
+
     private fun executeHttpRequest(
         requestId: String,
         method: String,
@@ -500,23 +510,24 @@ class LinerBridge(private val activity: MainActivity) {
     // ── Discord Rich Presence ──────────────────────────────────────────────
 
     /**
-     * Configures the Discord RPC client (application id + master switch).
-     * Mirrors the Electron preload's `discordRpcConfigure` so the renderer's
-     * settings store and sync hook run unchanged on Android.
+     * Player state payload (a serialized DiscordRpcStatePayload) mirrored to
+     * Discord by the Kotlin RPC client. Same contract as the Electron
+     * preload's `discordUpdateState`.
      */
     @JavascriptInterface
-    fun discordRpcConfigure(clientId: String, enabled: Boolean) {
-        DiscordRpc.configure(clientId, enabled)
+    fun discordUpdateState(payloadJson: String) {
+        DiscordRpc.updateState(payloadJson)
     }
 
-    /** Sets the profile activity from its JSON string (the pre-serialized DiscordActivity). */
+    /** Settings patch (a serialized Partial<DiscordRpcSettings>). */
     @JavascriptInterface
-    fun discordRpcSetPresence(activityJson: String) {
-        DiscordRpc.setPresence(activityJson)
+    fun discordUpdateSettings(settingsJson: String) {
+        DiscordRpc.updateSettings(settingsJson)
     }
 
+    /** Current RPC connection status as JSON: `{ connected, username? }`. */
     @JavascriptInterface
-    fun discordRpcClear() {
-        DiscordRpc.clear()
+    fun discordGetStatus(): String {
+        return DiscordRpc.getStatus()
     }
 }

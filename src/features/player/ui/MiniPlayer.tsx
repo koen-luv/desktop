@@ -829,10 +829,8 @@ function MiniPlayer({
             >
               {isLoading ? (
                 <span className="h-[16px] w-[16px] animate-spin rounded-full border-[2px] border-current border-t-transparent" />
-              ) : isPlaying ? (
-                <Pause size={16} weight="Bold" />
               ) : (
-                <Play size={16} weight="Bold" className="translate-x-[1px]" />
+                <PlayerMorphIcon icon={isPlaying ? ICON_PAUSE : ICON_PLAY} size={16} />
               )}
             </button>
             <button

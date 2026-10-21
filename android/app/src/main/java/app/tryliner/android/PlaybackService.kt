@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -15,14 +16,23 @@ import androidx.media.app.NotificationCompat.MediaStyle
 import android.support.v4.media.session.MediaSessionCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.DefaultMediaNotificationProvider
+import androidx.media3.session.LibraryResult
+import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
+import com.google.common.collect.ImmutableList
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.MoreExecutors
+import org.json.JSONObject
 import java.util.concurrent.Executors
 
 /**
@@ -30,10 +40,16 @@ import java.util.concurrent.Executors
  * buffering, stream errors and metadata; MediaSession exposes the lock screen,
  * Bluetooth and Android Auto controllers while this service renders the media
  * notification itself so track info and controls are always present.
+ *
+ * It is a [MediaLibraryService] so MediaBrowser clients (Android Auto, Android
+ * TV, Bluetooth sources) can browse Recents/Playlists/Queue and search. The
+ * browse tree is served from the WebView renderer through [AutoBrowse]; play
+ * requests funnel into [MediaSession.Callback.onSetMediaItems], where URI-less
+ * items are play intents that the renderer resolves with the real stream.
  */
-class PlaybackService : MediaSessionService() {
+class PlaybackService : MediaLibraryService() {
     private var player: ExoPlayer? = null
-    private var session: MediaSession? = null
+    private var session: MediaLibrarySession? = null
     private val handler = Handler(Looper.getMainLooper())
     private var idleCheck: Runnable? = null
     private val artworkExecutor = Executors.newSingleThreadExecutor()
@@ -98,30 +114,7 @@ class PlaybackService : MediaSessionService() {
         player = exoPlayer
 
         val forwarding = LinerForwardingPlayer(exoPlayer)
-        val mediaSession = MediaSession.Builder(this, forwarding)
-            .setCallback(object : MediaSession.Callback {
-                override fun onMediaButtonEvent(
-                    session: MediaSession,
-                    controllerInfo: MediaSession.ControllerInfo,
-                    intent: Intent,
-                ): Boolean {
-                    if (intent.action == Intent.ACTION_MEDIA_BUTTON) {
-                        @Suppress("DEPRECATION")
-                        val event = intent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT)
-                        when (event?.keyCode) {
-                            KeyEvent.KEYCODE_MEDIA_NEXT -> {
-                                emitMediaCommand("next")
-                                return true
-                            }
-                            KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
-                                emitMediaCommand("previous")
-                                return true
-                            }
-                        }
-                    }
-                    return super.onMediaButtonEvent(session, controllerInfo, intent)
-                }
-            })
+        val mediaSession = MediaLibrarySession.Builder(this, forwarding, libraryCallback)
             .build()
         session = mediaSession
 
@@ -154,7 +147,254 @@ class PlaybackService : MediaSessionService() {
         PlaybackHolder.attach(this, exoPlayer, mediaSession)
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session
+
+    /**
+     * Serves the browse tree to MediaBrowser clients. Roots and folders are
+     * static; leaf content is queried from the renderer through [AutoBrowse]
+     * and cached per served media id so [onGetItem] can answer synchronously.
+     */
+    private val libraryCallback = object : MediaLibrarySession.Callback {
+        override fun onMediaButtonEvent(
+            session: MediaSession,
+            controllerInfo: MediaSession.ControllerInfo,
+            intent: Intent,
+        ): Boolean {
+            if (intent.action == Intent.ACTION_MEDIA_BUTTON) {
+                @Suppress("DEPRECATION")
+                val event = intent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT)
+                when (event?.keyCode) {
+                    KeyEvent.KEYCODE_MEDIA_NEXT -> {
+                        emitMediaCommand("next")
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
+                        emitMediaCommand("previous")
+                        return true
+                    }
+                }
+            }
+            return super.onMediaButtonEvent(session, controllerInfo, intent)
+        }
+
+        override fun onGetLibraryRoot(
+            session: MediaLibrarySession,
+            controllerInfo: MediaSession.ControllerInfo,
+            params: MediaLibraryService.LibraryParams?,
+        ): ListenableFuture<LibraryResult<MediaItem>> =
+            Futures.immediateFuture(LibraryResult.ofItem(rootItem(), null))
+
+        override fun onGetChildren(
+            session: MediaLibrarySession,
+            controllerInfo: MediaSession.ControllerInfo,
+            mediaId: String,
+            page: Int,
+            pageSize: Int,
+            params: MediaLibraryService.LibraryParams?,
+        ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
+            when (mediaId) {
+                AutoBrowse.ROOT_ID ->
+                    return Futures.immediateFuture(LibraryResult.ofItemList(topLevelFolders(), null))
+                AutoBrowse.RECENTS_ID ->
+                    return rendererChildren(AutoBrowse.query("recents", ""))
+                AutoBrowse.PLAYLISTS_ID ->
+                    return rendererChildren(AutoBrowse.query("playlists", ""))
+                AutoBrowse.QUEUE_ID ->
+                    return rendererChildren(AutoBrowse.query("queue", ""))
+            }
+            if (mediaId.startsWith(AutoBrowse.PLAYLIST_PREFIX)) {
+                return rendererChildren(
+                    AutoBrowse.query("playlist", mediaId.removePrefix(AutoBrowse.PLAYLIST_PREFIX)),
+                )
+            }
+            return Futures.immediateFuture(
+                LibraryResult.ofItemList(ImmutableList.of(), null),
+            )
+        }
+
+        override fun onGetItem(
+            session: MediaLibrarySession,
+            controllerInfo: MediaSession.ControllerInfo,
+            mediaId: String,
+        ): ListenableFuture<LibraryResult<MediaItem>> {
+            val item = servedItem(mediaId)
+                ?: if (mediaId == AutoBrowse.ROOT_ID) rootItem() else null
+            return Futures.immediateFuture(
+                if (item != null) {
+                    LibraryResult.ofItem(item, null)
+                } else {
+                    LibraryResult.ofError(LibraryResult.RESULT_ERROR_BAD_VALUE)
+                },
+            )
+        }
+
+        override fun onSearch(
+            session: MediaLibrarySession,
+            controllerInfo: MediaSession.ControllerInfo,
+            query: String,
+            params: MediaLibraryService.LibraryParams?,
+        ): ListenableFuture<LibraryResult<Void>> =
+            Futures.transform(
+                rendererSearch(query),
+                { LibraryResult.ofVoid() },
+                MoreExecutors.directExecutor(),
+            )
+
+        override fun onGetSearchResult(
+            session: MediaLibrarySession,
+            controllerInfo: MediaSession.ControllerInfo,
+            query: String,
+            page: Int,
+            pageSize: Int,
+            params: MediaLibraryService.LibraryParams?,
+        ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
+            if (lastSearchQuery == query) {
+                return Futures.immediateFuture(LibraryResult.ofItemList(lastSearchItems, null))
+            }
+            return rendererSearch(query)
+        }
+
+        /**
+         * media3 converts Android Auto's playFromMediaId and playFromSearch
+         * into a setMediaItems call: URI-less items carry the mediaId (or the
+         * search query in requestMetadata) and are play intents for the
+         * renderer, which owns stream resolution and the queue. Returning an
+         * empty timeline acknowledges the intent without touching the real
+         * player; the renderer loads the stream through the normal pipeline.
+         * Controllers that pass real stream URIs keep the standard path.
+         */
+        override fun onSetMediaItems(
+            session: MediaSession,
+            controllerInfo: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>,
+            startIndex: Int,
+            startPositionMs: Long,
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+            if (mediaItems.isNotEmpty() && mediaItems.all { it.localConfiguration?.uri != null }) {
+                return super.onSetMediaItems(
+                    session,
+                    controllerInfo,
+                    mediaItems,
+                    startIndex,
+                    startPositionMs,
+                )
+            }
+            val first = mediaItems.firstOrNull()
+            val mediaId = first?.mediaId?.takeIf { it.isNotBlank() }
+            val searchQuery = first?.requestMetadata?.searchQuery?.takeIf { it.isNotBlank() }
+            val payload = JSONObject()
+            when {
+                mediaId != null -> payload.put("mediaId", mediaId)
+                searchQuery != null -> payload.put("query", searchQuery)
+                else -> return Futures.immediateFuture(emptyTimeline())
+            }
+            AutoBrowse.play(payload)
+            return Futures.immediateFuture(emptyTimeline())
+        }
+    }
+
+    private fun rootItem(): MediaItem =
+        MediaItem.Builder()
+            .setMediaId(AutoBrowse.ROOT_ID)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(getString(R.string.app_name))
+                    .setIsBrowsable(true)
+                    .setIsPlayable(false)
+                    .setFolderType(MediaMetadata.FOLDER_TYPE_MIXED)
+                    .build(),
+            )
+            .build()
+
+    private fun topLevelFolders(): List<MediaItem> = listOf(
+        folderItem(AutoBrowse.RECENTS_ID, "Recents"),
+        folderItem(AutoBrowse.PLAYLISTS_ID, "Playlists"),
+        folderItem(AutoBrowse.QUEUE_ID, "Queue"),
+    )
+
+    private fun folderItem(id: String, title: String): MediaItem =
+        MediaItem.Builder()
+            .setMediaId(id)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(title)
+                    .setIsBrowsable(true)
+                    .setIsPlayable(false)
+                    .setFolderType(MediaMetadata.FOLDER_TYPE_NONE)
+                    .build(),
+            )
+            .build()
+            .also { rememberServed(it) }
+
+    private fun rendererChildren(
+        query: ListenableFuture<String?>,
+    ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> =
+        Futures.transform(
+            query,
+            { json -> LibraryResult.ofItemList(entriesToMediaItems(AutoBrowse.parseEntries(json)), null) },
+            MoreExecutors.directExecutor(),
+        )
+
+    private fun rendererSearch(
+        query: String,
+    ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> =
+        Futures.transform(
+            AutoBrowse.query("search", query),
+            { json ->
+                val items = entriesToMediaItems(AutoBrowse.parseEntries(json))
+                lastSearchQuery = query
+                lastSearchItems = items
+                LibraryResult.ofItemList(items, null)
+            },
+            MoreExecutors.directExecutor(),
+        )
+
+    private fun entriesToMediaItems(entries: List<AutoBrowse.BrowseEntry>): List<MediaItem> =
+        entries.map { entry ->
+            MediaItem.Builder()
+                .setMediaId(entry.id)
+                .setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle(entry.title.ifBlank { "Unknown" })
+                        .setArtist(entry.subtitle.takeIf { it.isNotBlank() })
+                        .setArtworkUri(
+                            entry.artwork.takeIf { it.startsWith("http") }?.let(Uri::parse),
+                        )
+                        .setIsBrowsable(!entry.playable)
+                        .setIsPlayable(entry.playable)
+                        .setFolderType(
+                            if (entry.playable) {
+                                MediaMetadata.FOLDER_TYPE_NONE
+                            } else {
+                                MediaMetadata.FOLDER_TYPE_MIXED
+                            },
+                        )
+                        .build(),
+                )
+                .build()
+                .also { rememberServed(it) }
+        }
+
+    private fun emptyTimeline(): MediaSession.MediaItemsWithStartPosition =
+        MediaSession.MediaItemsWithStartPosition(ImmutableList.of(), 0, 0)
+
+    @Volatile
+    private var lastSearchQuery: String? = null
+
+    @Volatile
+    private var lastSearchItems: List<MediaItem> = emptyList()
+
+    private val servedLock = Any()
+    private val served = HashMap<String, MediaItem>()
+
+    private fun rememberServed(item: MediaItem) {
+        synchronized(servedLock) {
+            if (served.size > 400) served.clear()
+            served[item.mediaId] = item
+        }
+    }
+
+    private fun servedItem(mediaId: String): MediaItem? = synchronized(servedLock) { served[mediaId] }
 
     /**
      * A track load starts this service before the stream is ready, so the service

@@ -12,6 +12,7 @@ import { syncServerTime } from "./serverTime";
 import { clientCatalog } from "./clientCatalog";
 import { getLocalImportHandler } from "./localImports";
 import type { Track } from "@/shared/contracts";
+import type { PlaybackSession } from "@/shared/contracts/playback";
 import {
   executePlaybackEndpoint as executeInnertubePlan,
   type InnertubePlan,
@@ -876,6 +877,30 @@ export const api = {
     return getLocalImportHandler()
       .finalize(importId, tracks ?? [], title, description)
       .then(({ finalized }) => ({ denied: "all" as const, finalized }));
+  },
+
+  /**
+   * Signed playback session for a track (server-selected transport and codec).
+   * The backend route may be absent on partial deployments; callers fall back
+   * to the client-side Innertube resolvers when this rejects.
+   */
+  createPlaybackSession(
+    id: string,
+    preferredCodec?: "opus" | "aac",
+    signal?: AbortSignal,
+    transport?: "proxy" | "direct_innertube",
+  ): Promise<PlaybackSession> {
+    return request<PlaybackSession>(
+      `/v1/tracks/${encodeURIComponent(id)}/playback`,
+      {
+        method: "POST",
+        signal,
+        body: JSON.stringify({
+          ...(transport ? { transport } : {}),
+          ...(preferredCodec ? { preferredCodec } : {}),
+        }),
+      },
+    );
   },
 
   /**

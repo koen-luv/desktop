@@ -11,6 +11,8 @@ import { useThemeCustomizationSync } from "@/features/settings";
 import { useTouchBarSync } from "@/features/touchbar";
 import { OverlayPlayer, useOverlaySync } from "@/features/overlay";
 import { useDiscordSync } from "@/features/discord";
+import { useLastfmScrobbler } from "@/features/lastfm";
+import { useAutoSync } from "@/features/auto";
 import { AppRoutes } from "./routes";
 import DeeplinkHandler from "./DeeplinkHandler";
 import EnvironmentWarning from "./EnvironmentWarning";
@@ -45,6 +47,16 @@ function OverlaySync() {
 
 function DiscordSync() {
   useDiscordSync();
+  return null;
+}
+
+function LastfmSync() {
+  useLastfmScrobbler();
+  return null;
+}
+
+function AutoSync() {
+  useAutoSync();
   return null;
 }
 
@@ -88,6 +100,8 @@ export default function App() {
         <TouchBarSync />
         <OverlaySync />
         <DiscordSync />
+        <LastfmSync />
+        <AutoSync />
         <AppleEmojiProvider>
           <I18nProvider>
             <ToastProvider>

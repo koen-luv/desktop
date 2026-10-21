@@ -34,7 +34,10 @@ afterEach(() => {
 });
 
 describe("PlayerRuntime with soundcloud streams", () => {
-  it("plays a buffered hls blob through an object url and caches it without downloading again", async () => {
+  // This fork ships AUTO_CACHE_AUDIO = false: buffered streams play through an
+  // object url but are never written to the audio cache in the background
+  // (files are saved only via the explicit Download action).
+  it("plays a buffered hls blob through an object url without downloading it", async () => {
     mocks.resolveSoundCloudStream.mockResolvedValue(bufferedStream([1, 2, 3]));
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const track = soundCloudTrack("sc:101");
@@ -43,17 +46,17 @@ describe("PlayerRuntime with soundcloud streams", () => {
 
     expect(URL.createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
     expect(playerRuntime!.hasLoadedSourceFor(track.id)).toBe(true);
-    await vi.waitFor(async () => expect((await linerDb.getAudio(track.id))?.byteSize).toBe(3));
+    expect(await linerDb.getAudio(track.id)).toBeFalsy();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("preloads a buffered soundcloud stream straight into the audio cache", async () => {
+  it("preloads a buffered soundcloud stream without writing it to the audio cache", async () => {
     mocks.resolveSoundCloudStream.mockResolvedValue(bufferedStream([4, 5]));
     const fetchSpy = vi.spyOn(globalThis, "fetch");
 
     await playerRuntime!.preloadTrack(soundCloudTrack("sc:102"));
 
-    expect((await linerDb.getAudio("sc:102"))?.byteSize).toBe(2);
+    expect(await linerDb.getAudio("sc:102")).toBeFalsy();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 

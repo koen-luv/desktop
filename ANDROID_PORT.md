@@ -59,7 +59,7 @@ adb install -r android/app/build/outputs/apk/release/app-release.apk
 | `signRequest`, `signCoverUrl`, `syncServerTime` (native) | the same production WASM signer, bundled into the renderer (`src/platform/signerWasm.ts`) |
 | `net.fetch` through the main process | `LinerBridge.httpRequest` (OkHttp, async response events) for POST/PUT/PATCH/DELETE and YouTube hosts; `shouldInterceptRequest` (`CorsProxy.kt`) rewrites duplicated `Access-Control-Allow-Origin` headers for GET/HEAD and streams SSE lyrics |
 | localStorage / IndexedDB | the same WebView storage; the app cache is exposed through `getCacheStats`, `clearCoversCache`, `clearAudioCache`, `clearHttpCache` |
-| `HTMLAudioElement` + Web Audio + pitch shifter | `PlaybackService` (Media3 `ExoPlayer` + `MediaSessionService`), audio focus, wake lock, headphone unplug, notification/lockscreen/Bluetooth controls |
+| `HTMLAudioElement` + Web Audio + pitch shifter | `PlaybackService` (Media3 `ExoPlayer` + `MediaLibraryService`), audio focus, wake lock, headphone unplug, notification/lockscreen/Bluetooth controls, Android Auto browse tree |
 | `shell.openExternal`, clipboard, share | `openExternal`, `copyText`, `shareText` |
 | deep links via `liner://` protocol handler | `liner://` intent filter → `__linerAndroidEmit("deeplink", …)` |
 | window controls, Hyprland overlay, Touch Bar sync | not applicable on Android (no dead code is shipped in their place) |
@@ -84,6 +84,24 @@ nonce. Nothing is signed with a secret baked into the APK.
   when the activity is backgrounded, promotes itself to foreground before the
   five second deadline, and stops itself when a load never turns into playback.
 
+### Android Auto
+
+* `PlaybackService` is a `MediaLibraryService`; the manifest declares the
+  `android.media.browse.MediaBrowserService` action so Android Auto (and any
+  other MediaBrowser client) can discover and bind it.
+* The browse tree (Recents, Playlists, Queue, per-playlist folders, search) is
+  served from the renderer, which owns the library data: the service forwards
+  `autoBrowseQuery` events through `NativeEvents` and the renderer answers with
+  `autoBrowseResponse`. Queries time out after 3 s with an empty list, and
+  events emitted before the WebView attaches are queued (`NativeEvents`
+  pending queue), so a cold start from the car does not hang the client.
+* Play requests need no native stream knowledge: media3 converts Auto's
+  `playFromMediaId`/`playFromSearch` into `MediaSession.Callback.onSetMediaItems`,
+  which forwards the mediaId (or search query) to the renderer as an `autoPlay`
+  event and acknowledges with an empty timeline. The renderer then resolves the
+  stream and loads it through the normal playback pipeline, so next/previous,
+  notification, Discord and scrobbling all follow as with a UI-initiated play.
+
 ## Feature parity
 
 | Feature | State |
@@ -102,13 +120,30 @@ nonce. Nothing is signed with a secret baked into the APK.
 | Settings (two-level menus: grouped categories → one category screen at a time) and persistence | verified across a full reload |
 | System back, dialogs, rotation, safe areas, font scale | verified |
 | Deep links `liner://` | wired through the same handler as desktop |
-| Discord Rich Presence | ported: Kotlin WebSocket RPC client (`DiscordRpc.kt`) talks to the signed-in Discord client's local endpoint (ports 6463-6472, `10.0.2.2` on the emulator); the renderer's settings store and sync hook run unchanged through the `window.linerElectron` compatibility shim, so presence follows song transitions on Android exactly like on desktop |
+| Discord Rich Presence | verified (v2): the renderer pushes the desktop-parity state/settings payloads into `DiscordRpc.kt` (WebSocket to the signed-in Discord client's local endpoint, ports 6463-6472, `10.0.2.2` on the emulator); presence follows song transitions, artwork, status format and button settings exactly like desktop |
+| Last.fm scrobbling | verified: fully client-side scrobbler (`src/features/lastfm`) — Liner's own Last.fm app is built in (custom key/secret optional), out-of-band authorization, now-playing on first playing tick, scrobble at ≥ min(duration/2, 4 min) for tracks ≥ 30 s with the playback start timestamp; settings under Playback → Last.fm |
+| Android Auto | verified (CDP smoke on the release APK): `MediaLibraryService` with renderer-backed browse tree (Recents, Playlists, Queue, search) and play-through-the-renderer pipeline — queue and recents queries answered by the renderer (recents returned real server history with title/artists/artwork) and an `autoPlay` event with a served media id started normal playback (MiniPlayer playing with queue context); see "Android Auto" above |
 
 ## Verification performed
 
-Build/static: `pnpm build`, `pnpm exec tsc -b`, `pnpm test` (58 files, 347 tests),
-`./gradlew :app:assembleDebug`, `./gradlew :app:assembleRelease`,
-`apksigner verify`.
+Build/static: `pnpm build`, `pnpm exec tsc -b`, `pnpm exec vitest run`
+(96/97 files and 600/604 tests green with zero failures across repeated runs;
+one worker fork consistently hits the harness's ~4 GB V8 heap cap and exits,
+losing 4 tests — a tooling memory limit, not a test failure), `./gradlew
+:app:assembleDebug`, `./gradlew :app:assembleRelease`, `apksigner verify`.
+
+Android Auto (CDP smoke against the running release APK): an `autoBrowseQuery`
+for the queue folder was answered by the renderer (`{items:[]}` on an empty
+queue), a `recents` query returned real server history (`liner.track:` items
+with title, artists and artwork URL), and an `autoPlay` event carrying a served
+media id started playback through the normal pipeline (MiniPlayer showing the
+track playing with its queue context). The smoke also caught and led to a fix:
+the platform dispatcher pre-parses event JSON, so the Auto handlers now accept
+both object and string payloads (previously every query was silently dropped).
+
+Last.fm: the built-in application credentials were exercised against the live
+API — the same signed `auth.getToken` call the app uses returned a real request
+token and a working `last.fm/api/auth` authorization URL.
 
 Runtime (Android 15 emulator, API 35, x86_64): login with a real account, real
 home/discovery data, real stream playback (position 17.3 s → 21.1 s over 4 s,
@@ -141,3 +176,8 @@ settings category renders the Discord rows (and only those) on Android.
    approximate the desktop Web Audio graph rather than matching it exactly.
 4. **Electron-only surfaces** (custom window chrome, Hyprland overlay, Touch Bar,
    tray, auto-updater) have no Android equivalent and are not exposed there.
+5. **Android Auto needs the renderer.** Browse lists and stream resolution are
+   served by the WebView; if only the media service is alive (process restarted
+   by the car) or the renderer is still loading, folders appear empty and play
+   taps no-op. Events emitted before the WebView attaches are queued (bounded),
+   so a cold start from the car usually recovers within a few seconds.

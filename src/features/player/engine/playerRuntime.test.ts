@@ -183,7 +183,12 @@ describe("PlayerRuntime audio caching", () => {
     expect(usePlayerStore.getState().status).toBe("playing");
   });
 
-  it("fetches, plays, and saves to linerDb on cache miss", async () => {
+  // NOTE: this fork ships AUTO_CACHE_AUDIO = false — audio is written to
+  // linerDb only through the explicit Download action, never in the
+  // background. The upstream tests below are therefore inverted: playing a
+  // stream must NOT fetch/overwrite the cache, and preload only warms the
+  // resolver instead of downloading the track.
+  it("resolves a stream and plays on cache miss without writing audio to disk", async () => {
     const playSpy = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
     const sessionSpy = mocks.resolvePlaybackStream.mockResolvedValue(urlStream);
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -203,15 +208,11 @@ describe("PlayerRuntime audio caching", () => {
 
     expect(sessionSpy).toHaveBeenCalledTimes(1);
     expect(playSpy).toHaveBeenCalled();
-
-    await vi.waitFor(async () => {
-      const storedAudio = await linerDb.getAudio("fresh-track-2");
-      expect(storedAudio?.byteSize).toBe(16);
-    });
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(await linerDb.getAudio("fresh-track-2")).toBeFalsy();
   });
 
-  it("preloads audio in the background and enables instant cache-hit play on skip", async () => {
+  it("preloads only the resolved stream when background auto-cache is disabled", async () => {
     const sessionSpy = mocks.resolvePlaybackStream.mockResolvedValue(urlStream);
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0]), {
@@ -229,11 +230,8 @@ describe("PlayerRuntime audio caching", () => {
     await playerRuntime!.preloadTrack(nextTrack);
 
     expect(sessionSpy).toHaveBeenCalledTimes(1);
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-
-    const storedAudio = await linerDb.getAudio("next-track-3");
-    expect(storedAudio).not.toBeNull();
-    expect(storedAudio?.byteSize).toBe(16);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(await linerDb.getAudio("next-track-3")).toBeFalsy();
 
     sessionSpy.mockClear();
     fetchSpy.mockClear();
@@ -241,7 +239,9 @@ describe("PlayerRuntime audio caching", () => {
     const playSpy = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
     await playerRuntime!.loadAndPlay(nextTrack);
 
-    expect(sessionSpy).not.toHaveBeenCalled();
+    // Nothing was cached, so playback resolves again — but streams the URL
+    // directly without downloading anything.
+    expect(sessionSpy).toHaveBeenCalledTimes(1);
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(playSpy).toHaveBeenCalled();
     expect(usePlayerStore.getState().status).toBe("playing");

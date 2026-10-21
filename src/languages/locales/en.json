@@ -483,6 +483,7 @@
       "shortcuts": "Shortcuts",
       "overlay": "Overlay",
       "discord": "Discord RPC",
+      "lastfm": "Last.fm",
       "privacy": "Privacy"
     },
     "playback": {
@@ -574,6 +575,42 @@
       "always_on_top": {
         "title": "Always on top",
         "description": "Keep the overlay floating above other windows."
+      }
+    },
+    "lastfm": {
+      "description": "Scrobble what you listen to to your Last.fm profile.",
+      "section_credentials": "API Credentials",
+      "section_account": "Account",
+      "enable": {
+        "title": "Enable Scrobbling",
+        "description": "Send now-playing updates and scrobbles to your Last.fm profile."
+      },
+      "api_key": {
+        "title": "API Key",
+        "description": "Uses Liner's built-in Last.fm application by default; paste your own key to override."
+      },
+      "api_secret": {
+        "title": "API Secret",
+        "description": "Shared secret of your Last.fm application (Liner's built-in one is used by default)."
+      },
+      "account": {
+        "title": "Last.fm Account",
+        "description": "Authorize Liner to submit plays to your profile.",
+        "connected_description": "Scrobbling as {user}."
+      },
+      "connect": "Connect to Last.fm",
+      "connect_finish": "I've authorized — connect",
+      "connecting": "Connecting…",
+      "disconnect": "Disconnect",
+      "authorize_hint": "Allow Liner on Last.fm in the opened page (or via the link below), then press Connect.",
+      "authorize_link": "Open the Last.fm authorization page",
+      "error_prefix": "Error",
+      "status": {
+        "connected": "Connected as {user}",
+        "disconnected": "Not connected to Last.fm",
+        "ready": "Scrobbling",
+        "waiting": "Waiting for account",
+        "disabled": "Disabled"
       }
     },
     "discord": {

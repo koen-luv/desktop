@@ -158,19 +158,21 @@ describe("SettingsModal two-level menus", () => {
     // exposes the discord* methods; simulate both halves of the host here.
     (window as { LinerAndroid?: unknown }).LinerAndroid = {};
     (window as { linerElectron?: unknown }).linerElectron = {
-      discordRpcConfigure: () => {},
+      discordUpdateState: () => {},
     };
 
     await act(async () => {
       root.render(<SettingsModal />);
     });
 
-    expect(bodyText()).toContain(tEn("settings.categories.overlay.title"));
-    await click(buttonIncluding(tEn("settings.categories.overlay.title")), "overlay & discord category");
+    // On Android the category renders as "Discord" and carries the Discord
+    // section alone (the floating overlay is desktop-only).
+    expect(bodyText()).toContain(tEn("settings.tabs.discord"));
+    await click(buttonIncluding(tEn("settings.tabs.discord")), "discord category");
 
     // Discord rows render; the desktop-only floating-overlay controls do not.
-    expect(bodyText()).toContain(tEn("settings.discord.enabled.title"));
-    expect(bodyText()).toContain(tEn("settings.discord.client_id.title"));
+    expect(bodyText()).toContain(tEn("settings.discord.enable.title"));
+    expect(bodyText()).toContain(tEn("settings.discord.show_artwork.title"));
     expect(bodyText()).not.toContain(tEn("settings.overlay.enabled.title"));
     expect(bodyText()).not.toContain(tEn("settings.overlay.position.title"));
   });
