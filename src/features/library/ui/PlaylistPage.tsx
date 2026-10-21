@@ -477,7 +477,7 @@ function LibraryPlaylistContent() {
           >
             <div className="relative z-10 flex flex-col md:flex-row items-stretch gap-2 md:gap-[16px] px-3 md:pl-[32px] md:pr-[16px] h-full w-full min-h-0 box-border">
               <div
-                className="shrink-0 w-full max-w-[280px] md:w-[280px] self-start pt-[calc(var(--inset-top,0px)+56px)] md:pt-[56px] pb-2 md:pb-[24px]"
+                className="shrink-0 w-full max-w-[280px] md:w-[280px] self-center md:self-start text-center md:text-left pt-[calc(var(--inset-top,0px)+56px)] md:pt-[56px] pb-2 md:pb-[24px]"
                 data-no-window-drag
               >
                 <EntitySidebar
@@ -615,7 +615,7 @@ function LibraryPlaylistContent() {
                       <button
                         type="button"
                         onClick={() => setIsEditingDescription(true)}
-                        className="cursor-pointer border-0 bg-transparent p-0 text-left text-[13px] font-[400] text-text-tertiary transition-colors hover:text-text-primary"
+                        className="cursor-pointer border-0 bg-transparent p-0 text-center md:text-left text-[13px] font-[400] text-text-tertiary transition-colors hover:text-text-primary"
                         style={{ fontFamily: "var(--font-inter), sans-serif" }}
                       >
                         {t("common.add_description")}
@@ -623,7 +623,7 @@ function LibraryPlaylistContent() {
                     )
                   }
                   meta={
-                    <div className="flex items-center flex-wrap gap-[6px]">
+                    <div className="flex items-center justify-center md:justify-start flex-wrap gap-[6px]">
                       <div
                         className={`inline-flex h-[26px] items-center gap-[6px] rounded-md px-[8px] text-[12px] font-[400] select-none ${
                           hasCustomBg

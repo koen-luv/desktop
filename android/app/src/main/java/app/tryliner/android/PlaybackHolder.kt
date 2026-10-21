@@ -316,6 +316,15 @@ object PlaybackHolder {
             if (cause is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
                 builder.append(" (HTTP ").append(cause.responseCode).append(", ")
                 builder.append(cause.dataSpec?.uri?.host ?: "unknown host").append(")")
+                // The CDN's rejection body (XML error) is the only place that
+                // states why a URL was refused (expired signature vs. bot policy).
+                val body = cause.responseBody
+                if (body.isNotEmpty()) {
+                    val text = String(body, 0, minOf(body.size, 220), Charsets.UTF_8)
+                        .replace(Regex("\\s+"), " ")
+                        .trim()
+                    if (text.isNotEmpty()) builder.append(" | ").append(text)
+                }
             }
         } else {
             error.message?.let { builder.append(": ").append(it) }

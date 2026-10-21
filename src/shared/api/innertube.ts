@@ -137,13 +137,10 @@ function combineSignal(signal: AbortSignal | undefined): { signal: AbortSignal; 
 }
 
 /**
- * Executes a signed Innertube player plan and returns the best audio stream.
- * Throws `InnertubePlanError` (with an HTTP-like `status`) on any failure.
+ * Executes an Innertube plan (URL-validated, host-allowlisted, timed out) and
+ * returns the parsed JSON body. Throws `InnertubePlanError` on any failure.
  */
-export async function executePlaybackEndpoint(
-  plan: InnertubePlan,
-  signal?: AbortSignal,
-): Promise<ExecutedInnertubeStream> {
+export async function executeInnertubeJson<T>(plan: InnertubePlan, signal?: AbortSignal): Promise<T> {
   let endpoint: URL;
   try {
     endpoint = new URL(plan.endpoint);
@@ -190,12 +187,22 @@ export async function executePlaybackEndpoint(
     throw new InnertubePlanError(`Innertube responded ${response.status}`, response.status);
   }
 
-  let data: InnertubePlayerResponse;
   try {
-    data = await response.json();
+    return (await response.json()) as T;
   } catch {
     throw new InnertubePlanError("Innertube response was not valid JSON", 502);
   }
+}
+
+/**
+ * Executes a signed Innertube player plan and returns the best audio stream.
+ * Throws `InnertubePlanError` (with an HTTP-like `status`) on any failure.
+ */
+export async function executePlaybackEndpoint(
+  plan: InnertubePlan,
+  signal?: AbortSignal,
+): Promise<ExecutedInnertubeStream> {
+  const data = await executeInnertubeJson<InnertubePlayerResponse>(plan, signal);
 
   const playability = data.playabilityStatus?.status;
   if (playability && playability !== "OK") {

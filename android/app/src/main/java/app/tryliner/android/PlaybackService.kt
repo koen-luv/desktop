@@ -68,12 +68,20 @@ class PlaybackService : MediaSessionService() {
 
         // Streaming CDNs hand out cross-protocol redirects and expect a normal
         // player user agent, so the data source is configured explicitly.
+        // googlevideo answers HTTP 403 to a request without a Range header, and
+        // ExoPlayer omits Range on its first (position 0) request, so a default
+        // is provided here; real range requests still override it while seeking.
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent(Http.userAgent)
             .setConnectTimeoutMs(20_000)
             .setReadTimeoutMs(45_000)
             .setAllowCrossProtocolRedirects(true)
-            .setDefaultRequestProperties(mapOf("Accept-Language" to "en-US,en;q=0.9"))
+            .setDefaultRequestProperties(
+                mapOf(
+                    "Accept-Language" to "en-US,en;q=0.9",
+                    "Range" to "bytes=0-",
+                ),
+            )
 
         // Cached downloads are played back as file:// URIs, so the resolving data
         // source is required instead of the HTTP-only one.

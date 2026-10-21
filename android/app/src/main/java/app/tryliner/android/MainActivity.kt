@@ -142,7 +142,10 @@ class MainActivity : ComponentActivity() {
         settings.allowFileAccessFromFileURLs = false
         settings.allowUniversalAccessFromFileURLs = false
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-        settings.cacheMode = WebSettings.LOAD_DEFAULT
+        // The WebView serves the app shell from the APK assets, so there is
+        // nothing worth caching: without this, Chromium keeps serving a stale
+        // index.html (and its old JS bundle) after the app is updated.
+        settings.cacheMode = WebSettings.LOAD_NO_CACHE
         settings.loadsImagesAutomatically = true
         settings.blockNetworkImage = false
         settings.safeBrowsingEnabled = true

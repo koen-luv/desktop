@@ -36,8 +36,10 @@ export function SettingRow({
   }
 
   return (
-    <div className="flex items-center justify-between gap-[16px] py-[13px]">
-      <div className="flex min-w-0 max-w-[360px] flex-col gap-[2px]">
+    // Narrow (phone) widths stack the control under its label so wide pill
+    // groups never squeeze the description into a sliver of text.
+    <div className="flex flex-col items-start gap-[8px] py-[13px] sm:flex-row sm:items-center sm:justify-between sm:gap-[16px]">
+      <div className="flex w-full min-w-0 max-w-[360px] flex-col gap-[2px] sm:w-auto">
         <span
           className="text-text-primary text-[13px] font-[500] leading-snug"
           style={font}
