@@ -99,13 +99,14 @@ nonce. Nothing is signed with a secret baked into the APK.
 | Speed / pitch / reverb | ExoPlayer `PlaybackParameters` + `PresetReverb` |
 | Offline audio cache and `file://` replay | verified (`usingCache: true`) |
 | WebGL visualizer (Kawarp shader) | runs in the WebView with a live WebGL context |
-| Settings (playback, audio, appearance, customization) and persistence | verified across a full reload |
+| Settings (two-level menus: grouped categories → one category screen at a time) and persistence | verified across a full reload |
 | System back, dialogs, rotation, safe areas, font scale | verified |
 | Deep links `liner://` | wired through the same handler as desktop |
+| Discord Rich Presence | ported: Kotlin WebSocket RPC client (`DiscordRpc.kt`) talks to the signed-in Discord client's local endpoint (ports 6463-6472, `10.0.2.2` on the emulator); the renderer's settings store and sync hook run unchanged through the `window.linerElectron` compatibility shim, so presence follows song transitions on Android exactly like on desktop |
 
 ## Verification performed
 
-Build/static: `pnpm build`, `pnpm exec tsc -b`, `pnpm test` (49 files, 290 tests),
+Build/static: `pnpm build`, `pnpm exec tsc -b`, `pnpm test` (58 files, 347 tests),
 `./gradlew :app:assembleDebug`, `./gradlew :app:assembleRelease`,
 `apksigner verify`.
 
@@ -116,7 +117,13 @@ with artwork, foreground service, playback continuing after HOME, media button
 `next` changing the track, lyrics synchronization, settings persistence over
 reload, rotation without reloading the activity, back closing dialogs, cached
 track playback (`usingCache: true`), and the signed release APK performing login,
-playback and notification rendering.
+playback and notification rendering. Discord RPC on-device: the Android host
+opened a WebSocket to the desktop Discord client running on the development
+machine (`10.0.2.2:6463`, upgrade accepted with the `https://localhost` Origin),
+walked all 20 candidates, rejected a placeholder application id with the
+server's close code 4000, retried with the 2 s → 60 s backoff, and queued real
+track presence (`addiction (Slowed) — LONOWN`, with artwork) on playback; the
+settings category renders the Discord rows (and only those) on Android.
 
 ## Known limitations
 

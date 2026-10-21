@@ -59,3 +59,7 @@ GEMINI.md
 .agent/
 
 brag-output/
+
+# local-only artifacts
+/my-release-key.jks
+/liner-src/

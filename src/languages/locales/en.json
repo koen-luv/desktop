@@ -430,6 +430,28 @@
       "application": "Application",
       "help": "Help"
     },
+    "categories": {
+      "playback": {
+        "title": "Playback & Audio",
+        "description": "Playback behavior, transitions, sleep timer, quality and output."
+      },
+      "appearance": {
+        "title": "Appearance & Customization",
+        "description": "Theme, language, wallpaper and layout blocks."
+      },
+      "overlay": {
+        "title": "Overlay & Discord",
+        "description": "Always-on-top window, lyrics display and rich presence."
+      },
+      "storage": {
+        "title": "Storage & Cache",
+        "description": "Cache sizes, downloaded audio and cleanup."
+      },
+      "about": {
+        "title": "About & Help",
+        "description": "Version, branding, updates and support links."
+      }
+    },
     "docs": "Docs",
     "support": "Support",
     "manage_account": "Manage account",
@@ -558,11 +580,11 @@
       "section": "Discord",
       "enabled": {
         "title": "Discord Rich Presence",
-        "description": "Show the song you're listening to on your Discord profile (desktop app only)."
+        "description": "Show the song you're listening to on your Discord profile (desktop and Android — on Android the Discord app must be installed and signed in)."
       },
       "client_id": {
         "title": "Application (Client) ID",
-        "description": "From the Discord Developer Portal: create an application and paste its Application ID. Leave empty to disable."
+        "description": "From the Discord Developer Portal: create an application, add https://localhost as its RPC Origin, and paste its Application ID. Leave empty to disable."
       }
     },
     "sleep_timer": {

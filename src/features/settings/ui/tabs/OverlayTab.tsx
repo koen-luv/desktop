@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Refresh1Line } from "@mingcute/react";
 import { useTranslation } from "@/languages";
+import { isAndroidApp } from "@/platform";
 import {
   useOverlaySettingsStore,
   type OverlayPosition,
@@ -59,8 +60,10 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
   const alwaysOnTop = useOverlaySettingsStore((s) => s.alwaysOnTop);
   const setAlwaysOnTop = useOverlaySettingsStore((s) => s.setAlwaysOnTop);
 
-  // Discord Rich Presence is desktop-only (Electron owns the local IPC client).
-  const isElectron = Boolean(
+  // Rich Presence needs a native RPC bridge: Electron's IPC client on
+  // desktop, the Kotlin WebSocket client on Android (exposed through the
+  // compatibility shim). The bare web build has neither, so its section stays hidden.
+  const discordRpcSupported = Boolean(
     typeof window !== "undefined" && window.linerElectron?.discordRpcConfigure,
   );
   const discordEnabled = useDiscordSettingsStore((s) => s.enabled);
@@ -163,6 +166,9 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
 
   return (
     <div className="flex flex-col gap-[16px]">
+      {/* The overlay is a desktop-only floating window; on Android this
+          category carries the Discord section alone. */}
+      {!isAndroidApp() && (
       <SettingSection>
       <SettingRow
         title={t("settings.overlay.enabled.title") || "Enable overlay"}
@@ -332,8 +338,9 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
         />
       </div>
       </SettingSection>
+      )}
 
-      {isElectron && (
+      {discordRpcSupported && (
         <SettingSection label={t("settings.discord.section")}>
           <SettingRow
             title={t("settings.discord.enabled.title")}

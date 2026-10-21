@@ -11,11 +11,12 @@ const POSITION_SKEW_MS = 2_000;
 const REFRESH_INTERVAL_MS = 20_000;
 
 /**
- * Mirrors the player store into Discord Rich Presence on the desktop app.
+ * Mirrors the player store into Discord Rich Presence.
  *
- * Runs only where `window.linerElectron` exists (Electron). Discord has no
- * rich-presence API for Android apps and the web build would need a separate
- * OAuth flow, so those platforms simply no-op here.
+ * Runs wherever a native RPC bridge exists: Electron on desktop (local IPC)
+ * and the Android host, whose `window.linerElectron` compatibility shim
+ * forwards the same three calls to Kotlin and on to the signed-in Discord
+ * client's local RPC endpoint. The bare web build has neither and no-ops.
  *
  * Sending is throttled: a track/status change or a real seek pushes
  * immediately, but the steady advance of playback does not — the rendered

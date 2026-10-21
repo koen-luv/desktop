@@ -496,4 +496,27 @@ class LinerBridge(private val activity: MainActivity) {
             0L
         }
     }
+
+    // ── Discord Rich Presence ──────────────────────────────────────────────
+
+    /**
+     * Configures the Discord RPC client (application id + master switch).
+     * Mirrors the Electron preload's `discordRpcConfigure` so the renderer's
+     * settings store and sync hook run unchanged on Android.
+     */
+    @JavascriptInterface
+    fun discordRpcConfigure(clientId: String, enabled: Boolean) {
+        DiscordRpc.configure(clientId, enabled)
+    }
+
+    /** Sets the profile activity from its JSON string (the pre-serialized DiscordActivity). */
+    @JavascriptInterface
+    fun discordRpcSetPresence(activityJson: String) {
+        DiscordRpc.setPresence(activityJson)
+    }
+
+    @JavascriptInterface
+    fun discordRpcClear() {
+        DiscordRpc.clear()
+    }
 }

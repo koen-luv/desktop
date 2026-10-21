@@ -434,6 +434,28 @@
       "application": "Aplicación",
       "help": "Ayuda"
     },
+    "categories": {
+      "playback": {
+        "title": "Reproducción y audio",
+        "description": "Comportamiento de reproducción, transiciones, temporizador de sueño, calidad y salida."
+      },
+      "appearance": {
+        "title": "Apariencia y personalización",
+        "description": "Tema, idioma, fondo de pantalla y bloques de diseño."
+      },
+      "overlay": {
+        "title": "Superposición y Discord",
+        "description": "Ventana siempre visible, letra de las canciones y presencia en Discord."
+      },
+      "storage": {
+        "title": "Almacenamiento y caché",
+        "description": "Tamaños de caché, audio descargado y limpieza."
+      },
+      "about": {
+        "title": "Acerca de y ayuda",
+        "description": "Versión, marca, actualizaciones y enlaces de soporte."
+      }
+    },
     "docs": "Documentación",
     "support": "Soporte",
     "manage_account": "Administrar cuenta",
@@ -561,11 +583,11 @@
       "section": "Discord",
       "enabled": {
         "title": "Rich Presence de Discord",
-        "description": "Muestra la canción que escuchas en tu perfil de Discord (solo en la app de escritorio)."
+        "description": "Muestra la canción que escuchas en tu perfil de Discord (escritorio y Android; en Android la app de Discord debe estar instalada e iniciar sesión)."
       },
       "client_id": {
         "title": "ID de la aplicación (Client ID)",
-        "description": "Del Portal de Desarrolladores de Discord: crea una aplicación y pega su ID. Déjalo vacío para desactivarlo."
+        "description": "Del Portal de Desarrolladores de Discord: crea una aplicación, añade https://localhost como RPC Origin y pega su ID. Déjalo vacío para desactivarlo."
       }
     },
     "sleep_timer": {

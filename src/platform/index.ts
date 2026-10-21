@@ -67,6 +67,15 @@ export interface LinerAndroidBridge {
   audioClearCache(): boolean;
   requestNotificationPermission(): void;
   setKeepScreenOn(on: boolean): void;
+  /**
+   * Configures Discord Rich Presence (application id + master switch).
+   * Kotlin talks WebSocket to the signed-in Discord client's local RPC
+   * endpoint — the Android counterpart of the Electron main-process client.
+   */
+  discordRpcConfigure(clientId: string, enabled: boolean): void;
+  /** Sets the profile activity from its JSON string (a serialized DiscordActivity). */
+  discordRpcSetPresence(activityJson: string): void;
+  discordRpcClear(): void;
 }
 
 export type NativeMediaCommand =
@@ -313,6 +322,15 @@ export function installAndroidPlatform(): void {
       deeplinkListeners.add(cb);
       return () => deeplinkListeners.delete(cb);
     },
+    // Discord Rich Presence: same contract as the Electron preload, served by
+    // the Kotlin WebSocket client (DiscordRpc.kt). The activity object is
+    // stringified here because @JavascriptInterface methods take plain types.
+    discordRpcConfigure: (clientId, enabled) => bridge.discordRpcConfigure(clientId, enabled),
+    discordRpcSetPresence: (activity) => {
+      if (activity) bridge.discordRpcSetPresence(JSON.stringify(activity));
+      else bridge.discordRpcClear();
+    },
+    discordRpcClear: () => bridge.discordRpcClear(),
   };
 
   window.linerElectron = compatibility as LinerElectronApi;
