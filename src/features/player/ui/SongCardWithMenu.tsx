@@ -34,6 +34,7 @@ export interface SongCardWithMenuProps {
   icon?: React.ReactNode;
   showReorderHandle?: boolean;
   onGrabStart?: (e: React.PointerEvent<HTMLDivElement>) => void;
+  highlight?: string;
 }
 
 function SongCardWithMenu({
@@ -62,6 +63,7 @@ function SongCardWithMenu({
   icon,
   showReorderHandle,
   onGrabStart,
+  highlight,
 }: SongCardWithMenuProps) {
   const resolvedDurationMs = useMemo(() => {
     if (durationMs !== undefined) return durationMs;
@@ -151,6 +153,7 @@ function SongCardWithMenu({
     <SongCard
       id={id}
       title={title}
+      highlight={highlight}
       artists={artists}
       artistId={artistId}
       artistList={artistList}

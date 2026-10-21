@@ -15,6 +15,7 @@ import {
   CheckLine,
   More2Line,
   ArrowLeftLine,
+  Search2Line,
 } from "@mingcute/react";
 import { LuShuffle } from "react-icons/lu";
 import Button from "@/shared/ui/Button";
@@ -36,6 +37,14 @@ import { buildShareUrl } from "@/shared/utils/share";
 import { useExternalItems } from "@/features/library/hooks";
 import { useCollection } from "../hooks/useCollection";
 import { useIsContentTransparent } from "@/features/settings/store/customizationStore";
+import {
+  useTrackSearch,
+  useTrackSearchButtonLabel,
+  TrackSearchField,
+  TrackSearchEmpty,
+} from "@/features/library/ui/TrackSearch";
+
+const NO_TRACKS: Track[] = [];
 
 function CollectionContent() {
   const [searchParams] = useSearchParams();
@@ -135,6 +144,19 @@ function CollectionContent() {
 
   const playbackContext = id ? `${entityType}:${decodedId}` : (data?.title || null);
 
+  const search = useTrackSearch(data?.tracks ?? NO_TRACKS, `${type}:${decodedId}`);
+  const searchButtonLabel = useTrackSearchButtonLabel();
+  const visibleTracks = useMemo(
+    () => search.matches ?? (data?.tracks ?? NO_TRACKS).map((track, index) => ({ track, index })),
+    [search.matches, data?.tracks],
+  );
+
+  const handleSearchSubmit = useCallback(() => {
+    const first = search.matches?.[0];
+    if (!data || !first) return;
+    playerEngine.playTrack(first.track, data.tracks, playbackContext, data.coverUrl);
+  }, [search.matches, data, playbackContext]);
+
   const { toast } = useToast();
   const [addedToQueue, setAddedToQueue] = useState(false);
 
@@ -202,6 +224,11 @@ function CollectionContent() {
   };
 
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // results start at the top, not wherever the full list was scrolled to
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [search.activeQuery]);
   const targetScrollTopRef = useRef<number | null>(null);
   const rafIdRef = useRef<number | null>(null);
 
@@ -282,8 +309,8 @@ function CollectionContent() {
       <button
         type="button"
         onClick={handleBack}
-        title={t("common.back")}
         aria-label={t("common.back")}
+        data-no-tooltip="true"
         data-no-window-drag
         className={`absolute top-[calc(var(--inset-top,0px)+12px)] md:top-[12px] left-4 md:left-[32px] z-20 group inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-md px-[10px] active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto text-[13px] font-[500] border-0 !border-none ${
           hasCustomBg
@@ -298,6 +325,18 @@ function CollectionContent() {
         />
         <span className="relative -left-[1.5px] top-[1px]">{t("common.back")}</span>
       </button>
+      {/* track search sits centred in the page header */}
+      {data && isReady && (
+        <div className="absolute top-[12px] left-0 right-0 z-20 flex justify-center pointer-events-none">
+          <TrackSearchField
+            search={search}
+            totalCount={data.tracks.length}
+            placeholder={t(isAlbum ? "track_search.placeholder_album" : "track_search.placeholder_playlist")}
+            glass={hasCustomBg}
+            onSubmit={handleSearchSubmit}
+          />
+        </div>
+      )}
       <div className="relative z-1 grid grid-cols-1 w-full h-full min-h-0 overflow-y-auto md:overflow-hidden">
         {data && (
           <div
@@ -425,7 +464,10 @@ function CollectionContent() {
                           variant={hasCustomBg ? "glass-action" : "outline"}
                           onClick={handleAddToQueue}
                           disabled={!data || data.tracks.length === 0}
-                          className="!h-[36px] flex-1 min-w-0 !text-[13px] !font-[500] px-[12px] flex items-center justify-center gap-[6px]"
+                          className={`!h-[36px] flex-1 min-w-0 !text-[13px] !font-[500] px-[12px] flex items-center justify-center gap-[6px] ${
+                            // optical centring: with three icon buttons beside it the label reads 1px right
+                            !isDailyMix ? "[&>*]:-translate-x-px" : ""
+                          }`}
                           title={t("common.add_to_queue")}
                         >
                           <AnimatePresence mode="wait">
@@ -464,6 +506,20 @@ function CollectionContent() {
                           title={t("common.shuffle")}
                         >
                           <LuShuffle size={16} />
+                        </Button>
+
+                        <Button
+                          variant={hasCustomBg ? "glass-action" : "outline"}
+                          onClick={search.toggle}
+                          // keep focus in the field so its blur-to-close doesn't fire first
+                          onMouseDown={(e) => {
+                            if (search.isOpen) e.preventDefault();
+                          }}
+                          disabled={!data || data.tracks.length === 0}
+                          className="!h-[36px] !w-[36px] shrink-0 !p-0 flex items-center justify-center text-text-primary"
+                          title={searchButtonLabel}
+                        >
+                          <Search2Line size={16} />
                         </Button>
 
                         {!isDailyMix && (
@@ -517,8 +573,11 @@ function CollectionContent() {
                 style={{ willChange: "scroll-position" }}
               >
               <section>
+                {search.matches && search.matches.length === 0 ? (
+                  <TrackSearchEmpty query={search.activeQuery} onClear={() => search.setQuery("")} />
+                ) : (
                 <div className="flex flex-col">
-                  {data.tracks.map((track, index) => (
+                  {visibleTracks.map(({ track, index }) => (
                     <SongCardWithMenu
                       key={track.id}
                       id={track.id}
@@ -527,6 +586,7 @@ function CollectionContent() {
                       artistId={track.artistId}
                       artistList={track.artistList}
                       coverUrl={track.coverUrl || data.coverUrl}
+                      highlight={search.activeQuery || undefined}
                       trackNumber={isAlbum ? index + 1 : undefined}
                       duration={
                         track.durationMs
@@ -550,6 +610,7 @@ function CollectionContent() {
                     />
                   ))}
                 </div>
+                )}
               </section>
               </div>
             </div>

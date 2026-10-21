@@ -8,7 +8,10 @@ import {
   type AuthTokens,
   type AuthUser,
 } from "./auth-session";
-import { signApiRequest, syncServerTime } from "./requestSigner";
+import { syncServerTime } from "./serverTime";
+import { clientCatalog } from "./clientCatalog";
+import { getLocalImportHandler } from "./localImports";
+import type { Track } from "@/shared/contracts";
 import {
   executePlaybackEndpoint as executeInnertubePlan,
   type InnertubePlan,
@@ -21,9 +24,6 @@ import type {
   UserProfile,
   LeaderboardResponse,
   DailyMixesResponse,
-  WaveRecommendationRequest,
-  WaveRecommendationResponse,
-  UserTasteProfile,
 } from "@/shared/contracts";
 
 import { usePlayerStore } from "@/features/player/store/playerStore";
@@ -45,7 +45,7 @@ function translate(key: string, vars?: Record<string, string | number>) {
   }
 }
 
-import { DEFAULT_PRIMARY_API, getApiBaseUrl, switchToFallbackEdge, switchToPrimaryApi } from "./baseUrl";
+import { getApiBaseUrl } from "./baseUrl";
 import { platformFetch } from "@/platform/http";
 
 const CLIENT_VERSION =
@@ -187,8 +187,6 @@ async function executeRequest<T>(
 ): Promise<T> {
   const startTime = performance.now();
   const method = (init?.method ?? "GET").toUpperCase();
-  const rawBody = typeof init?.body === "string" ? init.body : null;
-  const signedHeaders = await signApiRequest(method, path, rawBody);
   const currentSession = getAuthSession();
   let accessToken = allowRefresh ? await getValidAccessToken() : null;
 
@@ -240,7 +238,6 @@ async function executeRequest<T>(
           ...(hasBody ? { "Content-Type": "application/json" } : {}),
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
           ...correlationHeaders,
-          ...signedHeaders,
           ...restHeaders,
         },
       },
@@ -250,81 +247,17 @@ async function executeRequest<T>(
     if (init?.signal?.aborted || err?.name === "AbortError") {
       throw err;
     }
-    if (switchToFallbackEdge()) {
-      try {
-        const fallbackSigned = await signApiRequest(method, path, rawBody);
-        res = await fetchWithTimeout(
-          getApiBaseUrl() + path,
-          {
-            ...init,
-            headers: {
-              ...(hasBody ? { "Content-Type": "application/json" } : {}),
-              ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-              ...correlationHeaders,
-              ...fallbackSigned,
-              ...restHeaders,
-            },
-          },
-          timeoutMs,
-        );
-      } catch (fallbackErr) {
-        switchToPrimaryApi();
-        const durationMs = Math.round(performance.now() - startTime);
-        telemetry.trackNetwork(method, path, 0, durationMs, requestId);
-        if (isConnectivityFailure(fallbackErr) && !isPlaybackPath(path)) {
-          recordConnectivityFailure({
-            method,
-            path: stripQuery(path),
-            status: statusOf(fallbackErr),
-            latencyMs: durationMs,
-          });
-        }
-        throw fallbackErr;
-      }
-    } else if (getApiBaseUrl() !== DEFAULT_PRIMARY_API) {
-      switchToPrimaryApi();
-      try {
-        const primarySigned = await signApiRequest(method, path, rawBody);
-        res = await fetchWithTimeout(
-          getApiBaseUrl() + path,
-          {
-            ...init,
-            headers: {
-              ...(hasBody ? { "Content-Type": "application/json" } : {}),
-              ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-              ...correlationHeaders,
-              ...primarySigned,
-              ...restHeaders,
-            },
-          },
-          timeoutMs,
-        );
-      } catch (primaryErr) {
-        const durationMs = Math.round(performance.now() - startTime);
-        telemetry.trackNetwork(method, path, 0, durationMs, requestId);
-        if (isConnectivityFailure(primaryErr) && !isPlaybackPath(path)) {
-          recordConnectivityFailure({
-            method,
-            path: stripQuery(path),
-            status: statusOf(primaryErr),
-            latencyMs: durationMs,
-          });
-        }
-        throw primaryErr;
-      }
-    } else {
-      const durationMs = Math.round(performance.now() - startTime);
-      telemetry.trackNetwork(method, path, 0, durationMs, requestId);
-      if (isConnectivityFailure(err) && !isPlaybackPath(path)) {
-        recordConnectivityFailure({
-          method,
-          path: stripQuery(path),
-          status: statusOf(err),
-          latencyMs: durationMs,
-        });
-      }
-      throw err;
+    const durationMs = Math.round(performance.now() - startTime);
+    telemetry.trackNetwork(method, path, 0, durationMs, requestId);
+    if (isConnectivityFailure(err) && !isPlaybackPath(path)) {
+      recordConnectivityFailure({
+        method,
+        path: stripQuery(path),
+        status: statusOf(err),
+        latencyMs: durationMs,
+      });
     }
+    throw err;
   }
 
   // sync server time offset from response Date header
@@ -371,12 +304,6 @@ async function executeRequest<T>(
       throw new ApiError(res.status, message, code, requestId);
     }
 
-    // Retry request with newly signed headers (synced server clock + fresh token if available)
-    const refreshedSignedHeaders = await signApiRequest(
-      method,
-      path,
-      rawBody,
-    );
     try {
       res = await fetchWithTimeout(
         getApiBaseUrl() + path,
@@ -386,7 +313,6 @@ async function executeRequest<T>(
             ...(hasBody ? { "Content-Type": "application/json" } : {}),
             ...correlationHeaders,
             ...restHeaders,
-            ...refreshedSignedHeaders,
             ...(nextToken ? { Authorization: `Bearer ${nextToken}` } : {}),
           },
         },
@@ -542,10 +468,6 @@ export type {
   UserPlaylist as ApiUserPlaylist,
   UserPlaylistItem as ApiUserPlaylistItem,
   LikedTracksPage as ApiLikedTracksPage,
-  PlaybackSessionResponse as PlaybackSession,
-  PlaybackSessionResponse as ApiPlaybackSession,
-  Codec,
-  CodecPreference,
   LyricsFormat,
   LyricsContentKind,
   LyricsSyncLevel,
@@ -585,6 +507,7 @@ export type {
 import type {
   SearchType,
   SearchResponse,
+  Track as ApiTrackBase,
   ApiTrackDetails,
   RadioResponse,
   ApiAlbumDetails,
@@ -593,7 +516,6 @@ import type {
   ApiLikedTracksPage,
   ApiUserPlaylist,
   ApiUserPlaylistItem,
-  PlaybackSessionResponse as PlaybackSession,
   LyricsStreamEvent,
   ImportJob,
   ImportReview,
@@ -702,14 +624,32 @@ export const api = {
   },
   search(q: string, type: SearchType = "all"): Promise<SearchResponse> {
     const params = new URLSearchParams({ q, type });
-    return request<SearchResponse>(`/v1/search?${params}`);
+    return clientCatalog.search(q, type, () => request<SearchResponse>(`/v1/search?${params}`));
   },
 
   getTrack(id: string): Promise<ApiTrackDetails> {
-    return request<ApiTrackDetails>(`/v1/tracks/${encodeURIComponent(id)}`);
+    return clientCatalog.getTrack(id, () =>
+      request<ApiTrackDetails>(`/v1/tracks/${encodeURIComponent(id)}`),
+    );
   },
 
   getRadio(
+    id: string,
+    options?: {
+      history?: string[];
+      k?: number;
+      drift_rate?: number;
+      temperature?: number;
+      wave_id?: string;
+    },
+  ): Promise<RadioResponse> {
+    const history = new Set(options?.history ?? []);
+    return clientCatalog
+      .getRadio(id, options?.k, () => api.getServerRadio(id, options))
+      .then((response) => ({ items: response.items.filter((item) => !history.has(item.id)) }));
+  },
+
+  getServerRadio(
     id: string,
     options?: {
       history?: string[];
@@ -741,16 +681,24 @@ export const api = {
   },
 
   getAlbum(id: string): Promise<ApiAlbumDetails> {
-    return request<ApiAlbumDetails>(`/v1/albums/${encodeURIComponent(id)}`);
+    return clientCatalog.getAlbum(id, () =>
+      request<ApiAlbumDetails>(`/v1/albums/${encodeURIComponent(id)}`),
+    );
+  },
+
+  getArtistImage(id: string): Promise<string | undefined> {
+    return clientCatalog.getArtistImage(id);
   },
 
   getArtist(id: string): Promise<ApiArtistDetails> {
-    return request<ApiArtistDetails>(`/v1/artists/${encodeURIComponent(id)}`);
+    return clientCatalog.getArtist(id, () =>
+      request<ApiArtistDetails>(`/v1/artists/${encodeURIComponent(id)}`),
+    );
   },
 
   getPlaylist(id: string): Promise<ApiCatalogPlaylistDetails> {
-    return request<ApiCatalogPlaylistDetails>(
-      `/v1/playlists/${encodeURIComponent(id)}`,
+    return clientCatalog.getPlaylist(id, () =>
+      request<ApiCatalogPlaylistDetails>(`/v1/playlists/${encodeURIComponent(id)}`),
     );
   },
 
@@ -760,10 +708,11 @@ export const api = {
     return request<ApiLikedTracksPage>(`/v1/me/library/tracks?${params}`);
   },
 
-  likeTrack(id: string): Promise<void> {
+  async likeTrack(id: string): Promise<void> {
+    const track = await clientCatalog.resolveSnapshot(id);
     return request<void>(
       `/v1/me/library/tracks/${encodeURIComponent(id)}`,
-      { method: "PUT" },
+      { method: "PUT", ...(track ? { body: JSON.stringify({ track, trackSnapshot: track }) } : {}) },
     );
   },
 
@@ -780,10 +729,16 @@ export const api = {
     return request<{ items: unknown[] }>(`/v1/me/library/${type}`);
   },
 
-  saveCollection(type: "albums" | "artists" | "playlists", id: string): Promise<void> {
+  // the catalog lives on the client now, so the server can't look a collection up by
+  // id any more: send what we know (name / title, cover) or the library shows a blank tile
+  saveCollection(
+    type: "albums" | "artists" | "playlists",
+    id: string,
+    snapshot?: Record<string, unknown>,
+  ): Promise<void> {
     return request<void>(
       `/v1/me/library/${type}/${encodeURIComponent(id)}`,
-      { method: "PUT" },
+      { method: "PUT", ...(snapshot ? { body: JSON.stringify({ snapshot }) } : {}) },
     );
   },
 
@@ -834,13 +789,27 @@ export const api = {
     });
   },
 
-  addPlaylistTrack(
+  async addPlaylistTrack(
     playlistId: string,
     trackId: string,
+    snapshot?: ApiTrackBase,
   ): Promise<ApiUserPlaylistItem> {
+    const track = snapshot ?? (await clientCatalog.resolveSnapshot(trackId));
     return request<ApiUserPlaylistItem>(
       `/v1/me/playlists/${encodeURIComponent(playlistId)}/tracks/${encodeURIComponent(trackId)}`,
-      { method: "POST" },
+      { method: "POST", ...(track ? { body: JSON.stringify({ track, trackSnapshot: track }) } : {}) },
+    );
+  },
+
+  addPlaylistTrackSnapshots(
+    playlistId: string,
+    tracks: ApiTrackBase[],
+  ): Promise<{ items: ApiUserPlaylistItem[]; added: number; rejected: number }> {
+    return request<{ items: ApiUserPlaylistItem[]; added: number; rejected: number }>(
+      `/v1/me/playlists/${encodeURIComponent(playlistId)}/tracks`,
+      { method: "POST", body: JSON.stringify({ tracks }) },
+      true,
+      60_000,
     );
   },
 
@@ -869,87 +838,44 @@ export const api = {
     );
   },
 
-  createPlaylistImport(
-    url: string,
-  ): Promise<ImportJob> {
-    return request<ImportJob>(
-      "/v1/me/playlist-imports",
-      {
-        method: "POST",
-        body: JSON.stringify({ url }),
-      },
-    );
-  },
-
   getPlaylistImport(
     importId: string,
   ): Promise<ImportJob> {
-    return request<ImportJob>(
-      `/v1/me/playlist-imports/${encodeURIComponent(importId)}`,
-    );
+    const job = getLocalImportHandler().getJob(importId);
+    return job ? Promise.resolve(job) : Promise.reject(new ApiError(404, "Import was not found."));
   },
 
   getPlaylistImportReview(
     importId: string,
   ): Promise<{ items: ImportReview[] }> {
-    return request<{ items: ImportReview[] }>(
-      `/v1/me/playlist-imports/${encodeURIComponent(importId)}/review`,
-    );
+    return Promise.resolve({ items: getLocalImportHandler().getReview(importId) });
   },
 
   decidePlaylistImportReview(
     importId: string,
     decisions: ImportReviewDecision[],
-    tracks?: any[],
+    tracks?: Track[],
     title?: string,
     description?: string,
   ): Promise<{ approved: string[]; denied: string[]; finalized?: boolean }> {
-    return request<{ approved: string[]; denied: string[]; finalized?: boolean }>(
-      `/v1/me/playlist-imports/${encodeURIComponent(importId)}/review`,
-      {
-        method: "POST",
-        body: JSON.stringify({ decisions, tracks, title, description }),
-      },
-    );
+    return getLocalImportHandler()
+      .finalize(importId, tracks ?? [], title, description)
+      .then(({ finalized }) => ({
+        approved: decisions.filter((d) => d.decision === "approve").map((d) => d.reviewId),
+        denied: decisions.filter((d) => d.decision === "deny").map((d) => d.reviewId),
+        finalized,
+      }));
   },
 
   skipPlaylistImportReview(
     importId: string,
-    tracks?: any[],
+    tracks?: Track[],
     title?: string,
     description?: string,
   ): Promise<{ denied: "all"; finalized: boolean }> {
-    return request<{ denied: "all"; finalized: boolean }>(
-      `/v1/me/playlist-imports/${encodeURIComponent(importId)}/review`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          action: "skip",
-          ...(tracks?.length ? { tracks } : {}),
-          ...(title ? { title } : {}),
-          ...(description ? { description } : {}),
-        }),
-      },
-    );
-  },
-
-  createPlaybackSession(
-    id: string,
-    preferredCodec?: "opus" | "aac",
-    signal?: AbortSignal,
-    transport?: "proxy" | "direct_innertube",
-  ): Promise<PlaybackSession> {
-    return request<PlaybackSession>(
-      `/v1/tracks/${encodeURIComponent(id)}/playback`,
-      {
-        method: "POST",
-        signal,
-        body: JSON.stringify({
-          ...(transport ? { transport } : {}),
-          ...(preferredCodec ? { preferredCodec } : {}),
-        }),
-      },
-    );
+    return getLocalImportHandler()
+      .finalize(importId, tracks ?? [], title, description)
+      .then(({ finalized }) => ({ denied: "all" as const, finalized }));
   },
 
   /**
@@ -967,9 +893,17 @@ export const api = {
   async *streamLyrics(
     id: string,
     signal?: AbortSignal,
+    hint?: { title: string; artist: string; durationMs?: number },
   ): AsyncGenerator<LyricsStreamEvent> {
-    const path = `/v1/tracks/${encodeURIComponent(id)}/lyrics`;
-    const signedHeaders = await signApiRequest("GET", path);
+    const hintParams =
+      hint?.title.trim() && hint.artist.trim()
+        ? new URLSearchParams({
+            title: hint.title.trim(),
+            artist: hint.artist.trim(),
+            ...(hint.durationMs && hint.durationMs > 0 ? { durationMs: String(Math.round(hint.durationMs)) } : {}),
+          }).toString()
+        : "";
+    const path = `/v1/tracks/${encodeURIComponent(id)}/lyrics${hintParams ? `?${hintParams}` : ""}`;
     const accessToken = await getValidAccessToken();
     const requestId =
       typeof crypto !== "undefined" && crypto.randomUUID
@@ -992,7 +926,6 @@ export const api = {
           headers: {
             ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
             ...correlationHeaders,
-            ...signedHeaders,
           },
         },
       );
@@ -1000,23 +933,7 @@ export const api = {
       if (signal?.aborted || fetchErr?.name === "AbortError") {
         throw fetchErr;
       }
-      if (getApiBaseUrl() !== DEFAULT_PRIMARY_API) {
-        switchToPrimaryApi();
-        const primarySigned = await signApiRequest("GET", path);
-        res = await fetch(
-          `${getApiBaseUrl()}${path}`,
-          {
-            signal,
-            headers: {
-              ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-              ...correlationHeaders,
-              ...primarySigned,
-            },
-          },
-        );
-      } else {
-        throw fetchErr;
-      }
+      throw fetchErr;
     }
 
     const lyricsDateHeader = res.headers?.get?.("date");
@@ -1102,19 +1019,5 @@ export const api = {
 
   getDailyMixes(): Promise<DailyMixesResponse> {
     return request<DailyMixesResponse>("/v1/me/recommendations/daily-mixes");
-  },
-
-  getWave(payload: WaveRecommendationRequest = {}): Promise<WaveRecommendationResponse> {
-    const params = new URLSearchParams();
-    if (payload.k) params.set("k", String(payload.k));
-    if (payload.waveId) params.set("waveId", payload.waveId);
-    if (payload.driftRate) params.set("driftRate", String(payload.driftRate));
-    if (payload.temperature) params.set("temperature", String(payload.temperature));
-    const qs = params.toString();
-    return request<WaveRecommendationResponse>(`/v1/me/recommendations/wave${qs ? `?${qs}` : ""}`);
-  },
-
-  getUserTasteProfile(): Promise<UserTasteProfile> {
-    return request<UserTasteProfile>("/v1/me/recommendations/taste");
   },
 };

@@ -2,11 +2,12 @@ import { usePlayerStore } from "../store/playerStore";
 import { ApiError } from "@/shared/api";
 import { log } from "@/shared/utils/logger";
 import { telemetry } from "@/shared/telemetry";
-import { linerDb } from "@/shared/storage";
+import { linerDb, audioCache } from "@/shared/storage";
 import { isStandaloneAudioFile } from "@/shared/storage/audioFormat";
 import type { Track } from "@/shared/types";
 import { pitchShifter } from "./pitchShifter";
-import { resolvePlayback, invalidateCachedStream } from "./playbackSource";
+import { resolvePlaybackStream, type PlaybackStream } from "./streamResolver";
+import { downloadAudioBytes } from "@/shared/media/innertube";
 import { transitionSpec } from "./transitions";
 
 /**
@@ -15,6 +16,10 @@ import { transitionSpec } from "./transitions";
  * restore the old background-caching behaviour.
  */
 const AUTO_CACHE_AUDIO = false;
+
+// error recovery tuning (see the audio "error" handler)
+const RECOVERY_HOLD_MS = 3000;
+const WAITING_GRACE_MS = 300; // a buffering hiccup shorter than this never shows // must play this far past a recovery before it may retry again
 
 export class PlayerRuntime {
   private audio: HTMLAudioElement;
@@ -31,12 +36,24 @@ export class PlayerRuntime {
   private ttfbMs = 0;
   private activePlayPromise: Promise<void> | null = null;
   private activeBlobUrl: string | null = null;
+  // track whose audio is attached to the element right now. During a skip the old
+  // source stays attached (paused) until the next one is ready, so this can lag
+  // currentTrackId for a moment.
+  private attachedTrackId: string | null = null;
   private preloadingTrackId: string | null = null;
   private preloadingPromise: Promise<void> | null = null;
   private preloadAbortController: AbortController | null = null;
   private backgroundCacheAbortController: AbortController | null = null;
   private currentSessionExpiresAt: number | null = null;
   private recoveryAttempts = 0;
+  // after a recovery, the retry budget only refills once playback gets past this
+  // position: a "playing" event alone is not proof (a bad frame further on would
+  // otherwise error -> recover -> play -> error forever, reloading every time)
+  private recoveryHoldUntilMs: number | null = null;
+  // a "waiting" only becomes the loading state if it lasts: a seek inside an already
+  // loaded / cached track fires waiting -> playing within milliseconds, and flipping
+  // the status for that re-animated the play / pause button on every seek
+  private waitingTimer: ReturnType<typeof setTimeout> | null = null;
   public onEnded?: () => void;
   public onError?: (info: { trackId: string; message: string }) => void;
 
@@ -57,7 +74,6 @@ export class PlayerRuntime {
     }
     this.audio = audio;
     this.setupAudioListeners(this.audio);
-    pitchShifter.attach(this.audio);
 
     const initialVolume = usePlayerStore.getState().volume;
     this.audio.volume = initialVolume;
@@ -65,6 +81,9 @@ export class PlayerRuntime {
     log("cyan", "boot", `volume ${initialVolume}`);
 
     usePlayerStore.subscribe((state, prevState) => {
+      if (state.status !== prevState.status) {
+        this.syncMediaSessionState(state.status);
+      }
       if (state.volume !== prevState.volume) {
         this.cancelFade();
         if (!this.audio.paused) {
@@ -133,6 +152,21 @@ export class PlayerRuntime {
       navigator.mediaSession.setActionHandler("nexttrack", () => {
         usePlayerStore.getState().dispatch({ type: "SKIP_NEXT" });
       });
+      navigator.mediaSession.setActionHandler("stop", () => {
+        usePlayerStore.getState().dispatch({ type: "PAUSE_REQUESTED" });
+      });
+      const seekBy = (deltaSeconds: number) => {
+        const st = usePlayerStore.getState();
+        const max = st.durationMs > 0 ? st.durationMs : Number.POSITIVE_INFINITY;
+        const next = Math.min(max, Math.max(0, st.positionMs + deltaSeconds * 1000));
+        st.dispatch({ type: "SEEK_COMMITTED", positionMs: Math.round(next) });
+      };
+      navigator.mediaSession.setActionHandler("seekbackward", (details) => {
+        seekBy(-(details.seekOffset ?? 10));
+      });
+      navigator.mediaSession.setActionHandler("seekforward", (details) => {
+        seekBy(details.seekOffset ?? 10);
+      });
       navigator.mediaSession.setActionHandler("seekto", (details) => {
         if (details.seekTime !== undefined && !Number.isNaN(details.seekTime)) {
           usePlayerStore.getState().dispatch({
@@ -143,6 +177,44 @@ export class PlayerRuntime {
       });
     } catch {
       // ignore unsupported media session actions
+    }
+  }
+
+  // windows' media controls (and apps built on them, like FluentFlyout) read this.
+  // "loading" between tracks still reports playing so the session never looks finished.
+  private syncMediaSessionState(status: string) {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    try {
+      navigator.mediaSession.playbackState =
+        status === "playing" || status === "loading"
+          ? "playing"
+          : status === "paused"
+            ? "paused"
+            : "none";
+      if (status === "idle") navigator.mediaSession.metadata = null;
+    } catch {
+      // ignore unsupported environments
+    }
+  }
+
+  // progress / seek bar in the system controls
+  private syncMediaSessionPosition() {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    const ms = navigator.mediaSession as MediaSession & {
+      setPositionState?: (state?: MediaPositionState) => void;
+    };
+    if (typeof ms.setPositionState !== "function") return;
+    if (this.attachedTrackId !== this.currentTrackId) return;
+    const duration = this.audio.duration;
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    try {
+      ms.setPositionState({
+        duration,
+        playbackRate: this.audio.playbackRate > 0 ? this.audio.playbackRate : 1,
+        position: Math.min(duration, Math.max(0, this.audio.currentTime || 0)),
+      });
+    } catch {
+      // ignore invalid transient states
     }
   }
 
@@ -180,6 +252,10 @@ export class PlayerRuntime {
 
       const posMs = Math.round(audioEl.currentTime * 1000);
       usePlayerStore.getState().setPosition(posMs);
+      if (this.recoveryHoldUntilMs !== null && posMs >= this.recoveryHoldUntilMs) {
+        this.recoveryHoldUntilMs = null;
+        this.recoveryAttempts = 0;
+      }
       this.maybeStartEndFade(audioEl);
     });
 
@@ -189,26 +265,51 @@ export class PlayerRuntime {
       if (Number.isNaN(audioEl.duration) || audioEl.duration <= 0) return;
 
       usePlayerStore.getState().setDuration(Math.round(audioEl.duration * 1000));
+      this.syncMediaSessionPosition();
     });
+
+    for (const type of ["seeked", "ratechange", "play", "pause", "loadedmetadata"]) {
+      audioEl.addEventListener(type, () => {
+        if (this.isResetting || audioEl !== this.audio) return;
+        this.syncMediaSessionPosition();
+      });
+    }
 
     audioEl.addEventListener("waiting", () => {
       if (this.isResetting || audioEl !== this.audio) return;
       log("yellow", "audio", "buffering (waiting)");
       this.stallStartTime = performance.now();
-      if (usePlayerStore.getState().status === "playing") {
-        usePlayerStore.getState().setStatus("loading");
-      }
+      if (this.waitingTimer) clearTimeout(this.waitingTimer);
+      this.waitingTimer = setTimeout(() => {
+        this.waitingTimer = null;
+        // still stuck: a real stall, show it
+        if (audioEl !== this.audio || audioEl.paused || audioEl.readyState >= 3) return;
+        if (usePlayerStore.getState().status === "playing") {
+          usePlayerStore.getState().setStatus("loading");
+        }
+      }, WAITING_GRACE_MS);
     });
+
+    // resumed (or never really stalled): drop a pending "loading"
+    for (const type of ["playing", "seeked", "canplay", "pause", "emptied"]) {
+      audioEl.addEventListener(type, () => {
+        if (audioEl !== this.audio || !this.waitingTimer) return;
+        if (type === "seeked" && audioEl.readyState < 3) return; // seeked but still no data
+        clearTimeout(this.waitingTimer);
+        this.waitingTimer = null;
+      });
+    }
 
     audioEl.addEventListener("ended", () => {
       if (this.isResetting || audioEl !== this.audio) return;
       if (!this.currentTrackId) return;
+      if (this.attachedTrackId !== this.currentTrackId) return;
 
       // Ensure the track truly finished playing (not an empty media load or teardown artefact)
       const duration = audioEl.duration;
       const currentTime = audioEl.currentTime;
       if (duration > 0 && currentTime >= Math.max(0, duration - 1.5)) {
-        log("cyan", "audio", "ended — skipping to next");
+        log("cyan", "audio", "ended â€” skipping to next");
         this.onEnded?.();
         const state = usePlayerStore.getState();
         state.dispatch({ type: "SKIP_NEXT", isAutoEnd: true });
@@ -218,6 +319,7 @@ export class PlayerRuntime {
     audioEl.addEventListener("playing", () => {
       if (this.isResetting || audioEl !== this.audio) return;
       log("green", "audio", "playing");
+      if (this.recoveryHoldUntilMs === null) this.recoveryAttempts = 0;
       this.applyPlaybackRateAndPitch();
 
       if (this.stallStartTime !== null) {
@@ -250,6 +352,8 @@ export class PlayerRuntime {
     audioEl.addEventListener("error", () => {
       if (this.isResetting || audioEl !== this.audio) return;
       if (!this.currentTrackId || !audioEl.src || audioEl.src === window.location.href) return;
+      // the previous track's source is still attached while the next one loads
+      if (this.attachedTrackId !== this.currentTrackId) return;
 
       const message = audioEl.error?.message || "Audio playback error";
       const code = audioEl.error?.code;
@@ -268,25 +372,28 @@ export class PlayerRuntime {
         });
       }
 
+      if (this.activeBlobUrl) {
+        URL.revokeObjectURL(this.activeBlobUrl);
+        this.activeBlobUrl = null;
+        void linerDb.deleteAudio(this.currentTrackId);
+        audioCache.deleteAudio(this.currentTrackId);
+      }
+
       const store = usePlayerStore.getState();
       const currentTrack = store.currentTrack;
+      const posMs = Number.isFinite(audioEl.currentTime) && audioEl.currentTime > 0
+        ? Math.round(audioEl.currentTime * 1000)
+        : store.positionMs;
+
       if (
         currentTrack &&
         currentTrack.id === this.currentTrackId &&
         this.recoveryAttempts < 1
       ) {
         this.recoveryAttempts++;
-        const posMs = store.positionMs;
-        const failedFromCache = Boolean(this.activeBlobUrl) && this.audio.src === this.activeBlobUrl;
-        log("yellow", "playback", `audio error encountered — recovering via ${failedFromCache ? "fresh stream (dropping bad cache)" : "cache/stream"} at ${posMs}ms`);
-        if (!failedFromCache) {
-          // The resolver may have cached the failing URL — drop it so the
-          // recovery resolves a fresh stream (recoveryAttempts > 0 also
-          // forces a refresh inside `loadAndPlay`).
-          invalidateCachedStream(currentTrack.id);
-        }
-        const evict = failedFromCache ? linerDb.deleteAudio(currentTrack.id) : Promise.resolve();
-        void evict.finally(() => this.loadAndPlay(currentTrack, posMs));
+        this.recoveryHoldUntilMs = posMs + RECOVERY_HOLD_MS;
+        log("yellow", "playback", `audio error encountered â€” recovering via cache/stream at ${posMs}ms`);
+        void this.loadAndPlay(currentTrack, posMs, true);
         return;
       }
 
@@ -305,6 +412,7 @@ export class PlayerRuntime {
       Date.now() >= this.currentSessionExpiresAt - 15_000;
     return (
       this.currentTrackId === trackId &&
+      this.attachedTrackId === trackId &&
       Boolean(this.audio.currentSrc || this.audio.src) &&
       this.audio.src !== window.location.href &&
       !this.audio.error &&
@@ -334,6 +442,8 @@ export class PlayerRuntime {
       const pitchSemitones = store.pitchSemitones ?? 0;
       const isReverbEnabled = store.isReverbEnabled ?? false;
       const reverbLevel = store.reverbLevel ?? 0.35;
+      const needsEffects = isReverbEnabled || (!isPitchLinked && Math.abs(pitchSemitones) >= 0.05);
+      if (!needsEffects && !pitchShifter.isAttached()) return;
       pitchShifter.attach(this.audio);
       pitchShifter.update({
         pitchSemitones,
@@ -471,10 +581,34 @@ export class PlayerRuntime {
       }
       this.audio.removeAttribute("src");
       this.audio.load();
+      this.attachedTrackId = null;
     } catch {
     } finally {
       this.isResetting = false;
     }
+  }
+
+  // between tracks: silence the old source but keep it attached until the next one
+  // is ready. Emptying the element here made Chromium drop the system media session
+  // during every skip, so Windows controls / FluentFlyout lost Liner after a track change.
+  private pauseForTransition() {
+    this.isResetting = true;
+    this.currentSessionExpiresAt = null;
+    try {
+      this.cancelFade();
+      this.audio.pause();
+    } catch {
+    } finally {
+      this.isResetting = false;
+    }
+  }
+
+  private attachSource(url: string, isBlob: boolean, trackId: string) {
+    const previousBlob = this.activeBlobUrl;
+    this.audio.src = url;
+    this.activeBlobUrl = isBlob ? url : null;
+    this.attachedTrackId = trackId;
+    if (previousBlob && previousBlob !== url) URL.revokeObjectURL(previousBlob);
   }
 
   public cancelPendingLoad(): void {
@@ -486,6 +620,7 @@ export class PlayerRuntime {
     this.currentTrackId = null;
     this.currentSessionExpiresAt = null;
     this.recoveryAttempts = 0;
+    this.recoveryHoldUntilMs = null;
     this.safeResetAudioElement();
     usePlayerStore.getState().setStatus("paused");
     log("cyan", "playback", "pending load cancelled");
@@ -503,38 +638,18 @@ export class PlayerRuntime {
     this.preloadAbortController = controller;
     this.preloadingTrackId = track.id;
 
+    const generation = audioCache.currentGeneration();
     const promise = (async () => {
       try {
-        // Single source of truth: the provider resolver handles transport
-        // selection (server-auto / direct / proxy), expiry and fallback.
-        const resolution = await resolvePlayback({
-          track,
-          purpose: "preload",
-          signal: controller.signal,
-        });
+        const stream = await resolvePlaybackStream(track, controller.signal);
         if (controller.signal.aborted) return;
         // Warm the in-memory stream cache only; never download/write audio to
         // disk during preload (files are saved only via the Download action).
         if (!AUTO_CACHE_AUDIO) return;
 
-        const stream = resolution.stream;
-        const response = await fetch(stream.url, {
-          headers: { Range: "bytes=0-" },
-          signal: controller.signal,
-        });
-
-        if (!response.ok && response.status !== 206) return;
-
-        const arrayBuffer = await response.arrayBuffer();
-        if (controller.signal.aborted) return;
-        if (!isStandaloneAudioFile(new Uint8Array(arrayBuffer, 0, Math.min(16, arrayBuffer.byteLength)))) return;
-
-        const mimeType =
-          stream.mimeType ||
-          response.headers.get("content-type") ||
-          "audio/webm";
-        const blob = new Blob([arrayBuffer], { type: mimeType });
-        await linerDb.putAudio(track.id, blob, mimeType);
+        const blob = await this.downloadAudioBlob(stream, controller.signal);
+        if (!blob || controller.signal.aborted) return;
+        if (!(await audioCache.saveAudioBlob(track.id, blob, blob.type, generation))) return;
         await linerDb.putTrack(track);
         log(
           "green",
@@ -579,13 +694,18 @@ export class PlayerRuntime {
     }
   }
 
-  public async loadAndPlay(track: Track, startPositionMs: number = 0) {
+  public async loadAndPlay(
+    track: Track,
+    startPositionMs: number = 0,
+    bypassCache: boolean = false,
+  ) {
     this.cancelFade();
     this.pendingStartPositionMs = startPositionMs;
     const epoch = ++this.loadEpoch;
 
     if (this.currentTrackId !== track.id) {
       this.recoveryAttempts = 0;
+      this.recoveryHoldUntilMs = null;
       // Fade the outgoing song out before switching (no-op when the preset's
       // fade-out is 0 or nothing is currently audible).
       await this.fadeOutForTransition();
@@ -620,20 +740,29 @@ export class PlayerRuntime {
     store.setStatus("loading", null);
     store.setPosition(startPositionMs > 0 ? startPositionMs : 0);
 
-    this.safeResetAudioElement();
+    this.pauseForTransition();
 
     try {
-      const cachedAudio = await linerDb.getAudio(track.id);
+      const cachedAudio = bypassCache ? null : await linerDb.getAudio(track.id);
       if (epoch !== this.loadEpoch || controller.signal.aborted) {
         return;
       }
 
-      if (cachedAudio) {
+      const isValidCachedBlob =
+        Boolean(cachedAudio?.blob) &&
+        cachedAudio!.blob.size > 0 &&
+        (!cachedAudio!.blob.type || cachedAudio!.blob.type.startsWith("audio/"));
+
+      if (cachedAudio && !isValidCachedBlob) {
+        void linerDb.deleteAudio(track.id);
+        audioCache.deleteAudio(track.id);
+      }
+
+      if (cachedAudio && isValidCachedBlob) {
         this.currentSessionExpiresAt = null;
         void linerDb.putTrack(track);
         const blobUrl = URL.createObjectURL(cachedAudio.blob);
-        this.activeBlobUrl = blobUrl;
-        this.audio.src = blobUrl;
+        this.attachSource(blobUrl, true, track.id);
         this.audio.volume = 0;
         this.audio.load();
         this.applyPlaybackRateAndPitch();
@@ -685,13 +814,7 @@ export class PlayerRuntime {
         return;
       }
 
-      const resolution = await resolvePlayback({
-        track,
-        purpose: "playback",
-        signal: controller.signal,
-        // A recovery attempt must never reuse the stream that just failed.
-        forceRefresh: this.recoveryAttempts > 0,
-      });
+      const stream = await resolvePlaybackStream(track, controller.signal);
       this.ttfbMs = Math.round(performance.now() - this.loadStartTime);
 
       if (epoch !== this.loadEpoch || controller.signal.aborted) {
@@ -699,24 +822,12 @@ export class PlayerRuntime {
         return;
       }
 
-      const stream = resolution.stream;
-      const url = stream.url;
-      const streamCodec = stream.codec || "opus";
-      const streamBitrate = stream.bitrate || 160000;
-      const streamMimeType = stream.mimeType || "audio/webm";
+      const streamCodec = stream.codec;
+      const streamBitrate = stream.bitrate;
       this.currentSessionExpiresAt = stream.expiresAtMs;
-      if (resolution.providerId !== "liner-auto") {
-        log(
-          "cyan",
-          "playback",
-          `resolved via fallback provider ${resolution.providerId} (${track.title})`,
-        );
-      }
-      if (this.activeBlobUrl) {
-        URL.revokeObjectURL(this.activeBlobUrl);
-        this.activeBlobUrl = null;
-      }
-      this.audio.src = url;
+      log("cyan", "playback", `resolved stream for ${track.title}`);
+      const url = stream.blob ? URL.createObjectURL(stream.blob) : stream.url;
+      this.attachSource(url, Boolean(stream.blob), track.id);
       this.audio.volume = 0;
       this.audio.load();
       this.applyPlaybackRateAndPitch();
@@ -731,8 +842,6 @@ export class PlayerRuntime {
         "playback",
         `stream attached: ${streamCodec} ${streamBitrate} bps (${track.title})`,
       );
-
-      this.cacheOncePlaying(track, url, streamMimeType, bgCacheController.signal);
 
       if (this.audio.readyState < 3) {
         await new Promise<void>((resolve) => {
@@ -760,6 +869,8 @@ export class PlayerRuntime {
 
       if (epoch === this.loadEpoch) {
         usePlayerStore.getState().setStatus("playing");
+        this.fadeVolume(usePlayerStore.getState().volume, 180);
+        this.cacheAudioInBackground(track, stream, bgCacheController.signal);
         this.applyTransitionFadeIn();
       }
       log(
@@ -785,7 +896,7 @@ export class PlayerRuntime {
       }
 
       if (error instanceof DOMException && error.name === "NotAllowedError") {
-        log("yellow", "playback", "autoplay blocked — waiting for user gesture");
+        log("yellow", "playback", "autoplay blocked â€” waiting for user gesture");
         usePlayerStore.getState().setStatus("paused");
         return;
       }
@@ -823,7 +934,7 @@ export class PlayerRuntime {
       try {
         this.audio.currentTime = positionMs / 1000;
       } catch {
-        // Media not seekable yet — ignore
+        // Media not seekable yet â€” ignore
       }
     };
     if (this.audio.readyState >= 1) {
@@ -888,14 +999,14 @@ export class PlayerRuntime {
         .catch((error) => {
           if (epoch !== this.loadEpoch) return;
           if (error.name === "NotAllowedError") {
-            log("yellow", "audio", "play blocked — waiting for user gesture");
+            log("yellow", "audio", "play blocked â€” waiting for user gesture");
             usePlayerStore.getState().setStatus("paused");
           } else if (error.name !== "AbortError") {
             log("red", "audio", `play failed: ${String(error)}`);
             if (currentTrack && this.recoveryAttempts < 1) {
               this.recoveryAttempts++;
-              log("yellow", "playback", "resume failed — attempting cache/stream recovery");
-              void this.loadAndPlay(currentTrack, usePlayerStore.getState().positionMs);
+              log("yellow", "playback", "resume failed â€” attempting cache/stream recovery");
+              void this.loadAndPlay(currentTrack, usePlayerStore.getState().positionMs, true);
               return;
             }
             usePlayerStore.getState().setStatus("paused");
@@ -927,7 +1038,7 @@ export class PlayerRuntime {
       usePlayerStore.getState().setSleepTimer(null);
       return;
     }
-    log("cyan", "audio", "sleep timer ended — fading out and pausing");
+    log("cyan", "audio", "sleep timer ended â€” fading out and pausing");
     this.fadeVolume(0, 4_000, () => {
       this.audio.pause();
       this.audio.volume = Math.max(
@@ -973,45 +1084,41 @@ export class PlayerRuntime {
     }
   }
 
-  private cacheOncePlaying(
-    track: Track,
-    url: string,
-    preferredMimeType: string | undefined,
-    signal: AbortSignal,
-  ) {
-    const onPlaying = () => {
-      this.audio.removeEventListener("playing", onPlaying);
-      if (signal.aborted || this.currentTrackId !== track.id || this.audio.error) return;
-      this.cacheAudioInBackground(track, url, preferredMimeType, signal);
-    };
-    this.audio.addEventListener("playing", onPlaying);
-    signal.addEventListener("abort", () => this.audio.removeEventListener("playing", onPlaying), { once: true });
+  private async downloadAudioBlob(stream: PlaybackStream, signal: AbortSignal): Promise<Blob | null> {
+    if (stream.blob) return stream.blob;
+    const startedAt = performance.now();
+    const bytes = await downloadAudioBytes(stream.url, {
+      contentLength: stream.contentLength,
+      signal,
+    });
+    if (!bytes || signal.aborted) return null;
+    const mimeType = stream.mimeType || "audio/webm";
+    if (!mimeType.startsWith("audio/") && !mimeType.startsWith("video/")) return null;
+    if (!isStandaloneAudioFile(bytes.subarray(0, 16))) {
+      log("yellow", "download", `not caching: stream is not a standalone audio file`);
+      return null;
+    }
+    log(
+      "cyan",
+      "download",
+      `${Math.round(bytes.byteLength / 1024)} KB in ${Math.round(performance.now() - startedAt)}ms (${stream.contentLength ? "chunked" : "single request"})`,
+    );
+    return new Blob([bytes], { type: mimeType });
   }
 
-  private cacheAudioInBackground(
-    track: Track,
-    url: string,
-    preferredMimeType?: string,
-    signal?: AbortSignal,
-  ) {
+  private cacheAudioInBackground(track: Track, stream: PlaybackStream, signal: AbortSignal) {
     if (!AUTO_CACHE_AUDIO) return;
     if (track.durationMs && track.durationMs > 20 * 60 * 1000) return;
-    fetch(url, { headers: { Range: "bytes=0-" }, signal })
-      .then(async (res) => {
-        if (!res.ok && res.status !== 206) return;
-        const arrayBuffer = await res.arrayBuffer();
-        if (signal?.aborted) return;
-        if (!isStandaloneAudioFile(new Uint8Array(arrayBuffer, 0, Math.min(16, arrayBuffer.byteLength)))) {
-          log("yellow", "playback", `not caching ${track.title}: stream is not a standalone audio file`);
-          return;
-        }
-        const mimeType = preferredMimeType || res.headers.get("content-type") || "audio/webm";
-        const blob = new Blob([arrayBuffer], { type: mimeType });
-        await linerDb.putAudio(track.id, blob, mimeType);
+    const generation = audioCache.currentGeneration();
+    void (async () => {
+      try {
+        const blob = await this.downloadAudioBlob(stream, signal);
+        if (!blob || signal.aborted) return;
+        if (!(await audioCache.saveAudioBlob(track.id, blob, blob.type, generation))) return;
         await linerDb.putTrack(track);
         log("green", "playback", `background cached: ${track.title} (${Math.round(blob.size / 1024)} KB)`);
-      })
-      .catch(() => {});
+      } catch {}
+    })();
   }
 }
 

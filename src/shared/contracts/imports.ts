@@ -22,10 +22,7 @@ export interface ImportJob {
   requiresDecision: boolean;
   playlistId?: string;
   result?: ImportResult;
-  queuePosition?: number;
   error?: { code: string; message: string };
-  importToken?: string;
-  workerWsUrl?: string;
   createdAt: Date | string;
   startedAt?: Date | string;
   finishedAt?: Date | string;

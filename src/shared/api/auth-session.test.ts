@@ -251,4 +251,73 @@ describe("auth-session token system", () => {
     expect(res401).toBeNull();
     expect(getAuthSession()).toBeNull();
   });
+
+  describe("refresh rejections", () => {
+    const base = (): AuthTokens => ({
+      accessToken: "old_token",
+      refreshToken: "rt_1",
+      accessTokenExpiresAt: new Date(Date.now() - 1000).toISOString(),
+      user: { id: "u1", email: "user@example.com" },
+    });
+    const reject = (status = 401, code = "INVALID_SIGNATURE") => ({
+      ok: false,
+      status,
+      headers: { get: () => null },
+      clone() {
+        return { json: async () => ({ code }) };
+      },
+    });
+    const okRefresh = () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      json: async () => ({
+        accessToken: "new_token",
+        refreshToken: "rt_2",
+        accessTokenExpiresAt: new Date(Date.now() + 3600_000).toISOString(),
+      }),
+    });
+
+    it("a one-off 401 (e.g. a rejected signature) is retried and does not sign out", async () => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      setAuthSession(base());
+      globalThis.fetch = vi.fn().mockResolvedValueOnce(reject()).mockResolvedValueOnce(okRefresh()) as any;
+      const res = await refreshAuthSession();
+      expect(res?.refreshToken).toBe("rt_2");
+      expect(getAuthSession()?.accessToken).toBe("new_token");
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("adopts a token rotated elsewhere instead of signing out", async () => {
+      setAuthSession(base());
+      const rotated = { ...base(), accessToken: "other_window_token", refreshToken: "rt_9" };
+      globalThis.fetch = vi.fn().mockImplementation(async () => {
+        // another window finished a refresh meanwhile
+        storageMap.set("liner_auth_session", JSON.stringify(rotated));
+        return reject(401, "TOKEN_REUSED");
+      }) as any;
+      const res = await refreshAuthSession();
+      expect(res?.refreshToken).toBe("rt_9");
+      expect(getAuthSession()?.accessToken).toBe("other_window_token");
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("signs out only after the retry is rejected too, and logs why", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      setAuthSession(base());
+      globalThis.fetch = vi.fn().mockResolvedValue(reject(401, "REFRESH_TOKEN_EXPIRED")) as any;
+      const res = await refreshAuthSession();
+      expect(res).toBeNull();
+      expect(getAuthSession()).toBeNull();
+      expect(warn.mock.calls.flat().join(" ")).toContain("REFRESH_TOKEN_EXPIRED");
+    });
+
+    it("keeps the session on server errors", async () => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      setAuthSession(base());
+      globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 503, headers: { get: () => null } }) as any;
+      expect(await refreshAuthSession()).toBeNull();
+      expect(getAuthSession()?.refreshToken).toBe("rt_1");
+    });
+  });
 });

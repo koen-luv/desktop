@@ -6,6 +6,8 @@ import TextInput from "@/shared/ui/TextInput";
 import Select from "@/shared/ui/Select";
 import { EyeLine, EyeCloseLine, ArrowLeftLine } from "@mingcute/react";
 import WindowControls from "@/features/navigation/ui/WindowControls";
+import { useWindowState } from "@/features/navigation/hooks/useWindowState";
+import { isAndroidApp } from "@/platform";
 import logo from "@/assets/logo.svg";
 import cloudsBanner from "@/assets/wallhaven-5g1yz8.jpg";
 import CircleDitherCanvas from "@/shared/ui/CircleDitherCanvas";
@@ -22,6 +24,9 @@ const USERNAME_RE = /^[a-z0-9_]{3,30}$/;
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  // maximized / fullscreen: square, borderless, edge to edge (same as the main app frame)
+  const { isEdgeToEdge } = useWindowState();
+  const frameShape = isEdgeToEdge ? "rounded-none" : "rounded-5xl";
   const login = useAuthStore((state) => state.login);
   const register = useAuthStore((state) => state.register);
   const { locale, setLocale, t } = useTranslation();
@@ -171,8 +176,16 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-none md:rounded-5xl border-0 md:border md:border-border-primary bg-bg-primary pt-[var(--inset-top,0px)] pb-[var(--inset-bottom,0px)]">
-      <div className="absolute inset-0 z-0 select-none overflow-hidden rounded-5xl">
+    <main
+      className={`relative flex h-full w-full items-center justify-center overflow-hidden ${
+        isAndroidApp() ? "rounded-none" : frameShape
+      } ${isEdgeToEdge || isAndroidApp() ? "border-0" : "border border-border-primary"} bg-bg-primary${
+        isAndroidApp() ? " pt-[var(--inset-top,0px)] pb-[var(--inset-bottom,0px)]" : ""
+      }`}
+    >
+      <div
+        className={`absolute inset-0 z-0 select-none overflow-hidden ${isAndroidApp() ? "rounded-none" : frameShape}`}
+      >
         <CircleDitherCanvas
           src={cloudsBanner}
           alt="Clouds Dither Background"
@@ -182,7 +195,7 @@ export default function LoginPage() {
           cornerRadius={12}
           gridType="square"
           objectFit="cover"
-          className="h-full w-full rounded-5xl overflow-hidden"
+          className={`h-full w-full ${frameShape} overflow-hidden`}
         />
       </div>
 
@@ -210,7 +223,7 @@ export default function LoginPage() {
               onChange={setLocale}
               align="bottom-right"
               variant="transparent"
-              className="ml-auto"
+              className="ml-auto min-w-[120px]"
               aria-label={t("login.select_language")}
             />
           </div>
@@ -282,7 +295,7 @@ export default function LoginPage() {
                     : t("login.profile_setup_subtitle")}
               </p>
 
-              <form onSubmit={submit} className="mt-[20px] flex flex-col">
+              <form noValidate onSubmit={submit} className="mt-[20px] flex flex-col">
                 <AnimatePresence initial={false}>
                   {mode === "login" || registerStep === 1 ? (
                     <motion.div

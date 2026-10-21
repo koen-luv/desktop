@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
+import { startPoTokenWorker } from "./potoken-preload";
 import type { MainNetResult } from "./netdiag";
-import type { DiscordActivity } from "./discordRpc";
 
 export interface DeeplinkTarget {
   type: "artist" | "album" | "playlist" | "track";
@@ -34,6 +34,7 @@ export interface UpdateDownloadProgress {
 export interface WindowState {
   isMaximized: boolean;
   isFullScreen: boolean;
+  isVisible?: boolean;
 }
 
 export interface LinerElectronApi {
@@ -46,15 +47,11 @@ export interface LinerElectronApi {
   isMaximized: () => Promise<boolean>;
   isFullScreen: () => Promise<boolean>;
   onWindowStateChange: (cb: (state: WindowState) => void) => () => void;
+  onWindowRestored?: (cb: () => void) => () => void;
+  onWindowMinimized?: (cb: () => void) => () => void;
   dragStart: () => void;
   dragMove: (deltaX: number, deltaY: number) => void;
   dragEnd: () => void;
-  signRequest: (input: { method: string; path: string; body?: string | null; timestamp?: number }) => Promise<{
-    signature?: string;
-    timestamp?: number;
-    nonce?: string;
-    error?: string;
-  }>;
   signMonitorRequest: (input: { method: string; path: string; body?: string | null; timestamp?: number }) => Promise<{
     signature?: string;
     timestamp?: number;
@@ -75,7 +72,10 @@ export interface LinerElectronApi {
     canceled?: boolean;
     error?: string;
   }>;
-  setAppIcon: (dataUrl: string) => Promise<void>;
+  setAppIcon: (
+    dataUrl: string,
+    options?: { isDefault?: boolean },
+  ) => Promise<void>;
   getAppVersion: () => Promise<string>;
   getCacheStats: () => Promise<ElectronCacheStats>;
   openCacheFolder: () => Promise<boolean>;
@@ -104,6 +104,7 @@ export interface LinerElectronApi {
   onBundleAvailable: (cb: (manifest: any) => void) => () => void;
   onBundleDownloadProgress: (cb: (progress: { percent: number; transferred: number; total: number }) => void) => () => void;
   onBundleReady: (cb: (state: any) => void) => () => void;
+  onBundleStamp: (cb: (line: string) => void) => () => void;
   touchbarUpdateState: (state: any) => void;
   onTouchBarAction: (cb: (action: any) => void) => () => void;
   sendTouchBarAction: (action: any) => void;
@@ -118,12 +119,14 @@ export interface LinerElectronApi {
   onOverlayState: (cb: (state: any) => void) => () => void;
   getOverlayInitialState: () => Promise<any>;
   updateOverlaySettings: (settings: any) => void;
+  pauseOverlayShortcuts: (paused: boolean) => void;
   onOverlaySettingsChanged: (cb: (settings: any) => void) => () => void;
   onOverlayVisibility: (cb: (visible: boolean) => void) => () => void;
-  // Discord Rich Presence (desktop only)
-  discordRpcConfigure: (clientId: string, enabled: boolean) => void;
-  discordRpcSetPresence: (activity: DiscordActivity | null) => void;
-  discordRpcClear: () => void;
+  setOverlayAuthenticated?: (authenticated: boolean) => void;
+  discordUpdateState: (state: any) => void;
+  discordUpdateSettings: (settings: any) => void;
+  getDiscordStatus: () => Promise<{ connected: boolean; username?: string }>;
+  mintPoToken: (identifier: string) => Promise<string>;
 }
 
 const isHyprland = Boolean(
@@ -148,6 +151,20 @@ const api: LinerElectronApi = {
       ipcRenderer.removeListener("window:state-changed", listener);
     };
   },
+  onWindowRestored: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on("window:restored", listener);
+    return () => {
+      ipcRenderer.removeListener("window:restored", listener);
+    };
+  },
+  onWindowMinimized: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on("window:minimized", listener);
+    return () => {
+      ipcRenderer.removeListener("window:minimized", listener);
+    };
+  },
   dragStart: () => {
     ipcRenderer.send("window:drag-start");
   },
@@ -157,7 +174,6 @@ const api: LinerElectronApi = {
   dragEnd: () => {
     ipcRenderer.send("window:drag-end");
   },
-  signRequest: (input) => ipcRenderer.invoke("signer:sign-request", input),
   signMonitorRequest: (input) => ipcRenderer.invoke("signer:sign-monitor-request", input),
   syncServerTime: (dateHeaderOrMs) => ipcRenderer.invoke("signer:sync-time", dateHeaderOrMs),
   getServerTimeOffset: () => ipcRenderer.invoke("signer:get-time-offset"),
@@ -167,7 +183,8 @@ const api: LinerElectronApi = {
   openDownloads: (customPath) => ipcRenderer.invoke("shell:open-downloads", customPath),
   openExportFolder: (customPath) => ipcRenderer.invoke("shell:open-export-folder", customPath),
   saveDump: (input) => ipcRenderer.invoke("dialog:save-dump", input),
-  setAppIcon: (dataUrl) => ipcRenderer.invoke("app:set-icon", dataUrl),
+  setAppIcon: (dataUrl, options) =>
+    ipcRenderer.invoke("app:set-icon", dataUrl, options),
   getAppVersion: () => ipcRenderer.invoke("app:get-version"),
   getCacheStats: () => ipcRenderer.invoke("storage:get-cache-stats"),
   openCacheFolder: () => ipcRenderer.invoke("shell:open-cache-folder"),
@@ -232,6 +249,13 @@ const api: LinerElectronApi = {
       ipcRenderer.removeListener("bundle:ready", listener);
     };
   },
+  onBundleStamp: (cb) => {
+    const listener = (_event: unknown, line: string) => cb(line);
+    ipcRenderer.on("bundle:stamp", listener);
+    return () => {
+      ipcRenderer.removeListener("bundle:stamp", listener);
+    };
+  },
   onDeeplink: (cb) => {
     const listener = (_event: unknown, target: DeeplinkTarget) => cb(target);
     ipcRenderer.on("deeplink:open", listener);
@@ -289,6 +313,9 @@ const api: LinerElectronApi = {
   updateOverlaySettings: (settings) => {
     ipcRenderer.send("overlay:update-settings", settings);
   },
+  pauseOverlayShortcuts: (paused) => {
+    ipcRenderer.send("overlay:pause-shortcuts", paused);
+  },
   onOverlaySettingsChanged: (cb) => {
     const listener = (_event: unknown, settings: any) => cb(settings);
     ipcRenderer.on("overlay:settings-changed", listener);
@@ -303,15 +330,21 @@ const api: LinerElectronApi = {
       ipcRenderer.removeListener("overlay:visibility", listener);
     };
   },
-  discordRpcConfigure: (clientId, enabled) => {
-    ipcRenderer.send("discord-rpc:configure", { clientId, enabled });
+  setOverlayAuthenticated: (authenticated) => {
+    ipcRenderer.send("overlay:set-authenticated", authenticated);
   },
-  discordRpcSetPresence: (activity) => {
-    ipcRenderer.send("discord-rpc:set-presence", activity);
+  discordUpdateState: (state) => {
+    ipcRenderer.send("discord:update-state", state);
   },
-  discordRpcClear: () => {
-    ipcRenderer.send("discord-rpc:clear");
+  discordUpdateSettings: (settings) => {
+    ipcRenderer.send("discord:update-settings", settings);
   },
+  getDiscordStatus: () => ipcRenderer.invoke("discord:get-status"),
+  mintPoToken: (identifier) => ipcRenderer.invoke("potoken:mint", identifier),
 };
 
-contextBridge.exposeInMainWorld("linerElectron", api);
+if (location.hostname === "www.youtube.com") {
+  startPoTokenWorker();
+} else {
+  contextBridge.exposeInMainWorld("linerElectron", api);
+}

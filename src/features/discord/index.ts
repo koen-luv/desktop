@@ -1,6 +1,3 @@
-export { useDiscordRpcSync } from "./hooks/useDiscordRpcSync";
+export { useDiscordSync } from "./hooks/useDiscordSync";
 export { useDiscordSettingsStore } from "./store/discordSettingsStore";
-export {
-  buildDiscordPresence,
-  type DiscordPresenceInput,
-} from "./lib/buildPresence";
+export * from "./contracts";

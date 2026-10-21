@@ -351,11 +351,8 @@ function ImportToastBridge({
 
   const getSubtitle = useCallback(() => {
     if (!job) return "";
-    if (isFailed) return t("import.status_failed");
+    if (isFailed) return job.error?.message || t("import.status_failed_sub");
     if (isQueued) {
-      if (job.queuePosition && job.queuePosition > 0) {
-        return t("import.status_queued_position_sub", { position: job.queuePosition });
-      }
       return t("import.status_queued_sub");
     }
     if (isRunning) {
@@ -381,9 +378,6 @@ function ImportToastBridge({
 
   const getTitle = useCallback(() => {
     if (isQueued) {
-      if (job?.queuePosition && job.queuePosition > 0) {
-        return t("import.status_queued_position", { position: job.queuePosition });
-      }
       return t("import.status_queued");
     }
     if (isRunning) return t("import.status_running");
@@ -391,7 +385,7 @@ function ImportToastBridge({
     if (isFinalizing) return t("import.status_finalizing");
     if (isCompleted) return t("import.status_completed");
     return t("import.status_failed");
-  }, [job?.queuePosition, isQueued, isRunning, isAwaiting, isFinalizing, isCompleted, t]);
+  }, [isQueued, isRunning, isAwaiting, isFinalizing, isCompleted, t]);
 
   useEffect(() => {
     if (!shouldShow || !job) {
@@ -469,7 +463,6 @@ function ImportToastBridge({
     shouldShow,
     job,
     job?.status,
-    job?.queuePosition,
     job?.result?.imported,
     job?.result?.total,
     isQueued,

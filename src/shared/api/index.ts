@@ -1,14 +1,5 @@
 export { api, mediaUrl, toMaxQualityAvatarUrl, ApiError, resolveApiErrorMessage } from "./api";
-export {
-  DEFAULT_PRIMARY_API,
-  FALLBACK_EDGE_API,
-  getApiBaseUrl,
-  setApiBaseUrl,
-  switchToFallbackEdge,
-  switchToPrimaryApi,
-  initApiEndpointProbe,
-  resetEndpointProbe,
-} from "./baseUrl";
+export { DEFAULT_PRIMARY_API, getApiBaseUrl } from "./baseUrl";
 export type {
   SearchType,
   ApiCover,
@@ -29,7 +20,6 @@ export type {
   ApiUserPlaylist,
   ApiUserPlaylistItem,
   ApiLikedTracksPage,
-  PlaybackSession,
   LyricsSyncLevel,
   LyricsCandidate,
   LyricsStreamEvent,
@@ -67,3 +57,9 @@ export {
 } from "./auth-session";
 
 export { toClientTrack } from "./track";
+
+export {
+  registerLocalImportHandler,
+  LOCAL_IMPORT_PREFIX,
+  type LocalImportHandler,
+} from "./localImports";

@@ -1,47 +1,114 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { debouncedStorage } from "@/shared/utils/storage";
+import {
+  DEFAULT_DISCORD_SETTINGS,
+  type DiscordRpcSettings,
+  type DiscordStatusDisplayType,
+} from "../contracts";
 
-interface DiscordSettingsState {
-  /** Master switch. Presence is also implicitly off while clientId is empty. */
-  enabled: boolean;
-  /** Discord application (client) id. Empty disables the feature entirely. */
-  clientId: string;
+interface DiscordSettingsState extends DiscordRpcSettings {
   setEnabled: (enabled: boolean) => void;
-  setClientId: (clientId: string) => void;
+  setStatusDisplayType: (statusDisplayType: DiscordStatusDisplayType) => void;
+  setShowArtwork: (showArtwork: boolean) => void;
+  setShowArtistSmallImage: (showArtistSmallImage: boolean) => void;
+  setShowTime: (showTime: boolean) => void;
+  setShowPaused: (showPaused: boolean) => void;
+  setShowButton: (showButton: boolean) => void;
+  setShowDownloadButton: (showDownloadButton: boolean) => void;
 }
 
-const DEFAULTS = { enabled: false, clientId: "" };
-
-function notifyElectron(clientId: string, enabled: boolean): void {
-  if (typeof window !== "undefined" && window.linerElectron?.discordRpcConfigure) {
-    window.linerElectron.discordRpcConfigure(clientId, enabled);
+function notifyElectron(patch: Partial<DiscordRpcSettings>) {
+  if (typeof window !== "undefined" && window.linerElectron?.discordUpdateSettings) {
+    window.linerElectron.discordUpdateSettings(patch);
   }
 }
 
+const VALID_STATUS_DISPLAY_TYPES: readonly DiscordStatusDisplayType[] = [
+  "artist",
+  "title",
+  "artist_title",
+  "title_artist",
+  "app",
+] as const;
+
 export const useDiscordSettingsStore = create<DiscordSettingsState>()(
   persist(
-    (set, get) => ({
-      ...DEFAULTS,
+    (set) => ({
+      ...DEFAULT_DISCORD_SETTINGS,
       setEnabled: (enabled) => {
         set({ enabled });
-        notifyElectron(get().clientId, enabled);
+        notifyElectron({ enabled });
       },
-      setClientId: (clientId) => {
-        // Client ids are numeric snowflakes; trim so a stray paste-space
-        // doesn't produce an unusable id.
-        const normalized = clientId.trim();
-        set({ clientId: normalized });
-        notifyElectron(normalized, get().enabled);
+      setStatusDisplayType: (statusDisplayType) => {
+        set({ statusDisplayType });
+        notifyElectron({ statusDisplayType });
+      },
+      setShowArtwork: (showArtwork) => {
+        set({ showArtwork });
+        notifyElectron({ showArtwork });
+      },
+      setShowArtistSmallImage: (showArtistSmallImage) => {
+        set({ showArtistSmallImage });
+        notifyElectron({ showArtistSmallImage });
+      },
+      setShowTime: (showTime) => {
+        set({ showTime });
+        notifyElectron({ showTime });
+      },
+      setShowPaused: (showPaused) => {
+        set({ showPaused });
+        notifyElectron({ showPaused });
+      },
+      setShowButton: (showButton) => {
+        set({ showButton });
+        notifyElectron({ showButton });
+      },
+      setShowDownloadButton: (showDownloadButton) => {
+        set({ showDownloadButton });
+        notifyElectron({ showDownloadButton });
       },
     }),
     {
       name: "liner_discord_settings_v1",
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => debouncedStorage),
+      partialize: (state): DiscordRpcSettings => ({
+        enabled: state.enabled,
+        statusDisplayType: state.statusDisplayType,
+        showArtwork: state.showArtwork,
+        showArtistSmallImage: state.showArtistSmallImage,
+        showTime: state.showTime,
+        showPaused: state.showPaused,
+        showButton: state.showButton,
+        showDownloadButton: state.showDownloadButton,
+      }),
       onRehydrateStorage: () => (state) => {
-        // Push the persisted config to the main process so presence connects on
-        // startup, not only after the user touches the setting.
-        if (state) notifyElectron(state.clientId, state.enabled);
+        if (!state) return;
+        if (typeof state.enabled !== "boolean") {
+          state.setEnabled(DEFAULT_DISCORD_SETTINGS.enabled);
+        }
+        if (!VALID_STATUS_DISPLAY_TYPES.includes(state.statusDisplayType)) {
+          state.setStatusDisplayType(DEFAULT_DISCORD_SETTINGS.statusDisplayType);
+        }
+        if (typeof state.showArtwork !== "boolean") {
+          state.setShowArtwork(DEFAULT_DISCORD_SETTINGS.showArtwork);
+        }
+        if (typeof state.showArtistSmallImage !== "boolean") {
+          state.setShowArtistSmallImage(DEFAULT_DISCORD_SETTINGS.showArtistSmallImage);
+        }
+        if (typeof state.showTime !== "boolean") {
+          state.setShowTime(DEFAULT_DISCORD_SETTINGS.showTime);
+        }
+        if (typeof state.showPaused !== "boolean") {
+          state.setShowPaused(DEFAULT_DISCORD_SETTINGS.showPaused);
+        }
+        if (typeof state.showButton !== "boolean") {
+          state.setShowButton(DEFAULT_DISCORD_SETTINGS.showButton);
+        }
+        if (typeof state.showDownloadButton !== "boolean") {
+          state.setShowDownloadButton(DEFAULT_DISCORD_SETTINGS.showDownloadButton);
+        }
       },
-    },
-  ),
+    }
+  )
 );

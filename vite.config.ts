@@ -1,11 +1,17 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import electron from "vite-plugin-electron/simple";
 import path from "path";
 import pkg from "./package.json" with { type: "json" };
 
-export default defineConfig({
+export default defineConfig(({ command, mode }) => {
+  if (command === "serve") {
+    const devSigningSecret = loadEnv(mode, process.cwd(), "LINER_").LINER_DEV_SIGNING_SECRET;
+    if (devSigningSecret) process.env.LINER_DEV_SIGNING_SECRET = devSigningSecret;
+  }
+
+  return {
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
@@ -48,4 +54,5 @@ export default defineConfig({
     outDir: "dist",
     emptyOutDir: true,
   },
+  };
 });

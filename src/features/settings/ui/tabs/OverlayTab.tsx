@@ -9,8 +9,9 @@ import {
   getEnglishKeyFromEvent,
   normalizeShortcutToEnglish,
 } from "@/features/overlay";
-import { useDiscordSettingsStore } from "@/features/discord";
-import { ToggleSwitch, TextInput } from "@/shared/ui";
+import { useShortcutsStore } from "@/features/shortcuts";
+import { acquireEscapeGuard } from "@/shared/utils/escapeGuard";
+import { ToggleSwitch, Tooltip } from "@/shared/ui";
 import { SettingRow, SettingSection, SegmentedControl } from "../controls";
 
 const POSITION_CONFIG = [
@@ -60,20 +61,22 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
   const alwaysOnTop = useOverlaySettingsStore((s) => s.alwaysOnTop);
   const setAlwaysOnTop = useOverlaySettingsStore((s) => s.setAlwaysOnTop);
 
-  // Rich Presence needs a native RPC bridge: Electron's IPC client on
-  // desktop, the Kotlin WebSocket client on Android (exposed through the
-  // compatibility shim). The bare web build has neither, so its section stays hidden.
-  const discordRpcSupported = Boolean(
-    typeof window !== "undefined" && window.linerElectron?.discordRpcConfigure,
-  );
-  const discordEnabled = useDiscordSettingsStore((s) => s.enabled);
-  const setDiscordEnabled = useDiscordSettingsStore((s) => s.setEnabled);
-  const discordClientId = useDiscordSettingsStore((s) => s.clientId);
-  const setDiscordClientId = useDiscordSettingsStore((s) => s.setClientId);
-
   const [isRecording, setIsRecording] = useState(false);
   const [heldModifiers, setHeldModifiers] = useState<string[]>([]);
   const recordButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Suspend the registered global hotkeys while recording. Otherwise the OS
+  // swallows the key combo that is already bound (e.g. pressing the current
+  // shortcut again) and the recorder never receives it, so it can't be saved.
+  useEffect(() => {
+    useShortcutsStore.getState().setIsRecording(isRecording);
+    // Esc cancels recording instead of closing the settings dialog
+    const releaseEscape = isRecording ? acquireEscapeGuard() : null;
+    return () => {
+      releaseEscape?.();
+      useShortcutsStore.getState().setIsRecording(false);
+    };
+  }, [isRecording]);
 
   useEffect(() => {
     if (!isRecording) {
@@ -128,6 +131,7 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
       const normalized = normalizeShortcutToEnglish(parts.join("+"));
       if (normalized) {
         setShortcut(normalized);
+        useShortcutsStore.getState().setGlobalShortcut("toggleOverlay", normalized);
         setHeldModifiers([]);
         setIsRecording(false);
       }
@@ -227,23 +231,29 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
             <div className="flex items-center gap-1.5">
               <AnimatePresence>
                 {shortcut !== DEFAULT_SHORTCUT && enabled && (
-                  <motion.button
-                    type="button"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ duration: 0.1, ease: "easeOut" }}
-                    title={t("settings.overlay.shortcut.reset") || "Reset to Alt+Shift+O"}
-                    aria-label={t("settings.overlay.shortcut.reset") || "Reset shortcut"}
-                    onClick={() => {
-                      setHeldModifiers([]);
-                      setIsRecording(false);
-                      setShortcut(DEFAULT_SHORTCUT);
-                    }}
-                    className="h-[28px] w-[28px] rounded-lg border-0 outline-none flex items-center justify-center bg-border-alpha-14 hover:bg-border-alpha-20 text-text-secondary hover:text-text-primary transition-colors cursor-pointer select-none active:scale-[0.95]"
+                  <Tooltip
+                    content={t("settings.overlay.shortcut.reset") || "Reset to Alt+Shift+O"}
+                    side="top"
+                    sideOffset={6}
                   >
-                    <Refresh1Line size={15} />
-                  </motion.button>
+                    <motion.button
+                      type="button"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      transition={{ duration: 0.1, ease: "easeOut" }}
+                      aria-label={t("settings.overlay.shortcut.reset") || "Reset shortcut"}
+                      onClick={() => {
+                        setHeldModifiers([]);
+                        setIsRecording(false);
+                        setShortcut(DEFAULT_SHORTCUT);
+                        useShortcutsStore.getState().setGlobalShortcut("toggleOverlay", DEFAULT_SHORTCUT);
+                      }}
+                      className="h-[28px] w-[28px] rounded-lg border-0 outline-none flex items-center justify-center bg-border-alpha-14 hover:bg-border-alpha-20 text-text-secondary hover:text-text-primary transition-colors cursor-pointer select-none active:scale-[0.95]"
+                    >
+                      <Refresh1Line size={15} />
+                    </motion.button>
+                  </Tooltip>
                 )}
               </AnimatePresence>
 
@@ -338,48 +348,6 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
         />
       </div>
       </SettingSection>
-      )}
-
-      {discordRpcSupported && (
-        <SettingSection label={t("settings.discord.section")}>
-          <SettingRow
-            title={t("settings.discord.enabled.title")}
-            description={t("settings.discord.enabled.description")}
-            titleKey="settings.discord.enabled.title"
-            descKey="settings.discord.enabled.description"
-            searchQuery={searchQuery}
-            control={
-              <ToggleSwitch checked={discordEnabled} onChange={setDiscordEnabled} />
-            }
-          />
-          <div
-            className={
-              discordEnabled
-                ? "flex flex-col transition-all duration-200"
-                : "flex flex-col opacity-40 grayscale pointer-events-none select-none transition-all duration-200"
-            }
-          >
-            <SettingRow
-              title={t("settings.discord.client_id.title")}
-              description={t("settings.discord.client_id.description")}
-              titleKey="settings.discord.client_id.title"
-              descKey="settings.discord.client_id.description"
-              searchQuery={searchQuery}
-              control={
-                <TextInput
-                  size="sm"
-                  variant="transparent"
-                  value={discordClientId}
-                  disabled={!discordEnabled}
-                  placeholder="123456789012345678"
-                  aria-label={t("settings.discord.client_id.title")}
-                  onChange={(e) => setDiscordClientId(e.target.value)}
-                  className="w-[210px]"
-                />
-              }
-            />
-          </div>
-        </SettingSection>
       )}
     </div>
   );

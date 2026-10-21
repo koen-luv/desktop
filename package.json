@@ -1,6 +1,6 @@
 {
   "name": "@liner/client",
-  "version": "0.1.35",
+  "version": "0.1.40",
   "type": "module",
   "private": true,
   "description": "Liner Music Player",
@@ -20,8 +20,9 @@
     "test:watch": "vitest",
     "electron:build": "tsc -b && vite build && electron-builder",
     "electron:build:linux": "tsc -b && vite build && electron-builder --linux",
-    "electron:build:win": "tsc -b && vite build && electron-builder --win",
-    "electron:build:mac": "tsc -b && vite build && electron-builder --mac"
+    "electron:build:win": "pnpm native:build && tsc -b && vite build && electron-builder --win",
+    "electron:build:mac": "tsc -b && vite build && electron-builder --mac",
+    "native:build": "pnpm dlx node-gyp@11 rebuild --directory native/snap-preview && node scripts/verify-native-addon.cjs"
   },
   "build": {
     "appId": "com.hkamori.liner",
@@ -48,7 +49,8 @@
     ],
     "files": [
       "dist/**/*",
-      "dist-electron/**/*"
+      "dist-electron/**/*",
+      "native/snap-preview/build/Release/snap_preview.node"
     ],
     "linux": {
       "executableName": "liner",
@@ -99,7 +101,10 @@
           ]
         }
       ]
-    }
+    },
+    "asarUnpack": [
+      "native/**/*.node"
+    ]
   },
   "dependencies": {
     "@braccato/core": "^1.4.0",
@@ -107,10 +112,13 @@
     "@mingcute/react": "^1.4.1",
     "@solar-icons/react": "^1.1.1",
     "@tanstack/react-virtual": "^3.13.23",
+    "@xhayper/discord-rpc": "^1.5.1",
+    "bgutils-js": "4.0.3",
     "electron-updater": "^6.8.9",
     "framer-motion": "^12.38.0",
     "gsap": "^3.15.0",
     "lottie-web": "^5.13.0",
+    "morphicons": "^1.7.1",
     "next-themes": "^0.4.6",
     "react": "19.2.4",
     "react-apple-emojis": "^3.0.0",
@@ -120,6 +128,7 @@
     "solar-icons": "^0.0.15",
     "soundtouchjs": "^0.3.0",
     "tar": "^7.5.22",
+    "youtubei.js": "18.1.0",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

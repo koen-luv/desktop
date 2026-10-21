@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useTranslation } from "@/languages";
 import { LuMinus, LuSquare, LuX } from "react-icons/lu";
 import { useIsContentTransparent } from "@/features/settings/store/customizationStore";
 import { isAndroidApp } from "@/platform";
+import { useWindowState } from "../hooks/useWindowState";
+import { useWindowAnimationStore } from "@/shared/ui";
 
 export interface WindowControlsProps {
   className?: string;
@@ -10,43 +12,48 @@ export interface WindowControlsProps {
   isFullscreen?: boolean;
 }
 
+// the window goes away right under the cursor (minimize / into the overlay), so
+// chromium never sees the pointer leave and the button keeps its hover look when the
+// window comes back. while this flag is on the control buttons drop their hover
+// highlight; it clears on the first real mouse move after the window is back.
+function suppressStaleHover() {
+  const root = document.documentElement;
+  root.setAttribute("data-hover-reset", "");
+  (document.activeElement as HTMLElement | null)?.blur?.();
+  let wentAway = false;
+  const clear = () => root.removeAttribute("data-hover-reset");
+  const onAway = () => {
+    wentAway = true;
+  };
+  const onBack = () => {
+    if (!wentAway) return;
+    window.removeEventListener("blur", onAway);
+    window.removeEventListener("focus", onBack);
+    document.removeEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pointermove", clear, { once: true });
+  };
+  const onVisibility = () => (document.hidden ? onAway() : onBack());
+  window.addEventListener("blur", onAway);
+  window.addEventListener("focus", onBack);
+  document.addEventListener("visibilitychange", onVisibility);
+}
+
 export default function WindowControls({
   className = "",
   variant = "default",
   style,
   isFullscreen = false,
 }: WindowControlsProps) {
-  const [isWindowFullScreen, setIsWindowFullScreen] = useState(false);
-  const [isWindowMaximized, setIsWindowMaximized] = useState(false);
-
-  useEffect(() => {
-    if (!window.linerElectron) return;
-
-    // hydrate initial os window state
-    window.linerElectron.isFullScreen?.().then((fs) => {
-      if (typeof fs === "boolean") setIsWindowFullScreen(fs);
-    });
-    window.linerElectron.isMaximized?.().then((max) => {
-      if (typeof max === "boolean") setIsWindowMaximized(max);
-    });
-
-    // live sync across os fullscreen transitions & maximize toggles
-    const unsubscribe = window.linerElectron.onWindowStateChange?.((state) => {
-      setIsWindowFullScreen(state.isFullScreen);
-      setIsWindowMaximized(state.isMaximized);
-    });
-
-    return () => {
-      unsubscribe?.();
-    };
-  }, []);
+  const { t } = useTranslation();
+  const { isFullScreen: isWindowFullScreen, isMaximized: isWindowMaximized } = useWindowState();
 
   const isHyprland = window.linerElectron?.isHyprland ?? false;
 
   const handleMinimize = () => {
     // macos fullscreen spaces and hyprland tiling wm prohibit/ignore minimizing
     if (isWindowFullScreen || isHyprland) return;
-    window.linerElectron?.minimize();
+    suppressStaleHover();
+    useWindowAnimationStore.getState().triggerMinimize();
   };
 
   const handleMaximize = () => {
@@ -54,7 +61,7 @@ export default function WindowControls({
   };
 
   const handleClose = () => {
-    window.linerElectron?.close();
+    useWindowAnimationStore.getState().triggerClose();
   };
 
   const isDarkMode = isFullscreen;
@@ -72,6 +79,8 @@ export default function WindowControls({
     >
       <div
         data-no-window-drag
+        data-no-tooltip="true"
+        data-window-controls
         className={`flex items-center h-[32px] min-h-[32px] max-h-[32px] box-border px-[3px] gap-[2px] rounded-lg pointer-events-auto transition-colors ${
           isFullscreen
             ? "apple-glass-pill-dark text-white"
@@ -87,6 +96,7 @@ export default function WindowControls({
           onClick={isMinimizeDisabled ? undefined : handleMinimize}
           disabled={isMinimizeDisabled}
           aria-disabled={isMinimizeDisabled}
+          data-no-tooltip="true"
           className={`flex items-center justify-center w-[26px] h-[26px] min-w-[26px] min-h-[26px] max-h-[26px] rounded-md border-none bg-transparent transition-colors ${
             isMinimizeDisabled
               ? "opacity-30 cursor-not-allowed pointer-events-none"
@@ -99,13 +109,13 @@ export default function WindowControls({
                     : "text-text-primary hover:bg-border-alpha-14 active:scale-95 cursor-pointer"
           }`}
           aria-label="Minimize"
-          title={isMinimizeDisabled ? undefined : "Minimize"}
         >
           <LuMinus size={13} />
         </button>
         <button
           type="button"
           onClick={handleMaximize}
+          data-no-tooltip="true"
           className={`flex items-center justify-center w-[26px] h-[26px] min-w-[26px] min-h-[26px] max-h-[26px] rounded-md cursor-pointer border-none bg-transparent transition-colors active:scale-95 ${
             isFullscreen
               ? "text-white/80 hover:text-white hover:bg-white/10"
@@ -117,17 +127,10 @@ export default function WindowControls({
           }`}
           aria-label={
             isWindowFullScreen
-              ? "Exit Fullscreen"
+              ? t("common.exitFullscreen")
               : isWindowMaximized
-                ? "Restore"
-                : "Maximize"
-          }
-          title={
-            isWindowFullScreen
-              ? "Exit Fullscreen"
-              : isWindowMaximized
-                ? "Restore"
-                : "Maximize"
+                ? t("common.restore")
+                : t("common.maximize")
           }
         >
           <LuSquare size={11} />
@@ -135,6 +138,7 @@ export default function WindowControls({
         <button
           type="button"
           onClick={handleClose}
+          data-no-tooltip="true"
           className={`flex items-center justify-center w-[26px] h-[26px] min-w-[26px] min-h-[26px] max-h-[26px] rounded-md cursor-pointer border-none bg-transparent transition-colors hover:bg-[#E81123] hover:text-white active:scale-95 ${
             isFullscreen
               ? "text-white/80 hover:text-white hover:bg-[#E81123]"
@@ -145,7 +149,6 @@ export default function WindowControls({
                   : "text-text-primary"
           }`}
           aria-label="Close"
-          title="Close"
         >
           <LuX size={13} />
         </button>

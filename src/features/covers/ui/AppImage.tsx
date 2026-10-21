@@ -149,7 +149,7 @@ export default function AppImage({
       style={containerStyle}
     >
       {/* Placeholder / Skeleton layer */}
-      {!isLoaded && !hasError && (
+      {Boolean(currentSrc) && !isLoaded && !hasError && (
         <div
           aria-hidden="true"
           className="absolute inset-0 pointer-events-none bg-bg-panel"
@@ -157,20 +157,22 @@ export default function AppImage({
       )}
 
       {/* Actual Image */}
-      <img
-        ref={imgRef}
-        src={currentSrc}
-        alt={alt}
-        crossOrigin={crossOrigin}
-        loading={priority ? "eager" : "lazy"}
-        decoding={priority ? "auto" : "async"}
-        draggable={draggable}
-        onLoad={handleLoad}
-        onError={handleError}
-        className={`${fill ? "absolute inset-0 w-full h-full object-cover" : "object-cover"} ${className}`}
-        style={imgStyle}
-        {...rest}
-      />
+      {Boolean(currentSrc) && (
+        <img
+          ref={imgRef}
+          src={currentSrc}
+          alt={alt}
+          crossOrigin={crossOrigin}
+          loading={priority ? "eager" : "lazy"}
+          decoding={priority ? "auto" : "async"}
+          draggable={draggable}
+          onLoad={handleLoad}
+          onError={handleError}
+          className={`${fill ? "absolute inset-0 w-full h-full object-cover" : "object-cover"} ${className}`}
+          style={imgStyle}
+          {...rest}
+        />
+      )}
     </div>
   );
 }

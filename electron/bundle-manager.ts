@@ -3,6 +3,7 @@ import path from "node:path";
 import fs from "node:fs";
 import crypto from "node:crypto";
 import * as tar from "tar";
+import type { BundleUpdateState } from "./bundle-stamp";
 
 export interface BundleManifest {
   bundleVersion: string;
@@ -31,11 +32,16 @@ export interface BundleUpdateProgress {
   total: number;
 }
 
+const STARTUP_UPDATE_BUDGET_MS = 8_000;
+const STARTUP_MANIFEST_TIMEOUT_MS = 1_500;
+const BACKGROUND_MANIFEST_TIMEOUT_MS = 15_000;
+
 export class BundleManager {
   private defaultRendererDist: string;
   private bundlesRoot: string;
   private stateFilePath: string;
   private activeState: ActiveBundleState | null = null;
+  private installedState: ActiveBundleState | null = null;
   private updaterUrl: string;
   private publicKeyHex: string;
   private mainWindow: BrowserWindow | null = null;
@@ -90,6 +96,7 @@ export class BundleManager {
           this.isVersionCompatible(app.getVersion(), parsed.minAppVersion)
         ) {
           this.activeState = parsed;
+          this.installedState = parsed;
           return;
         } else {
           console.warn(
@@ -102,6 +109,7 @@ export class BundleManager {
     }
 
     this.activeState = null;
+    this.installedState = null;
   }
 
   /**
@@ -142,9 +150,93 @@ export class BundleManager {
     return true;
   }
 
-  /**
-   * Queries /updates/manifest.json for a new bundle
-   */
+  private matches(state: ActiveBundleState | null, manifest: BundleManifest): boolean {
+    return (
+      state?.bundleVersion === manifest.bundleVersion &&
+      state?.sha256?.toLowerCase() === manifest.sha256.toLowerCase()
+    );
+  }
+
+  private compareVersions(left: string, right: string): number {
+    const a = left.split("-")[0].split(".").map(Number);
+    const b = right.split("-")[0].split(".").map(Number);
+    for (let i = 0; i < 3; i += 1) {
+      const diff = (a[i] || 0) - (b[i] || 0);
+      if (diff !== 0) return diff;
+    }
+    return 0;
+  }
+
+  private isUpgradeOver(state: ActiveBundleState | null, manifest: BundleManifest): boolean {
+    const order = this.compareVersions(manifest.bundleVersion, state?.bundleVersion ?? app.getVersion());
+    if (order !== 0) return order > 0;
+    return !this.matches(state, manifest);
+  }
+
+  private async fetchManifest(timeoutMs: number): Promise<BundleManifest> {
+    const res = await fetch(`${this.updaterUrl}/updates/manifest.json?t=${Date.now()}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    return (await res.json()) as BundleManifest;
+  }
+
+  private pruneBundles(): void {
+    const keep = new Set(
+      [this.activeState?.bundleDir, this.installedState?.bundleDir]
+        .filter((dir): dir is string => Boolean(dir))
+        .map((dir) => path.resolve(dir)),
+    );
+    try {
+      for (const entry of fs.readdirSync(this.bundlesRoot, { withFileTypes: true })) {
+        const full = path.resolve(this.bundlesRoot, entry.name);
+        if (!entry.isDirectory() || keep.has(full)) continue;
+        fs.rmSync(full, { recursive: true, force: true });
+      }
+    } catch (err) {
+      console.warn("\x1b[33m[BundleManager]\x1b[0m Failed to prune old bundles:", err);
+    }
+  }
+
+  public async updateBeforeLaunch(budgetMs = STARTUP_UPDATE_BUDGET_MS): Promise<void> {
+    this.pruneBundles();
+    const deadline = Date.now() + budgetMs;
+    let manifest: BundleManifest;
+    try {
+      manifest = await this.fetchManifest(Math.min(STARTUP_MANIFEST_TIMEOUT_MS, budgetMs));
+    } catch {
+      return;
+    }
+    if (!this.isVersionCompatible(app.getVersion(), manifest.minAppVersion)) return;
+    if (!this.isUpgradeOver(this.installedState, manifest)) return;
+
+    const remaining = deadline - Date.now();
+    if (remaining < 1_000) {
+      void this.downloadAndInstall(manifest);
+      return;
+    }
+    const result = await this.downloadAndInstall(manifest, AbortSignal.timeout(remaining));
+    if (result.success) {
+      this.activeState = this.installedState;
+      console.log(`\x1b[32m[BundleManager]\x1b[0m Starting on the freshly installed bundle ${manifest.bundleVersion}`);
+      return;
+    }
+    if (result.error && /abort|timeout/i.test(result.error)) void this.downloadAndInstall(manifest);
+  }
+
+  public async peekUpdate(): Promise<BundleUpdateState> {
+    try {
+      const manifest = await this.fetchManifest(5_000);
+      if (!this.isVersionCompatible(app.getVersion(), manifest.minAppVersion)) {
+        return { kind: "needs-app-update" };
+      }
+      return this.isUpgradeOver(this.activeState, manifest) ? { kind: "available", version: manifest.bundleVersion } : { kind: "latest" };
+    } catch {
+      return { kind: "unknown" };
+    }
+  }
+
   public async checkForUpdates(): Promise<{
     available: boolean;
     manifest?: BundleManifest;
@@ -154,15 +246,8 @@ export class BundleManager {
     this.isChecking = true;
 
     try {
-      const manifestUrl = `${this.updaterUrl}/updates/manifest.json?t=${Date.now()}`;
-      const res = await fetch(manifestUrl, { cache: "no-store" });
-      if (!res.ok) {
-        return { available: false, reason: `Server returned ${res.status}` };
-      }
+      const manifest = await this.fetchManifest(BACKGROUND_MANIFEST_TIMEOUT_MS);
 
-      const manifest = (await res.json()) as BundleManifest;
-
-      // 1. Check compatibility
       if (!this.isVersionCompatible(app.getVersion(), manifest.minAppVersion)) {
         console.log(
           `\x1b[33m[BundleManager]\x1b[0m Bundle ${manifest.bundleVersion} requires app >= ${manifest.minAppVersion}, but running ${app.getVersion()}`
@@ -170,17 +255,15 @@ export class BundleManager {
         return { available: false, reason: "App version too old for bundle" };
       }
 
-      // 2. Check if newer or different hash
-      const isSameVersion = this.activeState?.bundleVersion === manifest.bundleVersion;
-      const isSameHash = this.activeState?.sha256?.toLowerCase() === manifest.sha256.toLowerCase();
-
-      if (isSameVersion && isSameHash) {
-        return { available: false, reason: "Already up to date" };
+      if (!this.isUpgradeOver(this.installedState, manifest)) {
+        return {
+          available: false,
+          reason: this.isUpgradeOver(this.activeState, manifest) ? "Installed, applies on next launch" : "Already up to date",
+        };
       }
 
       console.log(`\x1b[32m[BundleManager]\x1b[0m New OTA bundle found: ${manifest.bundleVersion} (sha: ${manifest.sha256.slice(0, 8)}). Downloading silently in background...`);
 
-      // Auto download & install in background completely silently (no UI alerts)
       this.downloadAndInstall(manifest).then((res) => {
         if (res.success) {
           console.log(`\x1b[32m[BundleManager]\x1b[0m Bundle ${manifest.bundleVersion} installed silently. Will activate on next launch.`);
@@ -199,7 +282,10 @@ export class BundleManager {
   /**
    * Downloads, validates Ed25519 signature & sha256, and extracts bundle
    */
-  public async downloadAndInstall(manifest: BundleManifest): Promise<{ success: boolean; error?: string }> {
+  public async downloadAndInstall(
+    manifest: BundleManifest,
+    signal?: AbortSignal,
+  ): Promise<{ success: boolean; error?: string }> {
     if (this.isDownloading) return { success: false, error: "Already downloading" };
     this.isDownloading = true;
 
@@ -211,7 +297,7 @@ export class BundleManager {
 
     try {
       console.log(`\x1b[36m[BundleManager]\x1b[0m Downloading ${manifest.downloadUrl}...`);
-      const res = await fetch(manifest.downloadUrl);
+      const res = await fetch(manifest.downloadUrl, { signal });
       if (!res.ok) throw new Error(`Download failed with status ${res.status}`);
 
       const total = Number(res.headers.get("content-length")) || manifest.size || 0;
@@ -276,7 +362,7 @@ export class BundleManager {
       };
 
       fs.writeFileSync(this.stateFilePath, JSON.stringify(newState, null, 2), "utf-8");
-      this.activeState = newState;
+      this.installedState = newState;
 
       console.log(`\x1b[32m[BundleManager]\x1b[0m Successfully installed bundle ${manifest.bundleVersion}`);
       this.mainWindow?.webContents.send("bundle:ready", newState);
@@ -298,6 +384,7 @@ export class BundleManager {
    */
   public hotSwap(): boolean {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return false;
+    if (this.installedState) this.activeState = this.installedState;
     const indexPath = this.getEffectiveIndexPath();
     console.log(`\x1b[35m[BundleManager]\x1b[0m Performing Hot Swap to: ${indexPath}`);
     this.mainWindow.loadFile(indexPath);
@@ -320,6 +407,7 @@ export class BundleManager {
         fs.unlinkSync(this.stateFilePath);
       }
       this.activeState = null;
+      this.installedState = null;
 
       if (this.mainWindow && !this.mainWindow.isDestroyed()) {
         const fallbackPath = path.join(this.defaultRendererDist, "index.html");

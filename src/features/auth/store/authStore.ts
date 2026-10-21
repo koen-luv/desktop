@@ -10,6 +10,7 @@ import {
   type UpdateProfileInput,
 } from "@/shared/api";
 import { usePlayerStore, playerRuntime } from "@/features/player";
+import { queryCache } from "@/shared/cache/queryCache";
 
 // ---------------------------------------------------------------------------
 // Dev-only auth escape hatch.
@@ -168,6 +169,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       window.location.hash = "#/";
     }
     await clearAuthSession();
+    queryCache.clear();
     set({ status: "anonymous", user: null });
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("library:changed"));

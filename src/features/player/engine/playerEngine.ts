@@ -6,6 +6,7 @@ import {
   type PlayerState,
 } from "../store/playerStore";
 import { playerRuntime } from "./runtime";
+import { isRadioContext, shouldRefillRadio } from "./radioMode";
 import { pitchShifter } from "./pitchShifter";
 import {
   api,
@@ -83,8 +84,16 @@ function newRadioWaveId(): string {
   return `wave-${Date.now().toString(36)}-${Math.floor(Math.random() * 0xffffffff).toString(36)}`;
 }
 
+type LyricsHint = { title: string; artist: string; durationMs?: number };
+
+function lyricsHint(track: Track): LyricsHint {
+  const artist = track.artistList?.[0]?.name || track.artists.split(",")[0] || "";
+  return { title: track.title, artist: artist.trim(), durationMs: track.durationMs };
+}
+
 class PlaybackTelemetryTracker {
   private activeTrackId: string | null = null;
+  private activeTrack: Track | null = null;
   private playbackSessionId: string = "";
   private listeningSessionId: string = "";
   private lastActivityTime: number = 0;
@@ -120,6 +129,7 @@ class PlaybackTelemetryTracker {
 
     this.playbackSessionId = this.generatePlaybackSessionId();
     this.activeTrackId = track.id;
+    this.activeTrack = track;
     this.trackDurationMs = track.durationMs ?? 0;
     this.playedDurationMs = 0;
     this.lastTickTime = null;
@@ -191,10 +201,25 @@ class PlaybackTelemetryTracker {
     const isSkipped = !this.completed && this.playedDurationMs < 30000;
 
     if (this.playedDurationMs >= 3000 || this.completed) {
+      const snap = this.activeTrack;
+      const artistsList = snap?.artistList?.length
+        ? snap.artistList.map((a) => ({ id: a.id || "unknown", name: a.name }))
+        : (snap?.artists
+            ? snap.artists.split(",").map((name) => ({ id: snap?.artistId || "unknown", name: name.trim() }))
+            : [{ id: "unknown", name: "Unknown Artist" }]);
+
       this.sendEvent({
         playbackSessionId: this.playbackSessionId,
         listeningSessionId: this.getOrCreateListeningSession(),
         trackId: this.activeTrackId,
+        trackSnapshot: snap ? {
+          id: snap.id,
+          title: snap.title || "Unknown Track",
+          artists: artistsList,
+          album: snap.album ? { id: snap.album.id || "", title: snap.album.title || "" } : undefined,
+          cover: snap.coverUrl ? { url: snap.coverUrl, width: 512, height: 512 } : undefined,
+          durationMs: snap.durationMs || this.trackDurationMs,
+        } : undefined,
         playedDurationMs: Math.round(this.playedDurationMs),
         trackDurationMs: this.trackDurationMs > 0 ? this.trackDurationMs : undefined,
         completionRate: Number(completionRate.toFixed(4)),
@@ -207,6 +232,7 @@ class PlaybackTelemetryTracker {
     }
 
     this.activeTrackId = null;
+    this.activeTrack = null;
     this.playbackSessionId = "";
     this.lastTickTime = null;
     this.playedDurationMs = 0;
@@ -236,6 +262,8 @@ class PlayerEngine {
   private telemetry = new PlaybackTelemetryTracker();
   private radioAppendTimeout: ReturnType<typeof setTimeout> | null = null;
   private radioWaveId: string | null = null;
+  // single in-flight similar-tracks request, so a refill and an end-of-queue wait share it
+  private radioFetchInFlight: Promise<void> | null = null;
   private consecutiveAutoSkips = 0;
   private lastPreloadKey: string | null = null;
   private inFlightLyricsPrefetches = new Map<string, Promise<void>>();
@@ -441,9 +469,7 @@ class PlayerEngine {
       void playerRuntime.loadAndPlay(selectedTrack);
     }
 
-    if (finalIndex === finalQueue.length - 1) {
-      this.scheduleAppendSimilarTracks(mySession, selectedTrack.id);
-    }
+    this.maybeExtendQueue(mySession, selectedTrack.id, finalIndex, finalQueue.length);
   }
 
   public async playShuffled(
@@ -491,9 +517,7 @@ class PlayerEngine {
       void playerRuntime.loadAndPlay(seedTrack);
     }
 
-    if (finalQueue.length === 1) {
-      this.scheduleAppendSimilarTracks(mySession, seedTrack.id);
-    }
+    this.maybeExtendQueue(mySession, seedTrack.id, 0, finalQueue.length);
   }
 
   public async startRadioStation(track: Track): Promise<void> {
@@ -505,6 +529,8 @@ class PlayerEngine {
     const waveId = this.radioWaveId;
 
     store.setPlaybackContext(`radio:${track.id}`);
+    // a station never loops back to its first track
+    if (store.repeat === "all") store.setRepeat("off");
     store.setPlaybackContextCover(track.coverUrl ?? null);
     store.setQueue([track]);
     this.originalUpcomingQueue = [];
@@ -595,6 +621,23 @@ class PlayerEngine {
     const store = usePlayerStore.getState();
     const nextIndex = this.computeNextIndex(isAutoEnd);
 
+    if (nextIndex === null && isRadioContext(store.playbackContext) && store.currentTrack) {
+      // radio ran dry (refill not back yet / failed earlier): fetch now and carry on
+      const lengthBefore = store.queue.length;
+      const waitSession = this.sessionId;
+      store.setStatus("loading", null);
+      if (this.radioAppendTimeout) {
+        clearTimeout(this.radioAppendTimeout);
+        this.radioAppendTimeout = null;
+      }
+      await this.appendSimilarTracksForSeed(waitSession, store.currentTrack.id);
+      if (waitSession !== this.sessionId) return;
+      if (usePlayerStore.getState().queue.length > lengthBefore) {
+        await this.skipNext(isAutoEnd);
+        return;
+      }
+    }
+
     if (nextIndex === null) {
       this.stopPlayback();
       store.setStatus("idle");
@@ -618,9 +661,7 @@ class PlayerEngine {
       if (playerRuntime) {
         void playerRuntime.loadAndPlay(nextTrack);
       }
-      if (nextIndex === store.queue.length - 1) {
-        this.scheduleAppendSimilarTracks(mySession, nextTrack.id);
-      }
+      this.maybeExtendQueue(mySession, nextTrack.id, nextIndex, store.queue.length);
     }
   }
 
@@ -637,7 +678,7 @@ class PlayerEngine {
     const prevIndex =
       store.currentIndex > 0
         ? store.currentIndex - 1
-        : store.repeat === "all"
+        : store.repeat === "all" && !isRadioContext(store.playbackContext)
           ? store.queue.length - 1
           : 0;
 
@@ -654,9 +695,7 @@ class PlayerEngine {
       if (playerRuntime) {
         void playerRuntime.loadAndPlay(prevTrack);
       }
-      if (prevIndex === store.queue.length - 1) {
-        this.scheduleAppendSimilarTracks(mySession, prevTrack.id);
-      }
+      this.maybeExtendQueue(mySession, prevTrack.id, prevIndex, store.queue.length);
     }
   }
 
@@ -937,8 +976,22 @@ class PlayerEngine {
     if (isAutoEnd && store.repeat === "one") return store.currentIndex;
 
     if (store.currentIndex + 1 < queueSize) return store.currentIndex + 1;
+    // radio never wraps to its first track; skipNext refills it instead
+    if (isRadioContext(store.playbackContext)) return null;
     if (store.repeat === "all" || store.repeat === "one") return 0;
     return null;
+  }
+
+  /** queue refill trigger: radio refills early (one track left), autoplay-similar on the last track */
+  private maybeExtendQueue(
+    session: number,
+    seedTrackId: string,
+    index: number,
+    queueLength: number,
+  ): void {
+    const radio = isRadioContext(usePlayerStore.getState().playbackContext);
+    const due = radio ? shouldRefillRadio(queueLength, index) : index === queueLength - 1;
+    if (due) this.scheduleAppendSimilarTracks(session, seedTrackId);
   }
 
   private scheduleAppendSimilarTracks(
@@ -955,12 +1008,24 @@ class PlayerEngine {
     }, 400);
   }
 
-  private async appendSimilarTracksForSeed(
+  private appendSimilarTracksForSeed(session: number, seedTrackId: string): Promise<void> {
+    if (this.radioFetchInFlight) return this.radioFetchInFlight;
+    const run = this.fetchAndAppendSimilarTracks(session, seedTrackId).finally(() => {
+      if (this.radioFetchInFlight === run) this.radioFetchInFlight = null;
+    });
+    this.radioFetchInFlight = run;
+    return run;
+  }
+
+  private async fetchAndAppendSimilarTracks(
     session: number,
     seedTrackId: string,
   ): Promise<void> {
     const currentState = usePlayerStore.getState();
-    if (!currentState.autoplaySimilar) return;
+    // radio always continues; plain lists only when "autoplay similar" is on
+    const radio = isRadioContext(currentState.playbackContext);
+    if (!radio && !currentState.autoplaySimilar) return;
+    const startContext = currentState.playbackContext;
 
     const historyIds = currentState.queue.map((track) => track.id);
     // keep paginating the same wave instance across queue generations
@@ -985,8 +1050,10 @@ class PlayerEngine {
     }
 
     const state = usePlayerStore.getState();
-    if (session !== this.sessionId) return;
-    if (!state.autoplaySimilar) return;
+    // radio: still valid while the same station plays (skipping within it is fine);
+    // anything else: only for the exact track session that asked
+    if (radio ? state.playbackContext !== startContext : session !== this.sessionId) return;
+    if (!radio && !state.autoplaySimilar) return;
 
     const queuedIds = new Set(state.queue.map((track) => track.id));
     const additions = items
@@ -1016,7 +1083,7 @@ class PlayerEngine {
     let nextTrack: Track | null = null;
     if (currentIndex >= 0 && currentIndex < queue.length - 1) {
       nextTrack = queue[currentIndex + 1];
-    } else if (state.repeat === "all" && queue.length > 0) {
+    } else if (state.repeat === "all" && queue.length > 0 && !isRadioContext(state.playbackContext)) {
       nextTrack = queue[0];
     }
 
@@ -1037,7 +1104,7 @@ class PlayerEngine {
     }
 
     if (!lyricsCache.has(nextTrack.id)) {
-      void this.prefetchLyrics(nextTrack.id);
+      void this.prefetchLyrics(nextTrack.id, lyricsHint(nextTrack));
     }
 
     void linerDb.putTrack(nextTrack);
@@ -1047,7 +1114,7 @@ class PlayerEngine {
     }
   }
 
-  private async prefetchLyrics(trackId: string): Promise<void> {
+  private async prefetchLyrics(trackId: string, hint?: LyricsHint): Promise<void> {
     if (!trackId) return;
 
     if (lyricsCache.has(trackId)) return;
@@ -1074,7 +1141,7 @@ class PlayerEngine {
         }[] = [];
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
-        for await (const event of api.streamLyrics(trackId, controller.signal)) {
+        for await (const event of api.streamLyrics(trackId, controller.signal, hint)) {
           if (event.type === "provider" && event.status === "found") {
             const candidate = event.candidate;
             if (shouldCacheLyricsCandidate(candidate)) {
@@ -1236,7 +1303,7 @@ class PlayerEngine {
     log("cyan", "lyrics", `fetching for "${track.title}"`);
 
     try {
-      for await (const event of api.streamLyrics(trackId, controller.signal)) {
+      for await (const event of api.streamLyrics(trackId, controller.signal, lyricsHint(track))) {
         if (token !== this.lyricsLoadToken || controller.signal.aborted) break;
 
         if (event.type === "provider" && event.status === "found") {

@@ -87,6 +87,7 @@
     "confirm": "Подтвердить",
     "are_you_sure": "Вы уверены?",
     "delete_playlist_desc": "Этот плейлист будет удалён навсегда.",
+    "add_to_library_desc": "Этот элемент будет добавлен в вашу библиотеку.",
     "remove_from_library_desc": "Этот элемент будет удалён из вашей библиотеки.",
     "remove_track_from_playlist_desc": "Этот трек будет удалён из плейлиста.",
     "close": "Закрыть",
@@ -135,6 +136,7 @@
     "removed_from_library": "{type} удален(а) из библиотеки",
     "removed_from_library_success": "Удалено из библиотеки",
     "failed_remove_from_library": "Не удалось удалить из библиотеки",
+    "failed_to_remove_library": "Не удалось удалить из библиотеки",
     "failed_to_load_track": "Не удалось загрузить трек",
     "failed_to_resolve_link": "Не удалось распознать ссылку",
     "unsupported_link": "Нераспознанная или неподдерживаемая ссылка",
@@ -343,6 +345,9 @@
     "error_wrong_password": "Неверный пароль"
   },
   "player": {
+    "repeat_off": "Повтор: выкл.",
+    "repeat_all": "Повтор: всё",
+    "repeat_one": "Повтор: трек",
     "nothing_playing": "Ничего не играет",
     "choose_track": "Выберите трек в поиске",
     "queue": "Очередь",
@@ -411,7 +416,8 @@
     "min": "мин",
     "sec": "сек",
     "empty_title": "Этот плейлист пуст",
-    "empty_subtitle": "Найдите песни, чтобы добавить их"
+    "empty_subtitle": "Найдите песни, чтобы добавить их",
+    "likes_empty": "Пока нет понравившихся треков"
   },
   "search": {
     "placeholder": "Поиск треков, исполнителей, альбомов...",
@@ -469,11 +475,71 @@
       "account": "Аккаунт",
       "about": "О приложении",
       "playback": "Воспроизведение",
+      "shortcuts": "Горячие клавиши",
       "overlay": "Оверлей",
+      "discord": "Discord RPC",
       "privacy": "Конфиденциальность"
     },
     "playback": {
       "description": "Поведение очереди, действия по клику и вывод звука."
+    },
+    "shortcuts": {
+      "description": "Настройка глобальных и встроенных горячих клавиш плеера.",
+      "global_section": "Глобальные клавиши (Вне приложения)",
+      "global_desc": "Срабатывают из любого приложения в системе, даже когда Liner свернут или не в фокусе.",
+      "main_app_section": "Основное приложение",
+      "main_app_desc": "Активны при открытом и сфокусированном основном окне Liner.",
+      "miniplayer_section": "Режим мини-плеера",
+      "miniplayer_desc": "Активны при фокусе на мини-плеере (оверлее).",
+      "toggle_overlay": "Переключить оверлей мини-плеера",
+      "toggle_overlay_desc": "Показать или скрыть плавающий мини-плеер из любого места в ОС.",
+      "quick_like_song": "Быстрый лайк текущего трека",
+      "quick_like_song_desc": "Поставить или снять лайк треку снаружи плеера, даже если оверлей не в фокусе.",
+      "play_pause": "Воспроизведение / Пауза",
+      "play_pause_desc": "Переключить воспроизведение аудио.",
+      "next_track": "Следующий трек",
+      "next_track_desc": "Перейти к следующему треку в очереди.",
+      "prev_track": "Предыдущий трек",
+      "prev_track_desc": "Вернуться к предыдущему треку или началу песни.",
+      "seek_forward": "Перемотка вперед (+5с)",
+      "seek_forward_desc": "Перемотать воспроизведение на 5 секунд вперед.",
+      "seek_backward": "Перемотка назад (-5с)",
+      "seek_backward_desc": "Перемотать воспроизведение на 5 секунд назад.",
+      "volume_up": "Громкость +",
+      "volume_up_desc": "Увеличить громкость на 5%.",
+      "volume_down": "Громкость -",
+      "volume_down_desc": "Уменьшить громкость на 5%.",
+      "toggle_mute": "Заглушить звук",
+      "toggle_mute_desc": "Включить или отключить звук.",
+      "search": "Поиск музыки",
+      "search_desc": "Быстро открыть окно поиска музыки.",
+      "toggle_queue": "Очередь",
+      "toggle_queue_desc": "Открыть или закрыть панель очереди воспроизведения.",
+      "toggle_lyrics": "Текст песни",
+      "toggle_lyrics_desc": "Открыть или закрыть панель синхронизированного текста песни.",
+      "toggle_fullscreen": "Полноэкранный режим",
+      "toggle_fullscreen_desc": "Переключить полноэкранный вид плеера.",
+      "like_track": "Лайк / Снять лайк",
+      "like_track_desc": "Добавить трек в избранное или убрать из него.",
+      "focus_main_window": "Перейти в главное окно",
+      "focus_main_window_desc": "Сфокусировать и вывести главное окно Liner на передний план.",
+      "reset_all": "Сбросить все комбинации",
+      "reset_all_desc": "Восстановить заводские горячие клавиши для всех разделов.",
+      "reset_all_button": "Сбросить по умолчанию",
+      "reset_tooltip": "Сбросить по умолчанию ({shortcut})",
+      "conflict_error": "Уже используется в «{action}»",
+      "modifier_required": "Глобальная комбинация требует Ctrl, Alt или Shift",
+      "recording_hint": "Нажмите клавиши (Esc для отмены)",
+      "press_keys": "Нажмите клавиши...",
+      "search_placeholder": "Поиск комбинаций...",
+      "tab_all": "Все",
+      "tab_main_app": "Приложение",
+      "tab_overlay": "Оверлей",
+      "tab_global": "Глобальные",
+      "scope_global": "Глобальное",
+      "scope_main_app": "Приложение",
+      "scope_overlay": "Оверлей",
+      "reset_section": "Сбросить раздел"
     },
     "overlay": {
       "description": "Поведение десктопного оверлея, глобальное сочетание клавиш и позиция.",
@@ -503,6 +569,55 @@
       "always_on_top": {
         "title": "Поверх всех окон",
         "description": "Держать оверлей поверх остальных окон."
+      }
+    },
+    "discord": {
+      "description": "Отображение текущего трека в Discord с обложкой, фото артиста и прогресс-баром.",
+      "section_display": "Параметры отображения",
+      "section_buttons": "Кнопки профиля",
+      "enable": {
+        "title": "Discord Rich Presence",
+        "description": "Транслировать текущую воспроизводимую музыку в ваш профиль Discord."
+      },
+      "status_display": {
+        "title": "Формат статуса",
+        "description": "Выберите, что отображается в заголовке статуса «Слушает...» в Discord.",
+        "artist": "Исполнитель (По умолчанию)",
+        "song": "Название трека",
+        "artist_song": "Исполнитель — Трек",
+        "song_artist": "Трек — Исполнитель",
+        "app": "Liner (Название приложения)"
+      },
+      "show_timeline": {
+        "title": "Шкала времени трека",
+        "description": "Отображать интерактивный прогресс-бар с прошедшим и оставшимся временем."
+      },
+      "show_artwork": {
+        "title": "Обложка трека",
+        "description": "Показывать обложку альбома или песни в карточке активности Discord."
+      },
+      "show_artist_image": {
+        "title": "Мини-фото артиста",
+        "description": "Отображать фото исполнителя в маленьком значке в углу обложки."
+      },
+      "show_paused": {
+        "title": "Показывать при паузе",
+        "description": "Сохранять статус в Discord с индикатором паузы при остановке музыки."
+      },
+      "show_button": {
+        "title": "Кнопка «Слушать в Liner»",
+        "description": "Добавлять интерактивную кнопку со ссылкой на трек в Liner."
+      },
+      "show_download_button": {
+        "title": "Кнопка «Скачать Liner»",
+        "description": "Добавлять интерактивную кнопку со ссылкой на tryliner.fun для загрузки приложения."
+      },
+      "status": {
+        "connected": "Подключено к Discord ({user})",
+        "disconnected": "Discord не подключен",
+        "ready": "Готово",
+        "waiting": "Ожидание Discord",
+        "disabled": "Отключено"
       }
     },
     "miniplayer": {
@@ -897,8 +1012,6 @@
     "applying": "Импорт…",
     "status_queued": "Импорт добавлен в очередь",
     "status_queued_sub": "Обработка начнется в ближайшее время",
-    "status_queued_position": "Очередь: #{position}",
-    "status_queued_position_sub": "Ваш плейлист #{position} в очереди",
     "status_searching": "Поиск треков",
     "status_searching_sub": "Анализ исходного плейлиста…",
     "status_running": "Поиск треков",
@@ -911,6 +1024,7 @@
     "status_completed_sub": "Добавлено треков: {count}",
     "status_completed_sub_empty": "Плейлист готов к прослушиванию",
     "status_failed": "Ошибка импорта",
+    "status_failed_sub": "Что-то пошло не так",
     "view_playlist": "Открыть плейлист",
     "no_candidate_found": "Трек не найден в каталоге",
     "active_import": "Импорт плейлиста"
@@ -989,5 +1103,13 @@
     "downloaded_desc": "Перезапустите Liner для установки версии {version}.",
     "install_button": "Установить",
     "error_title": "Ошибка обновления"
+  },
+  "track_search": {
+    "placeholder_playlist": "Поиск в плейлисте",
+    "placeholder_album": "Поиск в альбоме",
+    "button": "Поиск треков",
+    "count": "{count} из {total}",
+    "no_results": "Нет треков по запросу «{query}»",
+    "clear": "Очистить поиск"
   }
 }

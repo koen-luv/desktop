@@ -24,6 +24,16 @@ describe("linerDb storage layer", () => {
     expect(record?.durationMs).toBe(180000);
   });
 
+  it("drops audio downloaded before a cache clear", async () => {
+    const generation = audioCache.currentGeneration();
+    audioCache.invalidate();
+    const blob = new Blob(["late download"], { type: "audio/webm" });
+    expect(await audioCache.saveAudioBlob("track_after_clear", blob, "audio/webm", generation)).toBe(false);
+    expect(await audioCache.hasAudio("track_after_clear")).toBe(false);
+    expect(await audioCache.saveAudioBlob("track_after_clear", blob, "audio/webm", audioCache.currentGeneration())).toBe(true);
+    expect(await audioCache.hasAudio("track_after_clear")).toBe(true);
+  });
+
   it("stores, checks, and calculates total bytes for audio blobs", async () => {
     const dummyBlob = new Blob(["dummy audio data content"], { type: "audio/ogg" });
     await audioCache.saveAudioBlob("track_audio_1", dummyBlob, "audio/ogg");
@@ -176,6 +186,18 @@ describe("linerDb storage layer", () => {
     await linerDb.updateArtistChecked("artist_test_1");
     const updated = await linerDb.getArtist("artist_test_1");
     expect(updated?.lastCheckedAt).toBeGreaterThan(initialTime);
+  });
+
+  it("keeps only the most recent audio blobs in memory instead of every played track", async () => {
+    for (let i = 1; i <= 6; i++) {
+      await linerDb.putAudio(`track_mem_${i}`, new Blob([`audio ${i}`], { type: "audio/ogg" }), "audio/ogg");
+    }
+    const inMemory = [...(linerDb as unknown as { memAudio: Map<string, unknown> }).memAudio.keys()];
+    expect(inMemory).toEqual(["track_mem_4", "track_mem_5", "track_mem_6"]);
+
+    await linerDb.getAudio("track_mem_5");
+    const afterRead = [...(linerDb as unknown as { memAudio: Map<string, unknown> }).memAudio.keys()];
+    expect(afterRead).toEqual(["track_mem_4", "track_mem_6", "track_mem_5"]);
   });
 
   it("tracks lastPlayedAt on putAudio and touchAudio", async () => {

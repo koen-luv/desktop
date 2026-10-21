@@ -8,7 +8,7 @@ import {
   resolveProxyInnertubeStream,
   resolveSessionStream,
   streamExpiryMs,
-} from "../engine/streamResolver";
+} from "../engine/streamResolverLegacy";
 import type { ResolveContext, ResolvedStream, SourceProvider } from "./types";
 
 /**

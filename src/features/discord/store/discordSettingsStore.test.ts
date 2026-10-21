@@ -1,41 +1,81 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useDiscordSettingsStore } from "./discordSettingsStore";
 
 describe("discordSettingsStore", () => {
-  const configure = vi.fn();
-
   beforeEach(() => {
-    vi.clearAllMocks();
-    (window as unknown as { linerElectron?: unknown }).linerElectron = {
-      discordRpcConfigure: configure,
+    // Reset to defaults
+    const store = useDiscordSettingsStore.getState();
+    store.setEnabled(true);
+    store.setStatusDisplayType("artist");
+    store.setShowArtwork(true);
+    store.setShowArtistSmallImage(true);
+    store.setShowTime(true);
+    store.setShowPaused(true);
+    store.setShowButton(true);
+    store.setShowDownloadButton(true);
+  });
+
+  it("initializes with expected default values", () => {
+    const state = useDiscordSettingsStore.getState();
+    expect(state.enabled).toBe(true);
+    expect(state.statusDisplayType).toBe("artist");
+    expect(state.showArtwork).toBe(true);
+    expect(state.showArtistSmallImage).toBe(true);
+    expect(state.showTime).toBe(true);
+    expect(state.showPaused).toBe(true);
+    expect(state.showButton).toBe(true);
+    expect(state.showDownloadButton).toBe(true);
+  });
+
+  it("updates status display format", () => {
+    const store = useDiscordSettingsStore.getState();
+    store.setStatusDisplayType("title");
+    expect(useDiscordSettingsStore.getState().statusDisplayType).toBe("title");
+
+    store.setStatusDisplayType("artist_title");
+    expect(useDiscordSettingsStore.getState().statusDisplayType).toBe("artist_title");
+
+    store.setStatusDisplayType("title_artist");
+    expect(useDiscordSettingsStore.getState().statusDisplayType).toBe("title_artist");
+
+    store.setStatusDisplayType("app");
+    expect(useDiscordSettingsStore.getState().statusDisplayType).toBe("app");
+  });
+
+  it("updates individual toggle flags", () => {
+    const store = useDiscordSettingsStore.getState();
+
+    store.setShowTime(false);
+    expect(useDiscordSettingsStore.getState().showTime).toBe(false);
+
+    store.setShowArtistSmallImage(false);
+    expect(useDiscordSettingsStore.getState().showArtistSmallImage).toBe(false);
+
+    store.setShowPaused(false);
+    expect(useDiscordSettingsStore.getState().showPaused).toBe(false);
+
+    store.setShowButton(false);
+    expect(useDiscordSettingsStore.getState().showButton).toBe(false);
+
+    store.setShowDownloadButton(false);
+    expect(useDiscordSettingsStore.getState().showDownloadButton).toBe(false);
+
+    store.setShowArtwork(false);
+    expect(useDiscordSettingsStore.getState().showArtwork).toBe(false);
+
+    store.setEnabled(false);
+    expect(useDiscordSettingsStore.getState().enabled).toBe(false);
+  });
+
+  it("notifies Electron bridge when settings change", () => {
+    const notifySpy = vi.fn();
+    (window as any).linerElectron = {
+      discordUpdateSettings: notifySpy,
     };
-    // Raw setState (not the actions) so resetting doesn't emit notifications.
-    useDiscordSettingsStore.setState({ enabled: false, clientId: "" });
-  });
 
-  it("defaults to disabled with an empty client id", () => {
-    const s = useDiscordSettingsStore.getState();
-    expect(s.enabled).toBe(false);
-    expect(s.clientId).toBe("");
-  });
+    const store = useDiscordSettingsStore.getState();
+    store.setShowTime(true);
 
-  it("pushes the (still empty) client id when enabled toggles on", () => {
-    useDiscordSettingsStore.getState().setEnabled(true);
-    expect(useDiscordSettingsStore.getState().enabled).toBe(true);
-    expect(configure).toHaveBeenCalledWith("", true);
-  });
-
-  it("trims the client id and pushes it with the current enabled flag", () => {
-    useDiscordSettingsStore.getState().setEnabled(true);
-    configure.mockClear();
-
-    useDiscordSettingsStore.getState().setClientId("  123456789012345678  ");
-    expect(useDiscordSettingsStore.getState().clientId).toBe("123456789012345678");
-    expect(configure).toHaveBeenCalledWith("123456789012345678", true);
-  });
-
-  it("does not notify electron when it isn't present (web/android)", () => {
-    (window as unknown as { linerElectron?: unknown }).linerElectron = undefined;
-    expect(() => useDiscordSettingsStore.getState().setEnabled(true)).not.toThrow();
+    expect(notifySpy).toHaveBeenCalledWith({ showTime: true });
   });
 });

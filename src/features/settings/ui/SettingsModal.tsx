@@ -1,13 +1,6 @@
 import { useMemo, useState, useEffect, useRef, type ComponentType } from "react";
 import { motion } from "framer-motion";
-import {
-  CloseLine,
-  Search2Line,
-  CloseCircleFill,
-  ExitLine,
-  ArrowLeftLine,
-  RightLine,
-} from "@mingcute/react";
+import { CloseLine, Search2Line, CloseCircleFill, ExitLine, ArrowLeftLine, RightLine, DiscordFill, KeyboardLine } from "@mingcute/react";
 import {
   Play,
   Palette,
@@ -27,12 +20,14 @@ import { useAuthStore } from "@/features/auth";
 import { isAndroidApp } from "@/platform";
 import {
   PlaybackTab,
+  ShortcutsTab,
   AppearanceTab,
   CustomizationTab,
   AudioTab,
   StorageTab,
   AboutTab,
   OverlayTab,
+  DiscordTab,
 } from "./tabs";
 
 /**
@@ -43,13 +38,24 @@ import {
  * own screen (with a back button) and stacks that category's sections under
  * their own headings. Desktop and Android share this exact structure.
  */
-type SectionId = "Playback" | "Overlay" | "Appearance" | "Customization" | "Audio" | "Storage" | "About";
+type SectionId =
+  | "Playback"
+  | "Shortcuts"
+  | "Overlay"
+  | "Discord"
+  | "Appearance"
+  | "Customization"
+  | "Audio"
+  | "Storage"
+  | "About";
 type CategoryId = "playback" | "appearance" | "overlay" | "storage" | "about";
 type GroupId = "preferences" | "application";
 
 const SECTION_ICONS: Record<SectionId, typeof Play> = {
   Playback: Play,
+  Shortcuts: KeyboardLine,
   Overlay: Widget5,
+  Discord: DiscordFill,
   Appearance: Palette,
   Customization: Gallery,
   Audio: HeadphonesRound,
@@ -59,7 +65,9 @@ const SECTION_ICONS: Record<SectionId, typeof Play> = {
 
 const SECTION_COMPONENTS: Record<SectionId, ComponentType<{ searchQuery?: string }>> = {
   Playback: PlaybackTab,
+  Shortcuts: ShortcutsTab,
   Overlay: OverlayTab,
+  Discord: DiscordTab,
   Appearance: AppearanceTab,
   Customization: CustomizationTab,
   Audio: AudioTab,
@@ -68,9 +76,9 @@ const SECTION_COMPONENTS: Record<SectionId, ComponentType<{ searchQuery?: string
 };
 
 const CATEGORIES: { id: CategoryId; group: GroupId; sections: SectionId[] }[] = [
-  { id: "playback", group: "preferences", sections: ["Playback", "Audio"] },
+  { id: "playback", group: "preferences", sections: ["Playback", "Shortcuts", "Audio"] },
   { id: "appearance", group: "preferences", sections: ["Appearance", "Customization"] },
-  { id: "overlay", group: "preferences", sections: ["Overlay"] },
+  { id: "overlay", group: "preferences", sections: ["Overlay", "Discord"] },
   { id: "storage", group: "application", sections: ["Storage"] },
   { id: "about", group: "application", sections: ["About"] },
 ];
@@ -83,17 +91,35 @@ const SETTING_ITEMS: { sectionId: SectionId; titleKey: string; descKey?: string;
   { sectionId: "Playback", titleKey: "settings.autoplay_similar.title", descKey: "settings.autoplay_similar.description" },
   { sectionId: "Playback", titleKey: "settings.transitions.title", descKey: "settings.transitions.description" },
   { sectionId: "Playback", titleKey: "settings.sleep_timer.title", descKey: "settings.sleep_timer.description" },
-  { sectionId: "Overlay", titleKey: "settings.discord.enabled.title", descKey: "settings.discord.enabled.description" },
-  { sectionId: "Overlay", titleKey: "settings.discord.client_id.title", descKey: "settings.discord.client_id.description" },
   { sectionId: "Playback", titleKey: "settings.track_double_click.title", descKey: "settings.track_double_click.description" },
   { sectionId: "Playback", titleKey: "settings.default_playback_context.title", descKey: "settings.default_playback_context.description" },
   { sectionId: "Playback", titleKey: "settings.audio.pause_on_device_change.title", descKey: "settings.audio.pause_on_device_change.description" },
+
+  // Shortcuts (desktop only)
+  { sectionId: "Shortcuts", titleKey: "settings.shortcuts.global_section", descKey: "settings.shortcuts.global_desc", overlayOnly: true },
+  { sectionId: "Shortcuts", titleKey: "settings.shortcuts.main_app_section", descKey: "settings.shortcuts.main_app_desc", overlayOnly: true },
+  { sectionId: "Shortcuts", titleKey: "settings.shortcuts.miniplayer_section", descKey: "settings.shortcuts.miniplayer_desc", overlayOnly: true },
+  { sectionId: "Shortcuts", titleKey: "settings.shortcuts.toggle_overlay", descKey: "settings.shortcuts.toggle_overlay_desc", overlayOnly: true },
+  { sectionId: "Shortcuts", titleKey: "settings.shortcuts.quick_like_song", descKey: "settings.shortcuts.quick_like_song_desc", overlayOnly: true },
+  { sectionId: "Shortcuts", titleKey: "settings.shortcuts.play_pause", descKey: "settings.shortcuts.play_pause_desc", overlayOnly: true },
+  { sectionId: "Shortcuts", titleKey: "settings.shortcuts.next_track", descKey: "settings.shortcuts.next_track_desc", overlayOnly: true },
+  { sectionId: "Shortcuts", titleKey: "settings.shortcuts.prev_track", descKey: "settings.shortcuts.prev_track_desc", overlayOnly: true },
+  { sectionId: "Shortcuts", titleKey: "settings.shortcuts.like_track", descKey: "settings.shortcuts.like_track_desc", overlayOnly: true },
 
   // Overlay
   { sectionId: "Overlay", titleKey: "settings.overlay.position.title", descKey: "settings.overlay.position.description", overlayOnly: true },
   { sectionId: "Overlay", titleKey: "settings.overlay.show_lyrics.title", descKey: "settings.overlay.show_lyrics.description", overlayOnly: true },
   { sectionId: "Overlay", titleKey: "settings.overlay.auto_show_on_minimize.title", descKey: "settings.overlay.auto_show_on_minimize.description", overlayOnly: true },
   { sectionId: "Overlay", titleKey: "settings.overlay.always_on_top.title", descKey: "settings.overlay.always_on_top.description", overlayOnly: true },
+
+  // Discord
+  { sectionId: "Discord", titleKey: "settings.discord.enable.title", descKey: "settings.discord.enable.description" },
+  { sectionId: "Discord", titleKey: "settings.discord.show_timeline.title", descKey: "settings.discord.show_timeline.description" },
+  { sectionId: "Discord", titleKey: "settings.discord.show_artwork.title", descKey: "settings.discord.show_artwork.description" },
+  { sectionId: "Discord", titleKey: "settings.discord.show_artist_image.title", descKey: "settings.discord.show_artist_image.description" },
+  { sectionId: "Discord", titleKey: "settings.discord.show_paused.title", descKey: "settings.discord.show_paused.description" },
+  { sectionId: "Discord", titleKey: "settings.discord.show_button.title", descKey: "settings.discord.show_button.description" },
+  { sectionId: "Discord", titleKey: "settings.discord.show_download_button.title", descKey: "settings.discord.show_download_button.description" },
 
   // Appearance
   { sectionId: "Appearance", titleKey: "settings.language.label", descKey: "settings.language.description" },
@@ -121,7 +147,9 @@ const SETTING_ITEMS: { sectionId: SectionId; titleKey: string; descKey?: string;
 
 const SECTION_LABEL_KEYS: Record<SectionId, string> = {
   Playback: "settings.tabs.playback",
+  Shortcuts: "settings.tabs.shortcuts",
   Overlay: "settings.tabs.overlay",
+  Discord: "settings.tabs.discord",
   Appearance: "settings.theme.title",
   Customization: "settings.tabs.customization",
   Audio: "settings.tabs.audio",
@@ -131,7 +159,9 @@ const SECTION_LABEL_KEYS: Record<SectionId, string> = {
 
 const SECTION_DESC_KEYS: Record<SectionId, string> = {
   Playback: "settings.playback.description",
+  Shortcuts: "settings.shortcuts.description",
   Overlay: "settings.overlay.description",
+  Discord: "settings.discord.description",
   Appearance: "settings.theme.description",
   Customization: "settings.customization.description",
   Audio: "settings.audio.description",
@@ -172,7 +202,10 @@ export default function SettingsModal() {
   const categoryTitles: Record<CategoryId, string> = {
     playback: t("settings.categories.playback.title"),
     appearance: t("settings.categories.appearance.title"),
-    overlay: t("settings.categories.overlay.title"),
+    // On Android this category renders the Discord section alone.
+    overlay: isAndroidApp()
+      ? t("settings.tabs.discord") || "Discord"
+      : t("settings.categories.overlay.title"),
     storage: t("settings.categories.storage.title"),
     about: t("settings.categories.about.title"),
   };
@@ -187,11 +220,9 @@ export default function SettingsModal() {
 
   const sectionTitles: Record<SectionId, string> = {
     Playback: t("settings.tabs.playback"),
-    // On Android this section is the Discord block; its heading only shows up
-    // in search results, since a single-section category renders without one.
-    Overlay: isAndroidApp()
-      ? t("settings.discord.section") || "Discord"
-      : t("settings.tabs.overlay") || "Overlay",
+    Shortcuts: t("settings.tabs.shortcuts") || "Shortcuts",
+    Overlay: t("settings.tabs.overlay") || "Overlay",
+    Discord: t("settings.tabs.discord") || "Discord RPC",
     Appearance: t("settings.tabs.appearance"),
     Customization: t("settings.tabs.customization") || "Customization",
     Audio: t("settings.tabs.audio"),
@@ -201,9 +232,9 @@ export default function SettingsModal() {
 
   const sectionDescriptions: Record<SectionId, string> = {
     Playback: t("settings.playback.description"),
-    Overlay: isAndroidApp()
-      ? ""
-      : t("settings.overlay.description") || "Desktop overlay behavior, position and lyrics display.",
+    Shortcuts: t("settings.shortcuts.description") || "System-wide and player keyboard shortcuts.",
+    Overlay: t("settings.overlay.description") || "Desktop overlay behavior, position and lyrics display.",
+    Discord: t("settings.discord.description") || "Show what you're listening to on Discord with artwork, artist badge and progress bar.",
     Appearance: t("settings.theme.description"),
     Customization: t("settings.customization.description") || "Window background wallpaper, transparency and block blur effects.",
     Audio: t("settings.audio.description"),
@@ -221,12 +252,12 @@ export default function SettingsModal() {
     const query = searchQuery.toLowerCase().trim();
     const labelMatches = new Set<SectionId>();
     const rowMatches = new Set<SectionId>();
-    // On Android the Overlay section only carries the Discord rows, so the
-    // overlay-only label and rows must not surface in search there.
+    // On Android the Overlay and Shortcuts sections are desktop-only, so their
+    // labels and rows must not surface in search there.
     const android = isAndroidApp();
 
     (Object.keys(SECTION_LABEL_KEYS) as SectionId[]).forEach((sectionId) => {
-      if (android && sectionId === "Overlay") return;
+      if (android && (sectionId === "Overlay" || sectionId === "Shortcuts")) return;
       const texts = [
         ...getTranslationsForAllLocales(SECTION_LABEL_KEYS[sectionId]),
         ...getTranslationsForAllLocales(SECTION_DESC_KEYS[sectionId]),
@@ -261,7 +292,7 @@ export default function SettingsModal() {
     () =>
       CATEGORIES.filter((cat) => {
         if (cat.id !== "overlay" || !isAndroidApp()) return true;
-        return Boolean(window.linerElectron?.discordRpcConfigure);
+        return Boolean(window.linerElectron?.discordUpdateState);
       }),
     [],
   );
@@ -458,7 +489,12 @@ export default function SettingsModal() {
   const categoryScreen = activeCategory ? (
     <div className="flex flex-col">
       {activeCategory.sections
-        .filter((sectionId) => !matchingSections.size || matchingSections.has(sectionId))
+        .filter((sectionId) => {
+          // Overlay and Shortcuts are desktop-only; Android renders the
+          // Discord section of the overlay category instead.
+          if (isAndroidApp() && (sectionId === "Overlay" || sectionId === "Shortcuts")) return false;
+          return !matchingSections.size || matchingSections.has(sectionId);
+        })
         .map((sectionId, index) => {
           const SectionComponent = SECTION_COMPONENTS[sectionId];
           const Icon = SECTION_ICONS[sectionId];

@@ -4,25 +4,30 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Radio,
   Sidebar,
-  Play,
-  Pause,
-  Repeat,
-  RepeatOne,
-  Shuffle,
   SkipNext,
   SkipPrevious,
-  VolumeCross,
-  VolumeSmall,
-  VolumeLoud,
   MaximizeSquare3,
   TrashBin2,
   Bookmark,
   PlaybackSpeed,
+  VolumeCross,
+  VolumeSmall,
+  VolumeLoud,
+  Repeat,
+  RepeatOne,
+  Shuffle,
 } from "@solar-icons/react";
 import { HeartFill, HeartLine } from "@mingcute/react";
 
+import {
+  PlayerMorphIcon,
+  ICON_PLAY,
+  ICON_PAUSE,
+} from "./morphPlayerIcons";
+
 import { usePlayerState } from "../hooks/usePlayerState";
 import { playerEngine } from "../engine/playerEngine";
+import { isRadioContext, nextRepeatMode } from "../engine/radioMode";
 import Button from "@/shared/ui/Button";
 import SongCard from "./SongCard";
 import { useTranslation } from "@/languages";
@@ -189,6 +194,7 @@ export interface MiniPlayerProps {
   onQueueToggle?: () => void;
   onFullscreenOpen?: () => void;
   embedded?: boolean;
+  isEdgeToEdge?: boolean;
 }
 
 function MiniPlayer({
@@ -196,6 +202,7 @@ function MiniPlayer({
   onQueueToggle,
   onFullscreenOpen,
   embedded = false,
+  isEdgeToEdge = false,
 }: MiniPlayerProps) {
   const player = usePlayerState();
   const { t } = useTranslation();
@@ -294,7 +301,7 @@ function MiniPlayer({
   const [queueLimit, setQueueLimit] = useState(50);
   const [volumeOpen, setVolumeOpen] = useState(false);
   const [volumePopupStyle, setVolumePopupStyle] = useState<React.CSSProperties>(
-    {},
+    { bottom: 52 },
   );
   const [speedOpen, setSpeedOpen] = useState(false);
   const [speedPopupStyle, setSpeedPopupStyle] = useState<React.CSSProperties>(
@@ -306,9 +313,11 @@ function MiniPlayer({
   const volumeToggleRef = useRef<HTMLButtonElement>(null);
   const speedPopupRef = useRef<HTMLDivElement>(null);
   const speedToggleRef = useRef<HTMLButtonElement>(null);
-  const volumeAutoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+  const volumeHoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const [isVolumeDragging, setIsVolumeDragging] = useState(false);
+  const lastNonZeroVolumeRef = useRef<number>(0.7);
 
   const currentTrack = player.currentTrack;
   const volumeLevel = toVolumeLevel(player.volume);
@@ -394,53 +403,107 @@ function MiniPlayer({
     player.playbackContextCover,
   ]);
 
+  // off -> all (loop the whole queue/playlist) -> one (loop the track) -> off
   const repeatIcon = useMemo(() => {
-    if (player.repeat === "one") {
-      return <RepeatOne size={18} weight="Outline" />;
-    }
+    if (player.repeat === "one") return <RepeatOne size={18} weight="Outline" />;
     return <Repeat size={18} weight="Outline" />;
   }, [player.repeat]);
+  const repeatLabel = t(`player.repeat_${player.repeat}`);
+
+  // "on" state for the shuffle / repeat toggles: the hover tint, but opaque, so the
+  // progress fill sliding underneath never changes it. Values are the hover tint
+  // pre-composited over the toolbox on bg-primary (dark #0a0a0a, light #f5f5f7).
+  // The toolbox pill itself is the opaque bg-toolbox equivalent for the same reason.
+  const activeToggleClass = "!bg-[#dfdfe1] dark:!bg-[#292929] !text-text-primary";
 
   const iconButtonClass =
     "inline-flex h-[30px] w-[30px] items-center justify-center rounded-md text-text-secondary transition-colors duration-150 hover:bg-black/[0.05] dark:hover:bg-white/[0.09] hover:text-text-primary active:scale-[0.96] border-none bg-transparent cursor-pointer";
 
-  const clearVolumeAutoCloseTimer = useCallback(() => {
-    if (volumeAutoCloseTimerRef.current) {
-      clearTimeout(volumeAutoCloseTimerRef.current);
-      volumeAutoCloseTimerRef.current = null;
+  const clearVolumeHoverTimer = useCallback(() => {
+    if (volumeHoverCloseTimerRef.current) {
+      clearTimeout(volumeHoverCloseTimerRef.current);
+      volumeHoverCloseTimerRef.current = null;
     }
   }, []);
 
-  const scheduleVolumeAutoClose = useCallback(() => {
-    clearVolumeAutoCloseTimer();
-    volumeAutoCloseTimerRef.current = setTimeout(() => {
-      setVolumeOpen(false);
-    }, 3000);
-  }, [clearVolumeAutoCloseTimer]);
-
-  useEffect(() => {
-    if (!volumeOpen) {
-      clearVolumeAutoCloseTimer();
-      return;
-    }
-    scheduleVolumeAutoClose();
-    return () => {
-      clearVolumeAutoCloseTimer();
-    };
-  }, [clearVolumeAutoCloseTimer, scheduleVolumeAutoClose, volumeOpen]);
-
-  useEffect(() => {
-    if (!volumeOpen) return;
+  const updateVolumePopupPosition = useCallback(() => {
     const toggle = volumeToggleRef.current;
     const root = miniPlayerRootRef.current;
     if (!toggle || !root) return;
     const toggleRect = toggle.getBoundingClientRect();
     const rootRect = root.getBoundingClientRect();
-    const popupW = 176;
+    const bar =
+      toggle.closest<HTMLElement>(".bg-bg-toolbox") || toggle.parentElement;
+    const barRect = bar?.getBoundingClientRect();
+
+    const popupW = 38;
     const btnW = toggleRect.width;
     const right = rootRect.right - toggleRect.right + (btnW - popupW) / 2;
-    setVolumePopupStyle({ right: Math.max(0, right) });
-  }, [volumeOpen]);
+    const targetTop = barRect ? barRect.top : toggleRect.top;
+    const bottom = rootRect.bottom - targetTop + 2;
+
+    setVolumePopupStyle({
+      right: Math.max(8, right),
+      bottom: Math.round(bottom),
+    });
+  }, []);
+
+  const handleVolumeMouseEnter = useCallback(() => {
+    clearVolumeHoverTimer();
+    updateVolumePopupPosition();
+    setSpeedOpen(false);
+    setVolumeOpen(true);
+  }, [clearVolumeHoverTimer, updateVolumePopupPosition]);
+
+  const handleVolumeMouseLeave = useCallback(() => {
+    clearVolumeHoverTimer();
+    // Keep open while user is actively dragging the slider
+    if (isVolumeDragging) return;
+    volumeHoverCloseTimerRef.current = setTimeout(() => {
+      setVolumeOpen(false);
+    }, 140);
+  }, [clearVolumeHoverTimer, isVolumeDragging]);
+
+  const handleToggleMute = useCallback(() => {
+    if (volumeLevel > 0) {
+      lastNonZeroVolumeRef.current = volumeLevel;
+      playerEngine.setVolume(0);
+    } else {
+      const restore = lastNonZeroVolumeRef.current || 0.7;
+      playerEngine.setVolume(toVolumeGain(restore));
+    }
+  }, [volumeLevel]);
+
+  const handleVolumeWheel = useCallback(
+    (e: React.WheelEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 0.04 : -0.04;
+      const nextLevel = Math.min(1, Math.max(0, volumeLevel + delta));
+      playerEngine.setVolume(toVolumeGain(nextLevel));
+      setVolumeOpen(true);
+      clearVolumeHoverTimer();
+      volumeHoverCloseTimerRef.current = setTimeout(() => {
+        setVolumeOpen(false);
+      }, 1200);
+    },
+    [clearVolumeHoverTimer, volumeLevel],
+  );
+
+  const handleVolumeDraggingChange = useCallback((dragging: boolean) => {
+    setIsVolumeDragging(dragging);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearVolumeHoverTimer();
+    };
+  }, [clearVolumeHoverTimer]);
+
+  useEffect(() => {
+    if (!volumeOpen) return;
+    updateVolumePopupPosition();
+  }, [volumeOpen, updateVolumePopupPosition]);
 
   useEffect(() => {
     if (!speedOpen) return;
@@ -467,9 +530,8 @@ function MiniPlayer({
         const clickedVolumeToggle =
           volumeToggleRef.current?.contains(target);
         if (!clickedVolumePopup && !clickedVolumeToggle) {
+          clearVolumeHoverTimer();
           setVolumeOpen(false);
-        } else {
-          scheduleVolumeAutoClose();
         }
       }
 
@@ -488,6 +550,7 @@ function MiniPlayer({
         if (volumeOpen) {
           event.preventDefault();
           event.stopPropagation();
+          clearVolumeHoverTimer();
           setVolumeOpen(false);
         }
         if (speedOpen) {
@@ -504,7 +567,7 @@ function MiniPlayer({
       document.removeEventListener("mousedown", onDocumentPointerDown, true);
       document.removeEventListener("keydown", onDocumentKeyDown, true);
     };
-  }, [scheduleVolumeAutoClose, speedOpen, volumeOpen]);
+  }, [clearVolumeHoverTimer, speedOpen, volumeOpen]);
 
   const [scrubRatio, setScrubRatio] = useState<number | null>(null);
   const activeProgress = scrubRatio !== null ? scrubRatio : progress;
@@ -519,25 +582,26 @@ function MiniPlayer({
           <motion.div
             key="volume-popup"
             ref={volumePopupRef}
-            initial={{ opacity: 0, y: 10, scale: 0.985 }}
+            initial={{ opacity: 0, y: 8, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.985 }}
-            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute bottom-[74px] z-[92] w-[184px] rounded-xl bg-bg-primary border border-border-primary/50 px-[12px] py-[8px] prevent-seek"
+            exit={{ opacity: 0, y: 6, scale: 0.96 }}
+            transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute bottom-[52px] z-[99] w-[38px] rounded-xl bg-bg-surface/90 dark:bg-[#161618]/95 backdrop-blur-2xl pt-[6px] pb-[8px] px-[4px] shadow-[0_8px_24px_rgba(0,0,0,0.14)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.5)] prevent-seek"
             style={volumePopupStyle}
             onPointerDown={(e) => e.stopPropagation()}
-            onMouseEnter={clearVolumeAutoCloseTimer}
-            onMouseMove={clearVolumeAutoCloseTimer}
-            onMouseLeave={scheduleVolumeAutoClose}
-            onMouseDown={scheduleVolumeAutoClose}
+            onMouseEnter={clearVolumeHoverTimer}
+            onMouseLeave={handleVolumeMouseLeave}
           >
+            {/* Seamless invisible hit zone bridging popup and toggle button */}
+            <div className="absolute -inset-x-3 -bottom-[22px] top-0 pointer-events-auto" />
+
             <VolumePicker
-              size="sm"
+              orientation="vertical"
               showValue
-              trackClassName="bg-black/[0.10] dark:bg-white/[0.14]"
-              fillClassName="bg-text-primary"
-              iconClassName="text-text-secondary hover:text-text-primary"
-              valueClassName="text-text-tertiary text-[11px]"
+              showIcon={false}
+              onDraggingChange={handleVolumeDraggingChange}
+              trackClassName="bg-black/[0.08] dark:bg-white/[0.12]"
+              fillClassName="bg-text-primary dark:bg-white"
             />
           </motion.div>
         )}
@@ -568,7 +632,9 @@ function MiniPlayer({
                 hasCustomBg ? "" : "bg-bg-primary"
               }`
             : embedded
-              ? `rounded-sm rounded-br-xl ${
+              ? `rounded-sm ${
+                  isEdgeToEdge ? "rounded-br-none" : "rounded-br-xl"
+                } ${
                   hasCustomBg ? "" : "bg-bg-primary"
                 }`
               : `rounded-3xl border-[0.5px] border-border-tertiary ${
@@ -796,7 +862,7 @@ function MiniPlayer({
             }`}
           >
             <div
-              className="ml-auto flex items-center gap-[2px] rounded-lg bg-bg-toolbox p-[3px] pointer-events-auto prevent-seek cursor-default"
+              className="ml-auto flex items-center gap-[2px] rounded-lg bg-[#ebebed] dark:bg-[#141414] p-[3px] pointer-events-auto prevent-seek cursor-default"
               onPointerDown={(e) => e.stopPropagation()}
             >
               <button
@@ -804,24 +870,25 @@ function MiniPlayer({
                 aria-label="Shuffle"
                 title={player.shuffle ? t("player.shuffle_on") : t("player.shuffle_off")}
                 className={`${iconButtonClass} ${
-                  player.shuffle ? "bg-bg-toolbox-active text-text-primary" : ""
+                  player.shuffle ? activeToggleClass : ""
                 }`}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => playerEngine.setShuffle(!player.shuffle)}
               >
-                <Shuffle size={18} weight={player.shuffle ? "Bold" : "Outline"} />
+                <Shuffle size={18} weight="Outline" />
               </button>
               <button
                 type="button"
-                aria-label="Repeat"
-                title="Repeat"
+                aria-label={repeatLabel}
+                title={repeatLabel}
                 className={`${iconButtonClass} ${
-                  player.repeat !== "off" ? "bg-bg-toolbox-active text-text-primary" : ""
+                  player.repeat !== "off" ? activeToggleClass : ""
                 }`}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() =>
                   playerEngine.setRepeat(
-                    player.repeat === "one" ? "off" : "one",
+                    // radio has no repeat-all: it refills instead of looping
+                    nextRepeatMode(player.repeat, isRadioContext(player.playbackContext)),
                   )
                 }
               >
@@ -869,31 +936,34 @@ function MiniPlayer({
                 ref={volumeToggleRef}
                 type="button"
                 aria-label="Volume"
-                title="Volume"
                 className={`${iconButtonClass} ${
                   volumeOpen ? "bg-bg-toolbox-active text-text-primary" : ""
                 }`}
                 onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => {
+                onMouseEnter={handleVolumeMouseEnter}
+                onMouseLeave={handleVolumeMouseLeave}
+                onWheel={handleVolumeWheel}
+                onClick={(e) => {
+                  e.stopPropagation();
                   setSpeedOpen(false);
                   onQueueOpenChange?.(false);
-                  setVolumeOpen((prev) => !prev);
-                  scheduleVolumeAutoClose();
+                  handleToggleMute();
+                  setVolumeOpen(true);
                 }}
                 style={{ cursor: "pointer" }}
               >
                 {volumeLevel === 0 ? (
-                  <VolumeCross size={20} />
+                  <VolumeCross size={18} weight="Outline" />
                 ) : volumeLevel < 0.33 ? (
-                  <VolumeSmall size={20} />
+                  <VolumeSmall size={18} weight="Outline" />
                 ) : (
-                  <VolumeLoud size={20} />
+                  <VolumeLoud size={18} weight="Outline" />
                 )}
               </button>
               <button
                 type="button"
-                aria-label="Open player"
-                title="Open player"
+                aria-label={t("player.open_player")}
+                title={t("player.open_player")}
                 className={iconButtonClass}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => {
@@ -910,8 +980,8 @@ function MiniPlayer({
               />
               <button
                 type="button"
-                aria-label="Queue"
-                title="Queue"
+                aria-label={t("player.queue")}
+                title={t("player.queue")}
                 className={iconButtonClass}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => {
@@ -955,16 +1025,30 @@ function MiniPlayer({
               }}
               style={{ cursor: "pointer" }}
             >
-              {isLoading ? (
+              {/* keep the morph icon mounted through the loading state
+                  (spinner overlays it) — swapping it out on "loading" would
+                  remount MorphIcon when the track starts, which skips the
+                  play -> pause morph animation. */}
+              <span className="relative flex h-[16px] w-[16px] items-center justify-center">
                 <span
-                  className="h-[16px] w-[16px] animate-spin rounded-full border-[2px] border-current border-t-transparent"
-                  aria-label="Loading playback"
-                />
-              ) : isPlaying ? (
-                <Pause size={16} weight="Bold" />
-              ) : (
-                <Play size={16} weight="Bold" className="translate-x-[0.5px]" />
-              )}
+                  className={`absolute inset-0 flex items-center justify-center ${
+                    isLoading ? "opacity-0" : ""
+                  } transition-transform ${
+                    isPlaying ? "" : "translate-x-[0.5px]"
+                  }`}
+                >
+                  <PlayerMorphIcon
+                    icon={isPlaying ? ICON_PAUSE : ICON_PLAY}
+                    size={16}
+                  />
+                </span>
+                {isLoading && (
+                  <span
+                    className="absolute h-[16px] w-[16px] animate-spin rounded-full border-[2px] border-current border-t-transparent"
+                    aria-label="Loading playback"
+                  />
+                )}
+              </span>
             </button>
             <button
               type="button"

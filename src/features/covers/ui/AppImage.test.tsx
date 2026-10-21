@@ -111,4 +111,16 @@ describe("AppImage Letterbox Auto-Scaling", () => {
     expect(img.style.transform).toContain("scale(1.34)");
     expect(img.style.transform).toContain("rotate(5deg)");
   });
+
+  it("does not render skeleton or img when src is empty", async () => {
+    await act(async () => {
+      root.render(<AppImage src="" width={100} height={100} />);
+    });
+
+    const img = container.querySelector("img");
+    expect(img).toBeNull();
+
+    const skeleton = container.querySelector(".bg-bg-panel");
+    expect(skeleton).toBeNull();
+  });
 });

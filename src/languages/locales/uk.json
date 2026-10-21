@@ -87,6 +87,7 @@
     "confirm": "Підтвердити",
     "are_you_sure": "Ви впевнені?",
     "delete_playlist_desc": "Цей плейлист буде видалено назавжди.",
+    "add_to_library_desc": "Цей елемент буде додано до вашої бібліотеки.",
     "remove_from_library_desc": "Цей елемент буде видалено з вашої бібліотеки.",
     "remove_track_from_playlist_desc": "Цей трек буде видалено з плейлиста.",
     "close": "Закрити",
@@ -135,6 +136,7 @@
     "removed_from_library": "{type} видалено з бібліотеки",
     "removed_from_library_success": "Видалено з бібліотеки",
     "failed_remove_from_library": "Не вдалося видалити з бібліотеки",
+    "failed_to_remove_library": "Не вдалося видалити з бібліотеки",
     "failed_to_load_track": "Не вдалося завантажити трек",
     "failed_to_resolve_link": "Не вдалося розпізнати посилання",
     "unsupported_link": "Нерозпізнане або непідтримуване посилання",
@@ -343,6 +345,9 @@
     "error_wrong_password": "Невірний пароль"
   },
   "player": {
+    "repeat_off": "Повтор: вимкнено",
+    "repeat_all": "Повтор: усе",
+    "repeat_one": "Повтор: трек",
     "nothing_playing": "Нічого не грає",
     "choose_track": "Виберіть трек в пошуку",
     "queue": "Черга",
@@ -411,7 +416,8 @@
     "min": "хв",
     "sec": "сек",
     "empty_title": "Цей плейліст порожній",
-    "empty_subtitle": "Знайдіть пісні, щоб додати їх"
+    "empty_subtitle": "Знайдіть пісні, щоб додати їх",
+    "likes_empty": "Поки немає вподобаних треків"
   },
   "search": {
     "placeholder": "Пошук треків, виконавців, альбомів...",
@@ -469,11 +475,71 @@
       "account": "Акаунт",
       "about": "Про додаток",
       "playback": "Відтворення",
+      "shortcuts": "Гарячі клавіші",
       "overlay": "Оверлей",
+      "discord": "Discord RPC",
       "privacy": "Конфіденційність"
     },
     "playback": {
       "description": "Поведінка черги, дії за кліком та виведення звуку."
+    },
+    "shortcuts": {
+      "description": "Налаштування глобальних та вбудованих гарячих клавіш плеєра.",
+      "global_section": "Глобальні клавіші (Поза додатком)",
+      "global_desc": "Спрацьовують з будь-якого додатку в системі, навіть коли Liner згорнутий або не у фокусі.",
+      "main_app_section": "Основний додаток",
+      "main_app_desc": "Активні при відкритому та сфокусованому основному вікні Liner.",
+      "miniplayer_section": "Режим міні-плеєра",
+      "miniplayer_desc": "Активні при фокусі на міні-плеєрі (оверлеї).",
+      "toggle_overlay": "Перемкнути оверлей міні-плеєра",
+      "toggle_overlay_desc": "Показати або сховати плаваючий міні-плеєр з будь-якого місця в ОС.",
+      "quick_like_song": "Швидкий лайк поточного треку",
+      "quick_like_song_desc": "Поставити або зняти лайк треку зовні плеєра, навіть якщо оверлей не у фокусі.",
+      "play_pause": "Відтворення / Пауза",
+      "play_pause_desc": "Перемкнути відтворення аудіо.",
+      "next_track": "Наступний трек",
+      "next_track_desc": "Перейти до наступного треку в черзі.",
+      "prev_track": "Попередній трек",
+      "prev_track_desc": "Повернутися до попереднього треку або початку пісні.",
+      "seek_forward": "Перемотування вперед (+5с)",
+      "seek_forward_desc": "Перемотати відтворення на 5 секунд вперед.",
+      "seek_backward": "Перемотування назад (-5с)",
+      "seek_backward_desc": "Перемотати відтворення на 5 секунд назад.",
+      "volume_up": "Гучність +",
+      "volume_up_desc": "Збільшити гучність на 5%.",
+      "volume_down": "Гучність -",
+      "volume_down_desc": "Зменшити гучність на 5%.",
+      "toggle_mute": "Вимкнути звук",
+      "toggle_mute_desc": "Увімкнути або вимкнути звук.",
+      "search": "Пошук музики",
+      "search_desc": "Швидко відкрити вікно пошуку музики.",
+      "toggle_queue": "Черга",
+      "toggle_queue_desc": "Відкрити або закрити панель черги відтворення.",
+      "toggle_lyrics": "Текст пісні",
+      "toggle_lyrics_desc": "Відкрити або закрити панель синхронізованого тексту пісні.",
+      "toggle_fullscreen": "Повноекранний режим",
+      "toggle_fullscreen_desc": "Перемкнути повноекранний вигляд плеєра.",
+      "like_track": "Лайк / Зняти лайк",
+      "like_track_desc": "Додати трек до улюблених або видалити з них.",
+      "focus_main_window": "Перейти до головного вікна",
+      "focus_main_window_desc": "Сфокусувати та вивести головне вікно Liner на передній план.",
+      "reset_all": "Скинути всі комбінації",
+      "reset_all_desc": "Відновити початкові гарячі клавіші для всіх розділів.",
+      "reset_all_button": "Скинути за замовчуванням",
+      "reset_tooltip": "Скинути за замовчуванням ({shortcut})",
+      "conflict_error": "Вже використовується в «{action}»",
+      "modifier_required": "Глобальна комбінація потребує Ctrl, Alt або Shift",
+      "recording_hint": "Натисніть клавіші (Esc для скасування)",
+      "press_keys": "Натисніть клавіші...",
+      "search_placeholder": "Пошук комбінацій...",
+      "tab_all": "Всі",
+      "tab_main_app": "Програма",
+      "tab_overlay": "Оверлей",
+      "tab_global": "Глобальні",
+      "scope_global": "Глобальне",
+      "scope_main_app": "Програма",
+      "scope_overlay": "Оверлей",
+      "reset_section": "Скинути розділ"
     },
     "overlay": {
       "description": "Поведінка десктопного оверлею, глобальне сполучення клавіш та позиція.",
@@ -503,6 +569,55 @@
       "always_on_top": {
         "title": "Поверх усіх вікон",
         "description": "Тримати оверлей поверх інших вікон."
+      }
+    },
+    "discord": {
+      "description": "Відображення поточного треку в Discord з обкладинкою, фото артиста та шкалою часу.",
+      "section_display": "Параметри відображення",
+      "section_buttons": "Кнопки профілю",
+      "enable": {
+        "title": "Discord Rich Presence",
+        "description": "Транслювати активне відтворення музики у ваш профіль Discord."
+      },
+      "status_display": {
+        "title": "Формат статусу",
+        "description": "Виберіть, що відображається в заголовку статусу «Слухає...» у Discord.",
+        "artist": "Виконавець (За замовчуванням)",
+        "song": "Назва треку",
+        "artist_song": "Виконавець — Трек",
+        "song_artist": "Трек — Виконавець",
+        "app": "Liner (Назва додатку)"
+      },
+      "show_timeline": {
+        "title": "Шкала часу треку",
+        "description": "Відображати інтерактивний прогрес-бар з часом, що минув та залишився."
+      },
+      "show_artwork": {
+        "title": "Обкладинка треку",
+        "description": "Показувати обкладинку альбому або пісні в картці Discord."
+      },
+      "show_artist_image": {
+        "title": "Міні-фото артиста",
+        "description": "Відображати фото виконавця у невеликому круглому значку на обкладинці."
+      },
+      "show_paused": {
+        "title": "Показувати при паузі",
+        "description": "Зберігати статус у Discord з індикатором паузи при зупинці музики."
+      },
+      "show_button": {
+        "title": "Кнопка «Слухати в Liner»",
+        "description": "Додавати інтерактивну кнопку з посиланням на трек у Liner."
+      },
+      "show_download_button": {
+        "title": "Кнопка «Завантажити Liner»",
+        "description": "Додавати кнопку з посиланням на tryliner.fun для завантаження додатку."
+      },
+      "status": {
+        "connected": "Підключено до Discord ({user})",
+        "disconnected": "Discord не підключено",
+        "ready": "Готово",
+        "waiting": "Очікування Discord",
+        "disabled": "Вимкнено"
       }
     },
     "miniplayer": {
@@ -897,8 +1012,6 @@
     "applying": "Імпорт…",
     "status_queued": "Імпорт додано до черги",
     "status_queued_sub": "Обробка розпочнеться найближчим часом",
-    "status_queued_position": "Черга: #{position}",
-    "status_queued_position_sub": "Ваш плейліст #{position} у черзі",
     "status_searching": "Пошук треків",
     "status_searching_sub": "Аналіз вихідного плейліста…",
     "status_running": "Пошук треків",
@@ -911,6 +1024,7 @@
     "status_completed_sub": "Додано треків: {count}",
     "status_completed_sub_empty": "Плейліст готовий до прослуховування",
     "status_failed": "Помилка імпорту",
+    "status_failed_sub": "Щось пішло не так",
     "view_playlist": "Відкрити плейліст",
     "no_candidate_found": "Трек не знайдено в каталозі",
     "active_import": "Імпорт плейлісту"
@@ -989,5 +1103,13 @@
     "downloaded_desc": "Перезапустіть Liner для встановлення версії {version}.",
     "install_button": "Встановити",
     "error_title": "Помилка оновлення"
+  },
+  "track_search": {
+    "placeholder_playlist": "Пошук у плейлисті",
+    "placeholder_album": "Пошук в альбомі",
+    "button": "Пошук треків",
+    "count": "{count} з {total}",
+    "no_results": "Немає треків за запитом «{query}»",
+    "clear": "Очистити пошук"
   }
 }

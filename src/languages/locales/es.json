@@ -87,6 +87,7 @@
     "confirm": "Confirmar",
     "are_you_sure": "¿Estás seguro?",
     "delete_playlist_desc": "Esta lista de reproducción se eliminará permanentemente.",
+    "add_to_library_desc": "Este elemento se añadirá a tu biblioteca.",
     "remove_from_library_desc": "Este elemento se eliminará de tu biblioteca.",
     "remove_track_from_playlist_desc": "Esta canción se eliminará de esta lista de reproducción.",
     "close": "Cerrar",
@@ -135,6 +136,7 @@
     "removed_from_library": "Se ha quitado {type} de la biblioteca",
     "removed_from_library_success": "Quitado de la biblioteca",
     "failed_remove_from_library": "Error al quitar de la biblioteca",
+    "failed_to_remove_library": "Error al quitar de la biblioteca",
     "failed_to_load_track": "Error al cargar la canción",
     "failed_to_resolve_link": "Error al resolver el enlace",
     "unsupported_link": "Enlace no reconocido o no compatible",
@@ -343,6 +345,9 @@
     }
   },
   "player": {
+    "repeat_off": "Repetir: desactivado",
+    "repeat_all": "Repetir: todo",
+    "repeat_one": "Repetir: canción",
     "nothing_playing": "Nada en reproducción",
     "choose_track": "Elige una canción en la búsqueda",
     "queue": "Cola",
@@ -411,7 +416,8 @@
     "min": "min",
     "sec": "s",
     "empty_title": "Esta lista de reproducción está vacía",
-    "empty_subtitle": "Busca canciones para añadirlas"
+    "empty_subtitle": "Busca canciones para añadirlas",
+    "likes_empty": "Aún no hay canciones que te gusten"
   },
   "search": {
     "placeholder": "Buscar canciones, artistas, álbumes...",
@@ -470,7 +476,9 @@
       "about": "Acerca de",
       "playback": "Reproducción",
       "overlay": "Superposición",
-      "privacy": "Privacidad"
+      "discord": "Discord RPC",
+      "privacy": "Privacidad",
+      "shortcuts": "Atajos"
     },
     "playback": {
       "description": "Comportamiento de la cola, acciones de clic y salida de audio."
@@ -503,6 +511,55 @@
       "always_on_top": {
         "title": "Siempre encima",
         "description": "Mantiene el reproductor flotando por encima de otras ventanas."
+      }
+    },
+    "discord": {
+      "description": "Muestra lo que estás escuchando en Discord con carátula, foto del artista y barra de progreso.",
+      "section_display": "Opciones de visualización",
+      "section_buttons": "Botones de perfil",
+      "enable": {
+        "title": "Discord Rich Presence",
+        "description": "Transmite tu música en reproducción activa a tu perfil de Discord."
+      },
+      "status_display": {
+        "title": "Línea de estado",
+        "description": "Elige qué se muestra en la cabecera 'Escuchando a...' de Discord.",
+        "artist": "Artista (Por defecto)",
+        "song": "Canción",
+        "artist_song": "Artista - Canción",
+        "song_artist": "Canción - Artista",
+        "app": "Liner (Nombre de app)"
+      },
+      "show_timeline": {
+        "title": "Línea de tiempo de reproducción",
+        "description": "Muestra una barra de progreso interactiva con el tiempo transcurrido y restante."
+      },
+      "show_artwork": {
+        "title": "Carátula de la canción",
+        "description": "Muestra la carátula de la pista o álbum en la tarjeta de actividad de Discord."
+      },
+      "show_artist_image": {
+        "title": "Insignia con foto del artista",
+        "description": "Muestra la foto del artista en una pequeña insignia circular en la esquina inferior."
+      },
+      "show_paused": {
+        "title": "Mostrar en pausa",
+        "description": "Mantiene el estado visible en Discord con un indicador de pausa al pausar la música."
+      },
+      "show_button": {
+        "title": "Botón 'Escuchar en Liner'",
+        "description": "Añade un botón interactivo con enlace a la canción en Liner."
+      },
+      "show_download_button": {
+        "title": "Botón 'Descargar Liner'",
+        "description": "Añade un botón interactivo que enlaza a tryliner.fun para descargar la aplicación."
+      },
+      "status": {
+        "connected": "Conectado a Discord ({user})",
+        "disconnected": "Discord no conectado",
+        "ready": "Listo",
+        "waiting": "Esperando a Discord",
+        "disabled": "Desactivado"
       }
     },
     "customization": {
@@ -812,6 +869,64 @@
       "never_run": "Las pruebas aún no se han ejecutado.",
       "last_run": "{ok}/{total} pruebas superadas · {time}",
       "open_folder": "Abrir carpeta de guardado"
+    },
+    "shortcuts": {
+      "description": "Personaliza los atajos de teclado globales del sistema y del reproductor.",
+      "global_section": "Atajos globales (en todo el sistema)",
+      "global_desc": "Funcionan desde cualquier aplicación de tu equipo, incluso con Liner minimizado o sin foco.",
+      "main_app_section": "Aplicación principal",
+      "main_app_desc": "Activos cuando la ventana principal de Liner está abierta y enfocada.",
+      "miniplayer_section": "Modo miniplayer",
+      "miniplayer_desc": "Activos cuando el miniplayer de escritorio está enfocado.",
+      "toggle_overlay": "Mostrar u ocultar la superposición del miniplayer",
+      "toggle_overlay_desc": "Muestra u oculta la superposición flotante del escritorio desde cualquier lugar del sistema.",
+      "quick_like_song": "Me gusta rápido a la canción actual",
+      "quick_like_song_desc": "Da o quita «Me gusta» a la canción en reproducción en todo el sistema, sin enfocar el reproductor.",
+      "play_pause": "Reproducir / Pausar",
+      "play_pause_desc": "Alterna la reproducción de audio.",
+      "next_track": "Pista siguiente",
+      "next_track_desc": "Salta a la siguiente canción de la cola.",
+      "prev_track": "Pista anterior",
+      "prev_track_desc": "Vuelve a la pista anterior o al inicio de la pista.",
+      "seek_forward": "Avanzar (+5 s)",
+      "seek_forward_desc": "Adelanta la posición de reproducción 5 segundos.",
+      "seek_backward": "Retroceder (-5 s)",
+      "seek_backward_desc": "Retrocede la posición de reproducción 5 segundos.",
+      "volume_up": "Subir volumen",
+      "volume_up_desc": "Aumenta el volumen de reproducción un 5 %.",
+      "volume_down": "Bajar volumen",
+      "volume_down_desc": "Reduce el volumen de reproducción un 5 %.",
+      "toggle_mute": "Silenciar / Activar sonido",
+      "toggle_mute_desc": "Alterna el silencio del audio.",
+      "search": "Buscar música",
+      "search_desc": "Abre rápidamente el cuadro de búsqueda.",
+      "toggle_queue": "Cola",
+      "toggle_queue_desc": "Abre o cierra el panel de la cola de reproducción.",
+      "toggle_lyrics": "Letras",
+      "toggle_lyrics_desc": "Abre o cierra el panel de letras sincronizadas.",
+      "toggle_fullscreen": "Pantalla completa / Vista del reproductor",
+      "toggle_fullscreen_desc": "Alterna la vista inmersiva del reproductor a pantalla completa.",
+      "like_track": "Me gusta / Quitar me gusta",
+      "like_track_desc": "Añade o quita la pista de tus canciones favoritas.",
+      "focus_main_window": "Cambiar a la ventana principal",
+      "focus_main_window_desc": "Enfoca la ventana principal de la aplicación y la trae al frente.",
+      "reset_all": "Restablecer todos los atajos",
+      "reset_all_desc": "Restaura los atajos predeterminados de todas las secciones.",
+      "reset_all_button": "Restablecer valores",
+      "reset_tooltip": "Restablecer al valor predeterminado ({shortcut})",
+      "conflict_error": "Ya lo usa «{action}»",
+      "modifier_required": "Los atajos globales requieren Ctrl, Alt o Shift",
+      "recording_hint": "Pulsa las teclas para asignar (Esc para cancelar)",
+      "press_keys": "Pulsa las teclas...",
+      "search_placeholder": "Buscar atajos...",
+      "tab_all": "Todos",
+      "tab_main_app": "App principal",
+      "tab_overlay": "Superposición",
+      "tab_global": "Globales",
+      "scope_global": "Globales",
+      "scope_main_app": "App principal",
+      "scope_overlay": "Superposición",
+      "reset_section": "Restablecer sección"
     }
   },
   "toast": {
@@ -940,7 +1055,9 @@
     "dump_copy_failed": "No se pudo acceder al portapapeles.",
     "download_dump": "Guardar informe",
     "support": "Contactar soporte",
-    "support_hint": "Adjunta el archivo del informe para que el equipo de soporte tenga toda la información."
+    "support_hint": "Adjunta el archivo del informe para que el equipo de soporte tenga toda la información.",
+    "wall_title_server": "Los servidores de Liner tienen problemas",
+    "wall_subtitle_server": "Tu conexión está bien, el servidor respondió con un error. Tu música y tu biblioteca están a salvo, inténtalo de nuevo en unos minutos."
   },
   "updater": {
     "modal_title": "Nueva actualización disponible",
@@ -953,5 +1070,13 @@
     "downloaded_desc": "Reinicia Liner para instalar la versión {version}.",
     "install_button": "Instalar",
     "error_title": "Error en la actualización"
+  },
+  "track_search": {
+    "placeholder_playlist": "Buscar en la playlist",
+    "placeholder_album": "Buscar en el álbum",
+    "button": "Buscar canciones",
+    "count": "{count} de {total}",
+    "no_results": "Ninguna canción coincide con «{query}»",
+    "clear": "Borrar búsqueda"
   }
 }

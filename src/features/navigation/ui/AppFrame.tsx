@@ -25,6 +25,7 @@ import PageTransition from "./PageTransition";
 import RightDrawer from "./RightDrawer";
 import { useGlobalShortcuts } from "../hooks/useGlobalShortcuts";
 import { useDisableButtonFocus } from "../hooks/useDisableButtonFocus";
+import { useWindowState } from "../hooks/useWindowState";
 import {
   useSearchTracks,
   useSearchAll,
@@ -78,6 +79,7 @@ export default function AppFrame({ children }: AppFrameProps) {
   const { pathname, search } = location;
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { isEdgeToEdge } = useWindowState();
 
   const searchOpen = useModalStore((state) => state.searchOpen);
   const openSearch = useModalStore((state) => state.openSearch);
@@ -746,7 +748,9 @@ export default function AppFrame({ children }: AppFrameProps) {
     <div
       ref={appFrameRef}
       data-custom-bg={hasCustomBg ? "true" : undefined}
-      className="safe-area-shell relative flex flex-col md:flex-row h-full w-full overflow-hidden rounded-none md:rounded-5xl bg-bg-canvas p-0 md:p-1.5 gap-0 md:gap-1.5"
+      className={`safe-area-shell relative flex flex-col md:flex-row h-full w-full overflow-hidden ${
+        isEdgeToEdge ? "rounded-none p-0" : "rounded-none p-0 md:rounded-5xl md:p-1.5"
+      } bg-bg-canvas gap-0 md:gap-1.5`}
       onScroll={(e) => {
         if (e.currentTarget.scrollLeft !== 0) e.currentTarget.scrollLeft = 0;
         if (e.currentTarget.scrollTop !== 0) e.currentTarget.scrollTop = 0;
@@ -754,7 +758,9 @@ export default function AppFrame({ children }: AppFrameProps) {
     >
       {hasCustomBg && backgroundImage && (
         <div
-          className="absolute inset-0 z-0 pointer-events-none overflow-hidden rounded-5xl"
+          className={`absolute inset-0 z-0 pointer-events-none overflow-hidden ${
+            isEdgeToEdge ? "rounded-none" : "rounded-5xl"
+          }`}
           aria-hidden="true"
         >
           <img
@@ -782,6 +788,7 @@ export default function AppFrame({ children }: AppFrameProps) {
         <Sidebar
           searchOpen={searchOpen}
           onSearchToggle={handleSearchToggle}
+          isEdgeToEdge={isEdgeToEdge}
         />
       </aside>
 
@@ -791,7 +798,7 @@ export default function AppFrame({ children }: AppFrameProps) {
           className={`flex-1 min-w-0 flex flex-col relative h-full ${
             hasCustomBg ? "" : "bg-bg-primary"
           } rounded-none md:rounded-sm ${
-            isFullscreenPlayer
+            isFullscreenPlayer || isEdgeToEdge
               ? "md:rounded-tr-none"
               : "md:rounded-tr-xl"
           } overflow-hidden`}
@@ -850,10 +857,13 @@ export default function AppFrame({ children }: AppFrameProps) {
         {shouldShowMiniPlayer && (
           <div
             ref={miniPlayerContainerRef}
-            className="relative z-[40] w-full shrink-0 px-0 md:px-0"
+            // Above the right drawer (z-50) so the player's volume/speed/queue
+            // popups, which live in this stacking context, aren't hidden by it.
+            className="relative z-[55] w-full shrink-0"
           >
             <MiniPlayer
               embedded
+              isEdgeToEdge={isEdgeToEdge}
               onQueueOpenChange={handleQueuePopupToggle}
               onQueueToggle={handleQueuePopupToggleRequest}
               onFullscreenOpen={openFullscreenPlayer}
@@ -1132,8 +1142,8 @@ export default function AppFrame({ children }: AppFrameProps) {
       <WindowControls
         isFullscreen={isFullscreenPlayer}
         style={{
-          top: isFullscreenPlayer ? 12 : 18,
-          right: isFullscreenPlayer ? 12 : 18,
+          top: isFullscreenPlayer || isEdgeToEdge ? 12 : 18,
+          right: isFullscreenPlayer || isEdgeToEdge ? 12 : 18,
           transition: "all 0.28s cubic-bezier(0.22, 1, 0.36, 1)",
           zIndex: 80,
         }}

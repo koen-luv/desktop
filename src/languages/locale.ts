@@ -1,15 +1,33 @@
-export type Locale = "en" | "ru" | "uk" | "es";
+export const SUPPORTED_LOCALES = [
+  "en",
+  "ru",
+  "uk",
+  "es",
+  "de",
+  "it",
+  "fr",
+  "pl",
+  "tr",
+  "pt",
+] as const;
+
+export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 const LOCALE_STORAGE_KEY = "liner_locale";
+
+const LANGUAGE_ALIASES: Record<string, Locale> = { ua: "uk" };
+
+function isLocale(value: string): value is Locale {
+  return (SUPPORTED_LOCALES as readonly string[]).includes(value);
+}
 
 export function getStoredLocale(): Locale {
   if (typeof window === "undefined" || !window.localStorage) return "en";
   const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY);
-  if (stored === "en" || stored === "ru" || stored === "uk" || stored === "es") return stored;
-  // Handle legacy stored 'ua'
-  if (stored === "ua") {
-    storeLocale("uk");
-    return "uk";
+  if (stored && isLocale(stored)) return stored;
+  if (stored && LANGUAGE_ALIASES[stored]) {
+    storeLocale(LANGUAGE_ALIASES[stored]);
+    return LANGUAGE_ALIASES[stored];
   }
   return getBrowserLocale();
 }
@@ -23,12 +41,10 @@ export function storeLocale(locale: Locale): void {
 export function getBrowserLocale(): Locale {
   if (typeof window === "undefined") return "ru";
   const langs = window.navigator.languages ?? [window.navigator.language];
-  for (const l of langs) {
-    const code = l.slice(0, 2).toLowerCase();
-    if (code === "en") return "en";
-    if (code === "es") return "es";
-    if (code === "ru") return "ru";
-    if (code === "uk" || code === "ua") return "uk";
+  for (const language of langs) {
+    const code = language.slice(0, 2).toLowerCase();
+    if (isLocale(code)) return code;
+    if (LANGUAGE_ALIASES[code]) return LANGUAGE_ALIASES[code];
   }
   return "ru";
 }
