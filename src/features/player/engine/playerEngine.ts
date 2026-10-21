@@ -29,6 +29,7 @@ import {
 } from "@/features/lyrics";
 import { preloadCoverArt } from "@/features/covers";
 import { linerDb, type CachedLyricsRecord } from "@/shared/storage";
+import { debouncedStorage } from "@/shared/utils/storage";
 import { showToast } from "@/shared/ui";
 import { createTranslatorSync, getStoredLocale } from "@/languages";
 import type { Track } from "@/shared/types";
@@ -191,9 +192,10 @@ class PlaybackTelemetryTracker {
     }
   }
 
-  public flushCurrentTrack() {
-    if (!this.activeTrackId) return;
+  public flushCurrentTrack(): Promise<void> {
+    if (!this.activeTrackId) return Promise.resolve();
     this.onPausedOrStopped();
+    let reported: Promise<void> = Promise.resolve();
 
     const durationMs = this.trackDurationMs > 0 ? this.trackDurationMs : this.playedDurationMs;
     const rawRate = durationMs > 0 ? this.playedDurationMs / durationMs : this.completed ? 1.0 : 0.0;
@@ -208,7 +210,7 @@ class PlaybackTelemetryTracker {
             ? snap.artists.split(",").map((name) => ({ id: snap?.artistId || "unknown", name: name.trim() }))
             : [{ id: "unknown", name: "Unknown Artist" }]);
 
-      this.sendEvent({
+      reported = this.sendEvent({
         playbackSessionId: this.playbackSessionId,
         listeningSessionId: this.getOrCreateListeningSession(),
         trackId: this.activeTrackId,
@@ -239,10 +241,11 @@ class PlaybackTelemetryTracker {
     this.completed = false;
     this.loopCount = 0;
     this.hasSeekBackward = false;
+    return reported;
   }
 
-  private sendEvent(payload: RecordPlaybackEventRequest) {
-    void api.recordPlaybackEvent(payload).catch((err) => {
+  private sendEvent(payload: RecordPlaybackEventRequest): Promise<void> {
+    return api.recordPlaybackEvent(payload).then(() => undefined, (err) => {
       log(
         "yellow",
         "telemetry",
@@ -878,6 +881,29 @@ class PlayerEngine {
       this.originalUpcomingQueue.unshift(track);
     }
     this.preloadNextTrack(store);
+  }
+
+  public async stopAndClear(): Promise<void> {
+    const reported = this.telemetry.flushCurrentTrack();
+    if (this.radioAppendTimeout) {
+      clearTimeout(this.radioAppendTimeout);
+      this.radioAppendTimeout = null;
+    }
+    this.radioFetchInFlight = null;
+    this.radioWaveId = null;
+    this.lyricsAbort?.abort();
+    this.lyricsAbort = null;
+    this.lyricsLoadToken += 1;
+    this.currentLyricsTrackId = null;
+    this.masterPlaylist = [];
+    this.originalUpcomingQueue = [];
+    this.lastPreloadKey = null;
+    this.consecutiveAutoSkips = 0;
+    playerRuntime?.stop();
+    usePlayerStore.getState().resetPlayback();
+    useLyricsStore.getState().reset();
+    debouncedStorage.flush();
+    await reported;
   }
 
   public clearQueue(): void {

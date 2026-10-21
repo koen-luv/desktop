@@ -17,8 +17,10 @@ async function resolveCollection(canonicalUrl: string, collection: SoundCloudCol
 
   const title = trimmedString(body?.title);
   const description = trimmedString(body?.description);
+  const artworkUrl = trimmedString(body?.artwork_url);
   if (title) collection.title = title;
   if (description) collection.description = description;
+  if (artworkUrl && !collection.artworkUrl) collection.artworkUrl = artworkUrl;
   collection.rawTracks.push(...asArray(body?.tracks).filter(isRecord));
 }
 

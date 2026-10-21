@@ -77,4 +77,32 @@ describe("PlayerRuntime with soundcloud streams", () => {
     expect(playerRuntime!.hasLoadedSourceFor(track.id)).toBe(false);
     vi.useRealTimers();
   });
+
+  it("keeps the previous source attached while the next track resolves (system media session survives skips)", async () => {
+    vi.mocked(URL.createObjectURL)
+      .mockReturnValueOnce("blob:first")
+      .mockReturnValueOnce("blob:second");
+    const removeSrc = vi.spyOn(HTMLMediaElement.prototype, "removeAttribute");
+    mocks.resolveSoundCloudStream.mockResolvedValueOnce(bufferedStream([1]));
+    await playerRuntime!.loadAndPlay(soundCloudTrack("sc:201"));
+    removeSrc.mockClear();
+
+    let release!: (value: unknown) => void;
+    mocks.resolveSoundCloudStream.mockReturnValueOnce(new Promise((resolve) => (release = resolve)));
+    const pending = playerRuntime!.loadAndPlay(soundCloudTrack("sc:202"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const audio = (playerRuntime as any).audio as HTMLAudioElement;
+    // mid-skip: the element is never emptied, and the old source doesn't count as the new track
+    expect(removeSrc).not.toHaveBeenCalledWith("src");
+    expect(audio.getAttribute("src")).toBe("blob:first");
+    expect(playerRuntime!.hasLoadedSourceFor("sc:202")).toBe(false);
+
+    release(bufferedStream([2]));
+    await pending;
+    expect(audio.getAttribute("src")).toBe("blob:second");
+    expect(playerRuntime!.hasLoadedSourceFor("sc:202")).toBe(true);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:first");
+    // two full loads; each waits up to 3s for a canplay jsdom never fires
+  }, 20_000);
 });

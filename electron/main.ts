@@ -1,4 +1,5 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, shell, screen, dialog, session, nativeImage, powerSaveBlocker } from "electron";
+import { app, BaseWindow, BrowserWindow, globalShortcut, ipcMain, shell, screen, dialog, session, nativeImage, powerSaveBlocker } from "electron";
+import type { Display, Rectangle } from "electron";
 import { autoUpdater } from "electron-updater";
 import path from "node:path";
 import fs from "node:fs";
@@ -34,12 +35,14 @@ import {
   type MainNetResult,
 } from "./netdiag.js";
 import { TouchBarManager } from "./touchbar.js";
+import { registerAuthSessionIpc } from "./auth-session-ipc.js";
 import { OverlayManager } from "./overlay.js";
 import { BundleManager } from "./bundle-manager.js";
 import { createBundleErrorStamp } from "./bundle-stamp.js";
 import { createSleepBlocker } from "./sleep-blocker.js";
 import { createShutdown } from "./shutdown.js";
-import { computeDragBounds } from "./window-drag.js";
+import { computeDragBounds, isInTopSnapZone, restoreUnderCursor } from "./window-drag.js";
+import { isWindows11, loadSnapPreviewAddon, NativeSnapPreview } from "./snap-native.js";
 import { DiscordRpcManager } from "./discord.js";
 import { PoTokenService } from "./potoken.js";
 
@@ -90,6 +93,40 @@ const execFile = ((...args: Parameters<typeof nodeExecFile>) => {
 }) as typeof nodeExecFile;
 
 // single owner of "the app is going away": releases the overlay, shortcuts,
+// translucent "drop to maximize" preview shown while dragging to the top edge
+let snapPreview: BaseWindow | null = null;
+// compositor-driven preview (native add-on); preferred over snapPreview when built
+let nativeSnap: NativeSnapPreview | null = null;
+
+function syncResizable() {
+  if (process.platform !== "win32" || !mainWindow || mainWindow.isDestroyed()) return;
+  const locked = mainWindow.isMaximized() || mainWindow.isFullScreen();
+  if (mainWindow.isResizable() === locked) mainWindow.setResizable(!locked);
+}
+
+// maximize / restore: on windows 11 with the native add-on, a vsync-paced morph of a
+// live thumbnail (see NativeSnapPreview.morph); otherwise instant
+function maximizeWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const resize = () => {
+    mainWindow?.maximize();
+    syncResizable();
+  };
+  if (nativeSnap) nativeSnap.morph(resize);
+  else resize();
+}
+
+function unmaximizeWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const resize = () => {
+    mainWindow?.unmaximize();
+    syncResizable();
+  };
+  if (nativeSnap) nativeSnap.morph(resize);
+  else resize();
+}
+
+// single owner of "the app is going away": releases the overlay, shortcuts,
 // helper processes and every window, then quits and force-exits if that stalls
 const shutdown = createShutdown({
   cleanup: [
@@ -99,6 +136,12 @@ const shutdown = createShutdown({
       // drop the discord ipc socket so presence clears and nothing keeps the process alive
       discordRpcManager?.destroy();
       discordRpcManager = null;
+    },
+    () => {
+      if (snapPreview && !snapPreview.isDestroyed()) snapPreview.destroy();
+      snapPreview = null;
+      nativeSnap?.destroy();
+      nativeSnap = null;
     },
     () => {
       poTokenService?.destroy();
@@ -187,10 +230,18 @@ function createWindow() {
     });
   };
 
-  mainWindow.on("maximize", broadcastWindowState);
-  mainWindow.on("unmaximize", broadcastWindowState);
-  mainWindow.on("enter-full-screen", broadcastWindowState);
-  mainWindow.on("leave-full-screen", broadcastWindowState);
+  // no edge resizing while maximized / fullscreen: the top edge would otherwise show the
+  // resize cursor and grabbing it to drag the window down resizes it instead
+  const onMaximizeStateChanged = () => {
+    syncResizable();
+    broadcastWindowState();
+  };
+  mainWindow.on("maximize", onMaximizeStateChanged);
+  mainWindow.on("unmaximize", onMaximizeStateChanged);
+  mainWindow.on("enter-full-screen", onMaximizeStateChanged);
+  mainWindow.on("leave-full-screen", onMaximizeStateChanged);
+  // transparent windows "maximize" by filling the work area, so catch it on resize too
+  mainWindow.on("resize", syncResizable);
   mainWindow.on("minimize", () => {
     broadcastWindowState();
     if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -296,6 +347,11 @@ function createWindow() {
   });
 
   mainWindow.on("closed", () => {
+    // a hidden drag-snap preview would otherwise keep window-all-closed from firing
+    if (snapPreview && !snapPreview.isDestroyed()) snapPreview.destroy();
+    snapPreview = null;
+    nativeSnap?.destroy();
+    nativeSnap = null;
     poTokenService?.destroy();
     mainWindow = null;
     if (process.platform === "darwin") {
@@ -374,7 +430,18 @@ if (!gotTheLock) {
       path.join(__dirname, "preload.cjs"),
       RENDERER_DIST,
     );
+    overlayManager.setIndexPathResolver(
+      () => bundleManager?.getEffectiveIndexPath() ?? path.join(RENDERER_DIST, "index.html"),
+    );
     overlayManager.setMainWindow(mainWindow);
+    // F in the overlay: the window grows back out of the pill (windows 11 + add-on)
+    overlayManager.setFocusMainHandler((restore) => {
+      const overlay = overlayManager;
+      if (nativeSnap && overlay) {
+        overlay.holdForTransition(); // it is closed (hidden) once the transform lands
+        void nativeSnap.fromOverlay(overlay.getWindow(), restore, () => overlay.closeOverlay());
+      } else restore();
+    });
     overlayManager.registerShortcut();
 
     discordRpcManager = new DiscordRpcManager();
@@ -390,6 +457,15 @@ if (!gotTheLock) {
     ipcMain.handle("window:minimize", () => {
       // cannot minimize a native fullscreen window or under hyprland tiling wm
       if (!mainWindow || mainWindow.isFullScreen() || isHyprland) return;
+      // windows 11 + add-on: the window flies into the overlay pill it is about to become
+      if (nativeSnap && overlayManager?.willShowOnMinimize()) {
+        const overlay = overlayManager;
+        void nativeSnap.toOverlay(
+          (beforeShow) => overlay.openForTransition(beforeShow),
+          () => mainWindow?.minimize(),
+        );
+        return;
+      }
       mainWindow.minimize();
     });
 
@@ -402,9 +478,9 @@ if (!gotTheLock) {
         if (mainWindow.isFullScreen()) {
           mainWindow.setFullScreen(false);
         } else if (mainWindow.isMaximized()) {
-          mainWindow.unmaximize();
+          unmaximizeWindow();
         } else {
-          mainWindow.maximize();
+          maximizeWindow();
         }
       }
     });
@@ -845,6 +921,7 @@ if (!gotTheLock) {
     // on scaled / mixed-dpi windows displays rounds the size and grows the window
     // (see window-drag.ts)
     let dragStartCursor: { x: number; y: number } | null = null;
+    let dragging = false; // between the renderer's drag-start and drag-end
     let dragStartBounds: { x: number; y: number; width: number; height: number } | null = null;
 
     const beginDrag = () => {
@@ -853,29 +930,275 @@ if (!gotTheLock) {
       dragStartBounds = mainWindow.getBounds();
     };
 
+    // drag-to-top snap (windows only). the custom drag bypasses aero snap, so we
+    // mirror it: touching the top edge shows windows' own acrylic blur over the work
+    // area (over every other app, under ours); pulling away hides it; dropping
+    // maximizes instantly.
+    //
+    // why there is no js animation: a backdrop window resized from js can't be smooth
+    // (dwm recomputes the acrylic per resize and main-process timers aren't vsync), so
+    // the preview is placed at its final size once and shown / hidden; windows itself
+    // draws the transition. nothing runs per frame, so nothing can stutter.
+    // the drag never pays for it either: no screen capture, the preview is a bare
+    // native window created (and primed) in the background after startup, and per
+    // drag move only a couple of cheap checks run.
+    // a windows 11 exclusive (elsewhere dragging to the top just moves the window)
+    const snapEnabled = isWindows11();
+    // acrylic needs windows 11 22h2 (build 22621)+; older builds get a flat tint
+    const acrylicSupported = snapEnabled && Number(os.release().split(".")[2] ?? 0) >= 22621;
+    const SNAP_RELEASE_PX = 24; // armed snap holds until the cursor is this far below the edge
+    const SNAP_INSET = 8; // gap between the preview and the work area edges
+
+    let snapReady = false;
+    let snapArmed = false;
+    let snapDisplay: Display | null = null;
+    let previewVisible = false;
+    let mainRaised = false;
+    let mainWasOnTop = false;
+    let previewHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const previewRectFor = (display: Display): Rectangle => {
+      const area = display.workArea;
+      return {
+        x: area.x + SNAP_INSET,
+        y: area.y + SNAP_INSET,
+        width: area.width - SNAP_INSET * 2,
+        height: area.height - SNAP_INSET * 2,
+      };
+    };
+
+    const createSnapPreview = () => {
+      if (snapPreview && !snapPreview.isDestroyed()) return;
+      // a bare native window (no web contents); the tint is its background colour
+      // (#AARRGGBB) over the acrylic. it is NOT always-on-top: shown, it lands at the
+      // top of the normal band (above every other app) while ours is raised above it,
+      // so it can never cover us, not even for a frame
+      const preview = new BaseWindow({
+        show: false,
+        frame: false,
+        resizable: false,
+        movable: false,
+        minimizable: false,
+        maximizable: false,
+        focusable: false,
+        skipTaskbar: true,
+        hasShadow: false,
+        ...(acrylicSupported
+          ? { backgroundMaterial: "acrylic" as const, backgroundColor: "#29808080" }
+          : { transparent: true, backgroundColor: "#9a767676" }),
+      });
+      snapPreview = preview;
+      preview.setIgnoreMouseEvents(true);
+      preview.on("closed", () => {
+        snapReady = false;
+        previewVisible = false;
+      });
+      // prime: show it once off-screen at full size so dwm sets up the backdrop now,
+      // not on the first real snap
+      const primary = screen.getPrimaryDisplay();
+      const rect = previewRectFor(primary);
+      preview.setBounds({ x: -32000, y: -32000, width: rect.width, height: rect.height });
+      preview.showInactive();
+      setTimeout(() => {
+        if (preview.isDestroyed()) return;
+        preview.hide();
+        snapReady = true;
+      }, 300);
+    };
+
+    // one-time cost (creating + priming the window), paid in the background, never in a drag
+    if (snapEnabled) {
+      const warmUp = () => {
+        if (dragStartCursor) {
+          setTimeout(warmUp, 1000);
+          return;
+        }
+        // preferred: the compositor-driven native preview (smooth, no per-frame work)
+        const addon = loadSnapPreviewAddon(process.env.APP_ROOT ?? path.join(__dirname, ".."));
+        if (addon) {
+          nativeSnap = NativeSnapPreview.create(addon, () => mainWindow, {
+            insetDip: SNAP_INSET,
+            tuckInsetDip: 20,
+            radiusDip: 8,
+            growMs: 220,
+            collapseMs: 240,
+            tint: 0x29808080,
+            tintNoBlur: 0x9a767676,
+          });
+          if (nativeSnap) {
+            nativeSnap.prime(screen.getPrimaryDisplay());
+            overlayManager?.enablePrewarm(); // the first hand-off to the overlay starts at once
+            return;
+          }
+        }
+        if (!addon) console.warn("[snap-preview] native add-on not available (using the plain preview)");
+        // fallback: a plain acrylic window, shown / hidden without animation
+        try {
+          createSnapPreview();
+        } catch {
+          // no preview: drop-to-maximize still works
+        }
+      };
+      app.whenReady().then(() => setTimeout(warmUp, 2500));
+    }
+
+    const raiseMain = () => {
+      if (!mainWindow || mainWindow.isDestroyed() || mainRaised) return;
+      mainRaised = true;
+      mainWasOnTop = mainWindow.isAlwaysOnTop();
+      mainWindow.setAlwaysOnTop(true, "pop-up-menu");
+    };
+
+    const lowerMain = () => {
+      if (!mainRaised) return;
+      mainRaised = false;
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setAlwaysOnTop(mainWasOnTop);
+    };
+
+    const hidePreview = () => {
+      if (previewHideTimer) {
+        clearTimeout(previewHideTimer);
+        previewHideTimer = null;
+      }
+      if (previewVisible && snapPreview && !snapPreview.isDestroyed()) snapPreview.hide();
+      previewVisible = false;
+      lowerMain();
+    };
+
+    const armSnap = (display: Display) => {
+      snapArmed = true;
+      snapDisplay = display;
+      if (nativeSnap) {
+        nativeSnap.arm(display);
+        return;
+      }
+      const preview = snapPreview;
+      // not ready yet: still armed for drop-to-maximize, just no preview this time
+      if (!snapReady || !preview || preview.isDestroyed()) return;
+      if (previewHideTimer) {
+        clearTimeout(previewHideTimer);
+        previewHideTimer = null;
+      }
+      raiseMain(); // first, so the preview can only ever appear below us
+      preview.setBounds(previewRectFor(display));
+      if (!previewVisible) {
+        preview.showInactive();
+        // top of the normal band: above every other app, still below our raised window
+        preview.moveTop();
+        previewVisible = true;
+      }
+    };
+
+    const disarmSnap = () => {
+      snapArmed = false;
+      snapDisplay = null;
+      if (nativeSnap) {
+        nativeSnap.collapse();
+        return;
+      }
+      hidePreview();
+    };
+
+    const settleSnap = () => {
+      const display = snapEnabled && snapArmed ? snapDisplay : null;
+      if (!display || !mainWindow || mainWindow.isDestroyed() || mainWindow.isMaximized()) {
+        if (snapArmed || previewVisible) disarmSnap();
+        else nativeSnap?.follow();
+        return;
+      }
+      snapArmed = false;
+      snapDisplay = null;
+      const area = display.workArea;
+      const from = mainWindow.getBounds();
+      // park the window inside the target display first (same size, no resize) so
+      // electron maximizes onto the display under the cursor
+      const parked = {
+        ...from,
+        x: from.width >= area.width ? area.x : Math.min(Math.max(from.x, area.x), area.x + area.width - from.width),
+        y: Math.max(from.y, area.y),
+      };
+      if (parked.x !== from.x || parked.y !== from.y) mainWindow.setBounds(parked);
+      // the window morphs into the screen over the blur (native add-on), or fills it at
+      // once with the plain fallback preview
+      if (nativeSnap) {
+        nativeSnap.morph(() => {
+          mainWindow?.maximize();
+          syncResizable();
+        });
+        return;
+      }
+      mainWindow.maximize();
+      syncResizable();
+      if (previewVisible) previewHideTimer = setTimeout(hidePreview, 120);
+      else lowerMain();
+    };
+
+    const trackSnap = (cursor: { x: number; y: number }) => {
+      const display = screen.getDisplayNearestPoint(cursor);
+      // arms on the very top edge; once armed it holds until the cursor clearly
+      // leaves (like windows), so a small wobble doesn't flicker it away
+      const holding =
+        snapArmed && snapDisplay?.id === display.id && isInTopSnapZone(cursor, display.bounds, SNAP_RELEASE_PX);
+      if (holding || isInTopSnapZone(cursor, display.bounds)) {
+        if (!snapArmed || snapDisplay?.id !== display.id) armSnap(display);
+      } else if (snapArmed) {
+        disarmSnap();
+      } else {
+        nativeSnap?.follow(); // collapsing: keep the box on the window
+      }
+    };
+
+    // dragging a maximized window out: restore it under the cursor instead of
+    // jumping back to wherever it was before maximize (instant, like windows)
+    const restoreForDrag = () => {
+      if (!mainWindow) return;
+      const maximized = mainWindow.getBounds();
+      const normal = mainWindow.getNormalBounds();
+      const restoredSize =
+        normal.width > 0 && normal.height > 0 && (normal.width < maximized.width || normal.height < maximized.height)
+          ? normal
+          : null;
+      const targetUnderCursor = (size: { width: number; height: number }) =>
+        restoreUnderCursor(maximized, size, screen.getCursorScreenPoint());
+      const resize = () => {
+        if (!mainWindow) return;
+        mainWindow.unmaximize();
+        mainWindow.setBounds(targetUnderCursor(restoredSize ?? mainWindow.getBounds()));
+        syncResizable();
+        // the drag continues from where the window landed
+        if (dragging) beginDrag();
+      };
+      // windows 11 + add-on: the window shrinks down into place under the cursor and
+      // keeps following it (see followMorph in drag-move)
+      if (nativeSnap) nativeSnap.morphDragOut(resize);
+      else resize();
+    };
+
     ipcMain.on("window:drag-start", () => {
       if (!mainWindow || mainWindow.isFullScreen()) return;
-      if (mainWindow.isMaximized()) {
-        mainWindow.unmaximize();
-      }
+      dragging = true;
+      if (mainWindow.isMaximized()) restoreForDrag();
       beginDrag();
     });
 
     ipcMain.on("window:drag-end", () => {
+      dragging = false;
       dragStartCursor = null;
       dragStartBounds = null;
+      if (snapEnabled) settleSnap();
     });
 
     ipcMain.on("window:drag-move", () => {
       if (!mainWindow || mainWindow.isFullScreen()) return;
       if (mainWindow.isMaximized()) {
-        mainWindow.unmaximize();
+        restoreForDrag();
         beginDrag();
       }
       if (!dragStartCursor || !dragStartBounds) beginDrag();
       if (!dragStartCursor || !dragStartBounds) return;
 
-      const next = computeDragBounds(dragStartBounds, dragStartCursor, screen.getCursorScreenPoint());
+      const cursor = screen.getCursorScreenPoint();
+      const next = computeDragBounds(dragStartBounds, dragStartCursor, cursor);
       const cur = mainWindow.getBounds();
       if (
         next.x !== cur.x ||
@@ -885,6 +1208,8 @@ if (!gotTheLock) {
       ) {
         mainWindow.setBounds(next);
       }
+      nativeSnap?.followMorph(); // restoring from maximize: keep the morph on the window
+      if (snapEnabled) trackSnap(cursor);
     });
 
     // signing ipc handlers
@@ -949,6 +1274,12 @@ if (!gotTheLock) {
     ipcMain.handle("signer:get-time-offset", () => {
       return getServerTimeOffset();
     });
+
+    const authSessions = registerAuthSessionIpc();
+    overlayManager?.bindAuthSource(
+      () => Boolean(authSessions.get()),
+      (listener) => authSessions.onChange(() => listener()),
+    );
 
     createWindow();
 

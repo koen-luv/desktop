@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
 import { useTranslation } from "@/languages";
 import { LuMinus, LuSquare, LuX } from "react-icons/lu";
 import { useIsContentTransparent } from "@/features/settings/store/customizationStore";
+import { useWindowState } from "../hooks/useWindowState";
 import { useWindowAnimationStore } from "@/shared/ui";
 
 export interface WindowControlsProps {
@@ -11,6 +11,32 @@ export interface WindowControlsProps {
   isFullscreen?: boolean;
 }
 
+// the window goes away right under the cursor (minimize / into the overlay), so
+// chromium never sees the pointer leave and the button keeps its hover look when the
+// window comes back. while this flag is on the control buttons drop their hover
+// highlight; it clears on the first real mouse move after the window is back.
+function suppressStaleHover() {
+  const root = document.documentElement;
+  root.setAttribute("data-hover-reset", "");
+  (document.activeElement as HTMLElement | null)?.blur?.();
+  let wentAway = false;
+  const clear = () => root.removeAttribute("data-hover-reset");
+  const onAway = () => {
+    wentAway = true;
+  };
+  const onBack = () => {
+    if (!wentAway) return;
+    window.removeEventListener("blur", onAway);
+    window.removeEventListener("focus", onBack);
+    document.removeEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pointermove", clear, { once: true });
+  };
+  const onVisibility = () => (document.hidden ? onAway() : onBack());
+  window.addEventListener("blur", onAway);
+  window.addEventListener("focus", onBack);
+  document.addEventListener("visibilitychange", onVisibility);
+}
+
 export default function WindowControls({
   className = "",
   variant = "default",
@@ -18,36 +44,14 @@ export default function WindowControls({
   isFullscreen = false,
 }: WindowControlsProps) {
   const { t } = useTranslation();
-  const [isWindowFullScreen, setIsWindowFullScreen] = useState(false);
-  const [isWindowMaximized, setIsWindowMaximized] = useState(false);
-
-  useEffect(() => {
-    if (!window.linerElectron) return;
-
-    // hydrate initial os window state
-    window.linerElectron.isFullScreen?.().then((fs) => {
-      if (typeof fs === "boolean") setIsWindowFullScreen(fs);
-    });
-    window.linerElectron.isMaximized?.().then((max) => {
-      if (typeof max === "boolean") setIsWindowMaximized(max);
-    });
-
-    // live sync across os fullscreen transitions & maximize toggles
-    const unsubscribe = window.linerElectron.onWindowStateChange?.((state) => {
-      setIsWindowFullScreen(state.isFullScreen);
-      setIsWindowMaximized(state.isMaximized);
-    });
-
-    return () => {
-      unsubscribe?.();
-    };
-  }, []);
+  const { isFullScreen: isWindowFullScreen, isMaximized: isWindowMaximized } = useWindowState();
 
   const isHyprland = window.linerElectron?.isHyprland ?? false;
 
   const handleMinimize = () => {
     // macos fullscreen spaces and hyprland tiling wm prohibit/ignore minimizing
     if (isWindowFullScreen || isHyprland) return;
+    suppressStaleHover();
     useWindowAnimationStore.getState().triggerMinimize();
   };
 
@@ -72,6 +76,7 @@ export default function WindowControls({
       <div
         data-no-window-drag
         data-no-tooltip="true"
+        data-window-controls
         className={`flex items-center h-[32px] min-h-[32px] max-h-[32px] box-border px-[3px] gap-[2px] rounded-lg pointer-events-auto transition-colors ${
           isFullscreen
             ? "apple-glass-pill-dark text-white"

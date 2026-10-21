@@ -172,6 +172,15 @@ export function toMaxQualityAvatarUrl(url: string | undefined): string {
 
 const inFlightGetRequests = new Map<string, Promise<unknown>>();
 
+async function readErrorCode(res: Response): Promise<string> {
+  try {
+    const data = (await res.clone().json()) as Record<string, unknown> | null;
+    return typeof data?.code === "string" ? data.code : "";
+  } catch {
+    return "";
+  }
+}
+
 async function executeRequest<T>(
   path: string,
   init?: RequestInit,
@@ -264,12 +273,15 @@ async function executeRequest<T>(
 
   if (res.status === 401 && allowRefresh && !path.startsWith("/v1/auth/")) {
     const currentSession = getAuthSession();
+    const signatureRejected = (await readErrorCode(res)).startsWith("SIGNATURE_");
     // If the token in session store was already rotated by another parallel request,
     // retry immediately with the rotated token without firing duplicate refresh requests
     let nextToken =
       currentSession?.accessToken && currentSession.accessToken !== accessToken
         ? currentSession.accessToken
-        : null;
+        : signatureRejected
+          ? accessToken
+          : null;
 
     if (!nextToken && currentSession?.refreshToken) {
       const refreshed = await refreshAuthSession();
@@ -732,10 +744,16 @@ export const api = {
     return request<{ items: unknown[] }>(`/v1/me/library/${type}`);
   },
 
-  saveCollection(type: "albums" | "artists" | "playlists", id: string): Promise<void> {
+  // the catalog lives on the client now, so the server can't look a collection up by
+  // id any more: send what we know (name / title, cover) or the library shows a blank tile
+  saveCollection(
+    type: "albums" | "artists" | "playlists",
+    id: string,
+    snapshot?: Record<string, unknown>,
+  ): Promise<void> {
     return request<void>(
       `/v1/me/library/${type}/${encodeURIComponent(id)}`,
-      { method: "PUT" },
+      { method: "PUT", ...(snapshot ? { body: JSON.stringify({ snapshot }) } : {}) },
     );
   },
 

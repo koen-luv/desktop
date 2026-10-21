@@ -151,6 +151,30 @@ describe("LoginPage Multi-Step Registration Flow", () => {
     expect(createAccBtn).toBeDefined();
   });
 
+  it("skips native email validation and shows the styled error in Login mode", async () => {
+    await act(async () => {
+      root.render(<LoginPage />);
+    });
+
+    const form = container.querySelector("form") as HTMLFormElement;
+    expect(form.noValidate).toBe(true);
+
+    const emailInput = container.querySelector("#auth-email") as HTMLInputElement;
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    await act(async () => {
+      setValue.call(emailInput, "dsf");
+      emailInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(container.querySelector("#auth-form-error")?.textContent).toContain(
+      "Enter a valid email address",
+    );
+    expect(mockLogin).not.toHaveBeenCalled();
+  });
+
   it("switches to Register Step 1 when clicking Create Account", async () => {
     await act(async () => {
       root.render(<LoginPage />);

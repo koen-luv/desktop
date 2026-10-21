@@ -47,6 +47,13 @@ function normalizeShortcut(raw: string): string {
   return normalized.join("+");
 }
 
+const WARM_DELAY_MS = 600;
+const REVEAL_FALLBACK_MS = 2_500;
+const LEGACY_READY_FALLBACK_MS = 1_500;
+const TRANSITION_READY_WAIT_MS = 1_200;
+const CRASH_WINDOW_MS = 60_000;
+const MAX_CRASHES_PER_WINDOW = 3;
+
 export class OverlayManager {
   private mainWindow: BrowserWindow | null = null;
   private overlayWindow: BrowserWindow | null = null;
@@ -71,6 +78,18 @@ export class OverlayManager {
   private moveAnimationTimer: NodeJS.Timeout | null = null;
   private currentAnimatedX: number | null = null;
   private closeTimeout: NodeJS.Timeout | null = null;
+  private rendererAuthenticated = false;
+  private authSource: (() => boolean) | null = null;
+  private contentReady = false;
+  private pendingShow = false;
+  private readyWaiters: Array<() => void> = [];
+  private warmTimer: NodeJS.Timeout | null = null;
+  private readyFallbackTimer: NodeJS.Timeout | null = null;
+  private revealFallbackTimer: NodeJS.Timeout | null = null;
+  private crashTimes: number[] = [];
+  private crashCooldownUntil = 0;
+  private indexPathResolver: (() => string) | null = null;
+  private loadedIndexPath: string | null = null;
 
   constructor(preloadPath: string, rendererDist: string) {
     this.preloadPath = preloadPath;
@@ -161,6 +180,8 @@ export class OverlayManager {
       this.mainWindow.on("closed", () => {
         this.destroy();
       });
+
+      this.mainWindow.webContents.on("did-finish-load", () => this.syncBundle());
     }
   }
 
@@ -170,6 +191,9 @@ export class OverlayManager {
       clearTimeout(this.closeTimeout);
       this.closeTimeout = null;
     }
+    this.clearLifecycleTimers();
+    this.pendingShow = false;
+    this.resetContentReady();
     this.unregisterShortcut();
     this.unregisterLikeShortcut();
     if (this.overlayWindow && !this.overlayWindow.isDestroyed()) {
@@ -384,36 +408,221 @@ export class OverlayManager {
     }, interval);
   }
 
+  /** where the overlay pill sits (or will sit) on screen, in dip */
+  public getPillBounds(): { x: number; y: number; width: number; height: number } {
+    if (this.overlayWindow && !this.overlayWindow.isDestroyed() && this.overlayWindow.isVisible()) {
+      return this.overlayWindow.getBounds();
+    }
+    return this.getWindowBounds();
+  }
+
+  /** minimizing the main window will bring the overlay up */
+  public willShowOnMinimize(): boolean {
+    return !this.disposed && this.isAuthenticated && this.enabled && this.autoShowOnMinimize;
+  }
+
+  public async openForTransition(beforeShow: (win: BrowserWindow) => void): Promise<BrowserWindow | null> {
+    if (this.disposed || !this.isAuthenticated || !this.enabled) return null;
+    if (this.closeTimeout) {
+      clearTimeout(this.closeTimeout);
+      this.closeTimeout = null;
+    }
+    const win = this.ensureWindow();
+    if (!win) return null;
+    beforeShow(win);
+    if (!this.contentReady) await this.waitForContent(TRANSITION_READY_WAIT_MS);
+    if (win.isDestroyed() || this.overlayWindow !== win) return null;
+    this.pendingShow = true;
+    this.reveal();
+    this.wasAutoOpened = true;
+    return win;
+  }
+
+  public holdForTransition() {
+    this.wasAutoOpened = false;
+  }
+
+  public prewarm() {
+    this.ensureWindow();
+  }
+
+  public enablePrewarm() {
+    this.scheduleWarm();
+  }
+
+  public setIndexPathResolver(resolve: () => string) {
+    this.indexPathResolver = resolve;
+  }
+
+  private currentIndexPath(): string {
+    return this.indexPathResolver?.() ?? path.join(this.rendererDist, "index.html");
+  }
+
+  private syncBundle() {
+    const win = this.overlayWindow;
+    if (!win || win.isDestroyed() || process.env.VITE_DEV_SERVER_URL) return;
+    if (this.loadedIndexPath === this.currentIndexPath() || win.isVisible() || this.pendingShow) return;
+    this.overlayWindow = null;
+    this.resetContentReady();
+    try {
+      win.destroy();
+    } catch {}
+    this.scheduleWarm();
+  }
+
+  public bindAuthSource(isSignedIn: () => boolean, subscribe: (listener: () => void) => void) {
+    this.authSource = isSignedIn;
+    subscribe(() => this.refreshAuth());
+    this.refreshAuth();
+  }
+
+  /** the overlay window, when it exists */
+  public getWindow(): BrowserWindow | null {
+    return this.overlayWindow && !this.overlayWindow.isDestroyed() ? this.overlayWindow : null;
+  }
+
+  // main installs this to animate the window back out of the overlay (F in the overlay)
+  private focusMainHandler: ((restore: () => void) => void) | null = null;
+
+  public setFocusMainHandler(handler: ((restore: () => void) => void) | null) {
+    this.focusMainHandler = handler;
+  }
+
   public showOverlay() {
-    if (!this.isAuthenticated || !this.enabled) return;
+    if (this.disposed || !this.isAuthenticated || !this.enabled) return;
 
     if (this.closeTimeout) {
       clearTimeout(this.closeTimeout);
       this.closeTimeout = null;
     }
 
-    if (this.overlayWindow && !this.overlayWindow.isDestroyed()) {
-      const bounds = this.getWindowBounds();
-      const currentBounds = this.overlayWindow.getBounds();
-      if (
-        currentBounds.x !== bounds.x ||
-        currentBounds.y !== bounds.y ||
-        currentBounds.width !== bounds.width ||
-        currentBounds.height !== bounds.height
-      ) {
-        this.overlayWindow.setBounds(bounds);
-      }
-      if (this.latestState) {
-        this.overlayWindow.webContents.send("overlay:state", this.latestState);
-      }
-      this.overlayWindow.webContents.send("overlay:visibility", true);
-      if (!this.overlayWindow.isVisible()) {
-        this.overlayWindow.showInactive();
-      }
-      this.applyAlwaysOnTop();
+    this.pendingShow = true;
+    if (!this.ensureWindow()) {
+      this.pendingShow = false;
       return;
     }
-    this.createOverlayWindow();
+    if (this.contentReady) {
+      this.reveal();
+      return;
+    }
+    if (!this.revealFallbackTimer) {
+      this.revealFallbackTimer = setTimeout(() => {
+        this.revealFallbackTimer = null;
+        this.reveal();
+      }, REVEAL_FALLBACK_MS);
+    }
+  }
+
+  private reveal() {
+    if (!this.pendingShow) return;
+    this.pendingShow = false;
+    if (this.revealFallbackTimer) {
+      clearTimeout(this.revealFallbackTimer);
+      this.revealFallbackTimer = null;
+    }
+    const win = this.overlayWindow;
+    if (!win || win.isDestroyed() || !this.isAuthenticated || !this.enabled) return;
+    const bounds = this.getWindowBounds();
+    const currentBounds = win.getBounds();
+    if (
+      currentBounds.x !== bounds.x ||
+      currentBounds.y !== bounds.y ||
+      currentBounds.width !== bounds.width ||
+      currentBounds.height !== bounds.height
+    ) {
+      win.setBounds(bounds);
+    }
+    if (this.latestState) {
+      win.webContents.send("overlay:state", this.latestState);
+    }
+    win.webContents.send("overlay:visibility", true);
+    if (!win.isVisible()) {
+      win.showInactive();
+    }
+    this.applyAlwaysOnTop();
+  }
+
+  private ensureWindow(): BrowserWindow | null {
+    if (this.disposed || !this.isAuthenticated || !this.enabled) return null;
+    if (Date.now() < this.crashCooldownUntil) return null;
+    if (!this.overlayWindow || this.overlayWindow.isDestroyed()) {
+      this.createOverlayWindow();
+    }
+    return this.overlayWindow && !this.overlayWindow.isDestroyed() ? this.overlayWindow : null;
+  }
+
+  private scheduleWarm() {
+    if (this.disposed || !this.isAuthenticated || !this.enabled) return;
+    if (this.overlayWindow && !this.overlayWindow.isDestroyed()) return;
+    if (this.warmTimer) return;
+    this.warmTimer = setTimeout(() => {
+      this.warmTimer = null;
+      this.ensureWindow();
+    }, WARM_DELAY_MS);
+  }
+
+  private markContentReady() {
+    if (this.readyFallbackTimer) {
+      clearTimeout(this.readyFallbackTimer);
+      this.readyFallbackTimer = null;
+    }
+    if (this.contentReady) return;
+    this.contentReady = true;
+    const waiters = this.readyWaiters;
+    this.readyWaiters = [];
+    for (const resolve of waiters) resolve();
+    this.reveal();
+  }
+
+  private resetContentReady() {
+    this.contentReady = false;
+    const waiters = this.readyWaiters;
+    this.readyWaiters = [];
+    for (const resolve of waiters) resolve();
+  }
+
+  private waitForContent(timeoutMs: number): Promise<void> {
+    if (this.contentReady) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(done, timeoutMs);
+      this.readyWaiters.push(done);
+    });
+  }
+
+  private clearLifecycleTimers() {
+    for (const timer of [this.warmTimer, this.readyFallbackTimer, this.revealFallbackTimer]) {
+      if (timer) clearTimeout(timer);
+    }
+    this.warmTimer = null;
+    this.readyFallbackTimer = null;
+    this.revealFallbackTimer = null;
+  }
+
+  private handleRendererGone(win: BrowserWindow, reason: string) {
+    if (this.overlayWindow !== win) return;
+    console.warn(`[overlay] renderer gone (${reason}), rebuilding the overlay`);
+    this.overlayWindow = null;
+    this.resetContentReady();
+    try {
+      win.destroy();
+    } catch {}
+    const now = Date.now();
+    this.crashTimes = this.crashTimes.filter((t) => now - t < CRASH_WINDOW_MS);
+    this.crashTimes.push(now);
+    if (this.crashTimes.length > MAX_CRASHES_PER_WINDOW) {
+      console.error("[overlay] renderer keeps crashing, not rebuilding it for now");
+      this.crashTimes = [];
+      this.crashCooldownUntil = now + CRASH_WINDOW_MS;
+      this.pendingShow = false;
+      this.clearLifecycleTimers();
+      return;
+    }
+    if (this.pendingShow) this.showOverlay();
+    else this.scheduleWarm();
   }
 
   public toggleOverlay(): boolean {
@@ -423,22 +632,21 @@ export class OverlayManager {
     }
 
     this.wasAutoOpened = false;
-    if (this.overlayWindow && !this.overlayWindow.isDestroyed()) {
-      if (this.overlayWindow.isVisible() && !this.closeTimeout) {
-        this.closeOverlay();
-        return false;
-      } else {
-        this.showOverlay();
-        return true;
-      }
+    if (this.overlayWindow && !this.overlayWindow.isDestroyed() && this.overlayWindow.isVisible() && !this.closeTimeout) {
+      this.closeOverlay();
+      return false;
     }
-
-    this.createOverlayWindow();
+    this.showOverlay();
     return true;
   }
 
   public closeOverlay() {
     this.wasAutoOpened = false;
+    this.pendingShow = false;
+    if (this.revealFallbackTimer) {
+      clearTimeout(this.revealFallbackTimer);
+      this.revealFallbackTimer = null;
+    }
     if (this.closeTimeout) {
       clearTimeout(this.closeTimeout);
       this.closeTimeout = null;
@@ -499,9 +707,17 @@ export class OverlayManager {
   }
 
   public setAuthenticated(authenticated: boolean) {
-    this.isAuthenticated = Boolean(authenticated);
+    this.rendererAuthenticated = Boolean(authenticated);
+    this.refreshAuth();
+  }
+
+  private refreshAuth() {
+    const was = this.isAuthenticated;
+    this.isAuthenticated = this.rendererAuthenticated || Boolean(this.authSource?.());
     if (!this.isAuthenticated) {
       this.closeOverlay();
+    } else if (!was) {
+      this.scheduleWarm();
     }
   }
 
@@ -533,28 +749,27 @@ export class OverlayManager {
       },
     });
 
-    this.overlayWindow.once("ready-to-show", () => {
-      if (this.overlayWindow && !this.overlayWindow.isDestroyed()) {
-        if (!this.isAuthenticated || !this.enabled) {
-          this.overlayWindow.hide();
-          return;
-        }
-        if (this.latestState) {
-          this.overlayWindow.webContents.send("overlay:state", this.latestState);
-        }
-        this.overlayWindow.webContents.send("overlay:visibility", true);
-        this.overlayWindow.showInactive();
-        this.applyAlwaysOnTop();
-      }
+    const win = this.overlayWindow;
+    this.resetContentReady();
+    win.webContents.on("render-process-gone", (_event, details) => this.handleRendererGone(win, details.reason));
+    win.webContents.on("did-finish-load", () => {
+      if (this.overlayWindow !== win || this.contentReady) return;
+      if (this.readyFallbackTimer) clearTimeout(this.readyFallbackTimer);
+      this.readyFallbackTimer = setTimeout(() => {
+        this.readyFallbackTimer = null;
+        if (this.overlayWindow === win) this.markContentReady();
+      }, LEGACY_READY_FALLBACK_MS);
     });
 
     this.applyAlwaysOnTop();
 
-    const targetUrl = process.env.VITE_DEV_SERVER_URL
-      ? `${process.env.VITE_DEV_SERVER_URL}#/overlay`
-      : `file://${path.join(this.rendererDist, "index.html")}#/overlay`;
-
-    this.overlayWindow.loadURL(targetUrl);
+    if (process.env.VITE_DEV_SERVER_URL) {
+      this.loadedIndexPath = null;
+      void win.loadURL(`${process.env.VITE_DEV_SERVER_URL}#/overlay`);
+    } else {
+      this.loadedIndexPath = this.currentIndexPath();
+      void win.loadFile(this.loadedIndexPath, { hash: "/overlay" });
+    }
 
     this.overlayWindow.webContents.on("did-finish-load", () => {
       if (this.latestState && this.overlayWindow && !this.overlayWindow.isDestroyed()) {
@@ -563,13 +778,21 @@ export class OverlayManager {
     });
 
     this.overlayWindow.on("closed", () => {
+      if (this.overlayWindow !== win) return;
       this.overlayWindow = null;
+      this.resetContentReady();
     });
   }
 
   private registerIpcHandlers() {
     ipcMain.on("overlay:set-authenticated", (_event, authenticated: boolean) => {
       this.setAuthenticated(authenticated);
+    });
+
+    ipcMain.on("overlay:ready", (event) => {
+      if (this.overlayWindow && !this.overlayWindow.isDestroyed() && event.sender === this.overlayWindow.webContents) {
+        this.markContentReady();
+      }
     });
 
     ipcMain.on("overlay:update-state", (_event, state: any) => {
@@ -588,11 +811,18 @@ export class OverlayManager {
       }
       if (action.type === "focusMainWindow") {
         if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-          if (this.mainWindow.isMinimized()) {
-            this.mainWindow.restore();
-          }
-          this.mainWindow.show();
-          this.mainWindow.focus();
+          const win = this.mainWindow;
+          const restore = () => {
+            if (win.isDestroyed()) return;
+            if (win.isMinimized()) {
+              win.restore();
+            }
+            win.show();
+            win.focus();
+          };
+          // animated (windows 11 add-on) only when coming back from minimized
+          if (this.focusMainHandler && win.isMinimized()) this.focusMainHandler(restore);
+          else restore();
         }
         return;
       }
@@ -633,6 +863,7 @@ export class OverlayManager {
           this.unregisterShortcut();
         } else {
           this.registerShortcut();
+          this.scheduleWarm();
         }
       }
 
