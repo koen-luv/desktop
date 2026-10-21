@@ -30,6 +30,10 @@ interface SnapPreviewAddon {
   revealMorph(): void;
   endMorph(): void;
   cloak(hwnd: Buffer, on: boolean): void;
+  setTransitionsDisabled?(hwnd: Buffer, disabled: boolean): void;
+  minimizeKeepingPreview?(hwnd: Buffer): void;
+  armRestoreTrap?(hwnd: Buffer, armed: boolean): void;
+  takeRestoredCloaked?(): boolean;
   transform(
     from: Edges,
     to: Edges,
@@ -107,6 +111,7 @@ const DRAG_OUT_MS = 200; // dragging out of maximize: a touch quicker, the windo
 const PAINT_WAIT_MS = 150; // longest we wait for the app to paint at its new size
 // window <-> overlay: a material-style container transform
 const TO_OVERLAY_MS = 190; // into the pill: quick
+const TRANSITIONS_RESTORE_MS = 400;
 const FROM_OVERLAY_MS = 230; // back out: expanding reads better a touch slower
 const EMPHASIZED: Bezier = [0.2, 0, 0, 1]; // quick departure, long gentle settle
 const CONTAINER_TINT = 0xf0141416; // the app's dark surface, over the live blur
@@ -436,15 +441,32 @@ export class NativeSnapPreview {
     }
     this.morphing = true;
     this.hideTimer = setTimeout(() => {
-      // the overlay is revealed by the add-on; the window is hidden: minimize it unseen
       try {
-        minimize();
+        this.minimizeKeepingPreview(hwnd, minimize);
       } finally {
-        setTimeout(() => this.addon.cloak(hwnd, false), 150);
-        this.addon.cloak(ovHwnd, false); // in case the add-on didn't get to it
+        this.addon.cloak(ovHwnd, false);
         this.finishMorph(60);
       }
     }, TO_OVERLAY_MS + 40);
+  }
+
+  private minimizeKeepingPreview(hwnd: Buffer, minimize: () => void) {
+    const setTransitionsDisabled = this.addon.setTransitionsDisabled?.bind(this.addon);
+    if (this.addon.minimizeKeepingPreview && setTransitionsDisabled) {
+      this.addon.minimizeKeepingPreview(hwnd);
+      this.addon.armRestoreTrap?.(hwnd, true);
+      setTimeout(() => setTransitionsDisabled(hwnd, false), TRANSITIONS_RESTORE_MS);
+      return;
+    }
+    if (!setTransitionsDisabled) {
+      minimize();
+      setTimeout(() => this.addon.cloak(hwnd, false), 150);
+      return;
+    }
+    setTransitionsDisabled(hwnd, true);
+    this.addon.cloak(hwnd, false);
+    minimize();
+    setTimeout(() => setTransitionsDisabled(hwnd, false), TRANSITIONS_RESTORE_MS);
   }
 
   /**
@@ -452,19 +474,39 @@ export class NativeSnapPreview {
    * restored hidden and painted first; the pill swells into it, the overlay content
    * fades out early, the app fades in late, and the window is revealed where it lands.
    */
-  async fromOverlay(overlay: BrowserWindow | null, restore: () => void, closeOverlay: () => void) {
+  takeRestoredCloaked(): boolean {
+    return this.addon.takeRestoredCloaked?.() ?? false;
+  }
+
+  disarmRestoreTrap() {
     const win = this.getMain();
+    if (win && !win.isDestroyed()) this.addon.armRestoreTrap?.(win.getNativeWindowHandle(), false);
+  }
+
+  async fromOverlay(
+    overlay: BrowserWindow | null,
+    restore: () => void,
+    closeOverlay: () => void,
+    alreadyRestored = false,
+  ) {
+    const win = this.getMain();
+    const uncloakedRestore = () => {
+      if (!alreadyRestored) return restore();
+      if (win && !win.isDestroyed()) this.addon.cloak(win.getNativeWindowHandle(), false);
+      closeOverlay();
+    };
     if (!win || win.isDestroyed() || !overlay || overlay.isDestroyed() || !overlay.isVisible()) {
-      restore();
+      uncloakedRestore();
       return;
     }
     const hwnd = win.getNativeWindowHandle();
     const ovHwnd = overlay.getNativeWindowHandle();
     const from = this.addon.windowRect(ovHwnd);
-    if (!from) return restore();
+    if (!from) return uncloakedRestore();
+    this.addon.armRestoreTrap?.(hwnd, false);
     this.clearHide();
     this.addon.cloak(hwnd, true);
-    restore();
+    if (!alreadyRestored) restore();
     await afterPaint(win);
     const to = this.addon.windowRect(hwnd);
     if (!to || !this.surfaceOnTop(hwnd)) {

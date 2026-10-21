@@ -34,6 +34,7 @@ import {
 } from "./netdiag.js";
 import { TouchBarManager } from "./touchbar.js";
 import { registerAuthSessionIpc } from "./auth-session-ipc.js";
+import { ThumbarController } from "./thumbar.js";
 import { OverlayManager } from "./overlay.js";
 import { BundleManager } from "./bundle-manager.js";
 import { createBundleErrorStamp } from "./bundle-stamp.js";
@@ -75,6 +76,7 @@ process.env.VITE_PUBLIC = process.env.VITE_DEV_SERVER_URL
 let mainWindow: BrowserWindow | null = null;
 let touchBarManager: TouchBarManager | null = null;
 let overlayManager: OverlayManager | null = null;
+let thumbar: ThumbarController | null = null;
 let bundleManager: BundleManager | null = null;
 let discordRpcManager: DiscordRpcManager | null = null;
 let poTokenService: PoTokenService | null = null;
@@ -363,6 +365,8 @@ function createWindow() {
 
   touchBarManager?.setMainWindow(mainWindow);
   overlayManager?.setMainWindow(mainWindow);
+  mainWindow.on("show", () => thumbar?.refresh());
+  mainWindow.on("restore", () => thumbar?.refresh());
 }
 
 // Single instance lock
@@ -415,8 +419,15 @@ if (!gotTheLock) {
     touchBarManager.registerShortcut();
 
     const updateSleepBlocker = createSleepBlocker(powerSaveBlocker);
-    ipcMain.on("touchbar:update-state", (_event, state: { status: string }) => {
+    thumbar = new ThumbarController(
+      () => mainWindow,
+      (type) => {
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("overlay:action", { type });
+      },
+    );
+    ipcMain.on("touchbar:update-state", (_event, state: { status: string; track?: unknown }) => {
       updateSleepBlocker(state.status);
+      thumbar?.update(state);
     });
 
     overlayManager = new OverlayManager(
@@ -435,6 +446,12 @@ if (!gotTheLock) {
         void nativeSnap.fromOverlay(overlay.getWindow(), restore, () => overlay.closeOverlay());
       } else restore();
     });
+    overlayManager.setRestoreInterceptor(() => {
+      const overlay = overlayManager;
+      if (!nativeSnap || !overlay || !nativeSnap.takeRestoredCloaked()) return false;
+      void nativeSnap.fromOverlay(overlay.getWindow(), () => {}, () => overlay.closeOverlay(), true);
+      return true;
+    });
     overlayManager.registerShortcut();
 
     discordRpcManager = new DiscordRpcManager();
@@ -451,7 +468,7 @@ if (!gotTheLock) {
       // cannot minimize a native fullscreen window or under hyprland tiling wm
       if (!mainWindow || mainWindow.isFullScreen() || isHyprland) return;
       // windows 11 + add-on: the window flies into the overlay pill it is about to become
-      if (nativeSnap && overlayManager?.willShowOnMinimize()) {
+      if (nativeSnap && overlayManager?.willShowOnMinimize() && overlayManager.isReadyForTransition()) {
         const overlay = overlayManager;
         void nativeSnap.toOverlay(
           (beforeShow) => overlay.openForTransition(beforeShow),

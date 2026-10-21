@@ -53,6 +53,16 @@ const LEGACY_READY_FALLBACK_MS = 1_500;
 const TRANSITION_READY_WAIT_MS = 1_200;
 const CRASH_WINDOW_MS = 60_000;
 const MAX_CRASHES_PER_WINDOW = 3;
+const PRIME_PAINT_WAIT_MS = 600;
+const PRIME_SETTLE_MS = 50;
+
+function waitForFrame(win: BrowserWindow, timeoutMs: number): Promise<void> {
+  const painted = win.webContents
+    .executeJavaScript("new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(1))))", false)
+    .then(() => undefined)
+    .catch(() => undefined);
+  return Promise.race([painted, new Promise<void>((resolve) => setTimeout(resolve, timeoutMs))]);
+}
 
 export class OverlayManager {
   private mainWindow: BrowserWindow | null = null;
@@ -88,6 +98,9 @@ export class OverlayManager {
   private revealFallbackTimer: NodeJS.Timeout | null = null;
   private crashTimes: number[] = [];
   private crashCooldownUntil = 0;
+  private primed = false;
+  private priming = false;
+  private wantVisible = false;
   private indexPathResolver: (() => string) | null = null;
   private loadedIndexPath: string | null = null;
 
@@ -171,6 +184,10 @@ export class OverlayManager {
       });
 
       this.mainWindow.on("restore", () => {
+        if (this.restoreInterceptor?.()) {
+          this.wasAutoOpened = false;
+          return;
+        }
         if (this.wasAutoOpened) {
           this.wasAutoOpened = false;
           this.closeOverlay();
@@ -470,6 +487,33 @@ export class OverlayManager {
     this.scheduleWarm();
   }
 
+  public isReadyForTransition(): boolean {
+    const win = this.getWindow();
+    return Boolean(win) && this.contentReady && this.primed && !this.priming;
+  }
+
+  private primeSurface(win: BrowserWindow) {
+    if (process.platform !== "win32" || this.primed || this.priming) return;
+    if (win.isVisible()) {
+      this.primed = true;
+      return;
+    }
+    this.priming = true;
+    void (async () => {
+      try {
+        win.setOpacity(0);
+        win.showInactive();
+        await waitForFrame(win, PRIME_PAINT_WAIT_MS);
+        await new Promise<void>((resolve) => setTimeout(resolve, PRIME_SETTLE_MS));
+      } catch {}
+      this.priming = false;
+      if (win.isDestroyed() || this.overlayWindow !== win) return;
+      if (!this.wantVisible) win.hide();
+      win.setOpacity(1);
+      this.primed = true;
+    })();
+  }
+
   public bindAuthSource(isSignedIn: () => boolean, subscribe: (listener: () => void) => void) {
     this.authSource = isSignedIn;
     subscribe(() => this.refreshAuth());
@@ -486,6 +530,12 @@ export class OverlayManager {
 
   public setFocusMainHandler(handler: ((restore: () => void) => void) | null) {
     this.focusMainHandler = handler;
+  }
+
+  private restoreInterceptor: (() => boolean) | null = null;
+
+  public setRestoreInterceptor(interceptor: (() => boolean) | null) {
+    this.restoreInterceptor = interceptor;
   }
 
   public showOverlay() {
@@ -522,6 +572,7 @@ export class OverlayManager {
     }
     const win = this.overlayWindow;
     if (!win || win.isDestroyed() || !this.isAuthenticated || !this.enabled) return;
+    this.wantVisible = true;
     const bounds = this.getWindowBounds();
     const currentBounds = win.getBounds();
     if (
@@ -536,9 +587,9 @@ export class OverlayManager {
       win.webContents.send("overlay:state", this.latestState);
     }
     win.webContents.send("overlay:visibility", true);
-    if (!win.isVisible()) {
-      win.showInactive();
-    }
+    win.setOpacity(1);
+    win.showInactive();
+    this.primed = true;
     this.applyAlwaysOnTop();
   }
 
@@ -572,10 +623,14 @@ export class OverlayManager {
     this.readyWaiters = [];
     for (const resolve of waiters) resolve();
     this.reveal();
+    const win = this.overlayWindow;
+    if (win && !win.isDestroyed()) this.primeSurface(win);
   }
 
   private resetContentReady() {
     this.contentReady = false;
+    this.primed = false;
+    this.priming = false;
     const waiters = this.readyWaiters;
     this.readyWaiters = [];
     for (const resolve of waiters) resolve();
@@ -643,6 +698,7 @@ export class OverlayManager {
   public closeOverlay() {
     this.wasAutoOpened = false;
     this.pendingShow = false;
+    this.wantVisible = false;
     if (this.revealFallbackTimer) {
       clearTimeout(this.revealFallbackTimer);
       this.revealFallbackTimer = null;
@@ -696,6 +752,7 @@ export class OverlayManager {
           this.overlayWindow.setAlwaysOnTop(true);
         }
       }
+      if (!this.wantVisible) return;
       try {
         this.overlayWindow.moveTop();
       } catch {}
@@ -760,8 +817,6 @@ export class OverlayManager {
         if (this.overlayWindow === win) this.markContentReady();
       }, LEGACY_READY_FALLBACK_MS);
     });
-
-    this.applyAlwaysOnTop();
 
     if (process.env.VITE_DEV_SERVER_URL) {
       this.loadedIndexPath = null;
