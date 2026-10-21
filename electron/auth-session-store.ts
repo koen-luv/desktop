@@ -22,15 +22,8 @@ export type SessionCipher = {
   decrypt: (data: Buffer) => string;
 };
 
-export type RefreshSigner = (input: { method: string; path: string; body: string }) => {
-  signature: string;
-  timestamp: number;
-  nonce: string;
-};
-
 export type AuthSessionStoreDeps = {
   fetch: (url: string, init: RequestInit) => Promise<Response>;
-  sign: RefreshSigner;
   syncClock: (dateHeader: string) => void;
 };
 
@@ -172,14 +165,10 @@ export class AuthSessionStore {
 
   private postRefresh(apiBaseUrl: string, refreshToken: string): Promise<Response> {
     const body = JSON.stringify({ refreshToken });
-    const signed = this.deps.sign({ method: "POST", path: REFRESH_PATH, body });
     return this.deps.fetch(`${apiBaseUrl}${REFRESH_PATH}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-liner-signature": signed.signature,
-        "x-liner-timestamp": String(signed.timestamp),
-        "x-liner-nonce": signed.nonce,
       },
       body,
       signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),

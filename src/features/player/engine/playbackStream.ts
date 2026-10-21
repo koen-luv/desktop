@@ -1,5 +1,6 @@
 import type { ResolvedAudioStream } from "@/shared/media/innertube";
 import type { ResolvedSoundCloudStream } from "@/shared/media/soundcloud";
+import type { LinerAudioStream } from "@/shared/media/liner/linerPlayback";
 import type { Track } from "@/shared/types";
 
 interface PlaybackStreamFormat {
@@ -52,5 +53,17 @@ export function fromSoundCloudStream(stream: ResolvedSoundCloudStream): Playback
     url: stream.url,
     expiresAtMs: toTimestamp(stream.expiresAt),
     ...(stream.contentLength ? { contentLength: stream.contentLength } : {}),
+  };
+}
+
+export function fromLinerStream(stream: LinerAudioStream, track: PlayableTrack): PlaybackStream {
+  const seconds = track.durationMs ? track.durationMs / 1000 : 0;
+  return {
+    url: stream.url,
+    mimeType: stream.mimeType,
+    codec: stream.codec ?? "opus",
+    bitrate: seconds > 0 ? Math.round((stream.size * 8) / seconds) : 0,
+    expiresAtMs: toTimestamp(stream.expiresAt),
+    ...(stream.size ? { contentLength: stream.size } : {}),
   };
 }

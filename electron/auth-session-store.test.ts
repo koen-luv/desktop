@@ -32,7 +32,6 @@ describe("AuthSessionStore", () => {
   const createStore = (cipher: SessionCipher = xorCipher) =>
     new AuthSessionStore(file, cipher, {
       fetch: fetchMock,
-      sign: () => ({ signature: "sig", timestamp: 1, nonce: "n" }),
       syncClock,
     });
 

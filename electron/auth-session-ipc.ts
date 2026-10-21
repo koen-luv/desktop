@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, net, safeStorage, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
 import path from "node:path";
 import { AuthSessionStore } from "./auth-session-store.js";
-import { signRequest, syncServerTime } from "./crypto.js";
+import { syncServerTime } from "./crypto.js";
 
 function isAppUrl(url: string | undefined): boolean {
   if (!url) return false;
@@ -29,7 +29,6 @@ export function registerAuthSessionIpc(): AuthSessionStore {
     },
     {
       fetch: (url, init) => net.fetch(url, init),
-      sign: (input) => signRequest(input),
       syncClock: (dateHeader) => {
         syncServerTime(dateHeader);
       },

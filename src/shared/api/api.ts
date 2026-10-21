@@ -8,7 +8,7 @@ import {
   type AuthTokens,
   type AuthUser,
 } from "./auth-session";
-import { signApiRequest, syncServerTime } from "./requestSigner";
+import { syncServerTime } from "./serverTime";
 import { clientCatalog } from "./clientCatalog";
 import { getLocalImportHandler } from "./localImports";
 import type { Track } from "@/shared/contracts";
@@ -172,15 +172,6 @@ export function toMaxQualityAvatarUrl(url: string | undefined): string {
 
 const inFlightGetRequests = new Map<string, Promise<unknown>>();
 
-async function readErrorCode(res: Response): Promise<string> {
-  try {
-    const data = (await res.clone().json()) as Record<string, unknown> | null;
-    return typeof data?.code === "string" ? data.code : "";
-  } catch {
-    return "";
-  }
-}
-
 async function executeRequest<T>(
   path: string,
   init?: RequestInit,
@@ -189,8 +180,6 @@ async function executeRequest<T>(
 ): Promise<T> {
   const startTime = performance.now();
   const method = (init?.method ?? "GET").toUpperCase();
-  const rawBody = typeof init?.body === "string" ? init.body : null;
-  const signedHeaders = await signApiRequest(method, path, rawBody);
   const currentSession = getAuthSession();
   let accessToken = allowRefresh ? await getValidAccessToken() : null;
 
@@ -242,7 +231,6 @@ async function executeRequest<T>(
           ...(hasBody ? { "Content-Type": "application/json" } : {}),
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
           ...correlationHeaders,
-          ...signedHeaders,
           ...restHeaders,
         },
       },
@@ -273,15 +261,12 @@ async function executeRequest<T>(
 
   if (res.status === 401 && allowRefresh && !path.startsWith("/v1/auth/")) {
     const currentSession = getAuthSession();
-    const signatureRejected = (await readErrorCode(res)).startsWith("SIGNATURE_");
     // If the token in session store was already rotated by another parallel request,
     // retry immediately with the rotated token without firing duplicate refresh requests
     let nextToken =
       currentSession?.accessToken && currentSession.accessToken !== accessToken
         ? currentSession.accessToken
-        : signatureRejected
-          ? accessToken
-          : null;
+        : null;
 
     if (!nextToken && currentSession?.refreshToken) {
       const refreshed = await refreshAuthSession();
@@ -312,12 +297,6 @@ async function executeRequest<T>(
       throw new ApiError(res.status, message, code, requestId);
     }
 
-    // Retry request with newly signed headers (synced server clock + fresh token if available)
-    const refreshedSignedHeaders = await signApiRequest(
-      method,
-      path,
-      rawBody,
-    );
     try {
       res = await fetchWithTimeout(
         getApiBaseUrl() + path,
@@ -327,7 +306,6 @@ async function executeRequest<T>(
             ...(hasBody ? { "Content-Type": "application/json" } : {}),
             ...correlationHeaders,
             ...restHeaders,
-            ...refreshedSignedHeaders,
             ...(nextToken ? { Authorization: `Bearer ${nextToken}` } : {}),
           },
         },
@@ -907,7 +885,6 @@ export const api = {
           }).toString()
         : "";
     const path = `/v1/tracks/${encodeURIComponent(id)}/lyrics${hintParams ? `?${hintParams}` : ""}`;
-    const signedHeaders = await signApiRequest("GET", path);
     const accessToken = await getValidAccessToken();
     const requestId =
       typeof crypto !== "undefined" && crypto.randomUUID
@@ -930,7 +907,6 @@ export const api = {
           headers: {
             ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
             ...correlationHeaders,
-            ...signedHeaders,
           },
         },
       );
