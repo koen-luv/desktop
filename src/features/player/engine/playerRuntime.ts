@@ -555,6 +555,7 @@ export class PlayerRuntime {
     this.preloadAbortController = controller;
     this.preloadingTrackId = track.id;
 
+    const generation = audioCache.currentGeneration();
     const promise = (async () => {
       try {
         const stream = await resolvePlaybackStream(track, controller.signal);
@@ -562,7 +563,7 @@ export class PlayerRuntime {
 
         const blob = await this.downloadAudioBlob(stream, controller.signal);
         if (!blob || controller.signal.aborted) return;
-        await linerDb.putAudio(track.id, blob, blob.type);
+        if (!(await audioCache.saveAudioBlob(track.id, blob, blob.type, generation))) return;
         await linerDb.putTrack(track);
         log(
           "green",
@@ -973,11 +974,12 @@ export class PlayerRuntime {
 
   private cacheAudioInBackground(track: Track, stream: PlaybackStream, signal: AbortSignal) {
     if (track.durationMs && track.durationMs > 20 * 60 * 1000) return;
+    const generation = audioCache.currentGeneration();
     void (async () => {
       try {
         const blob = await this.downloadAudioBlob(stream, signal);
         if (!blob || signal.aborted) return;
-        await linerDb.putAudio(track.id, blob, blob.type);
+        if (!(await audioCache.saveAudioBlob(track.id, blob, blob.type, generation))) return;
         await linerDb.putTrack(track);
         log("green", "playback", `background cached: ${track.title} (${Math.round(blob.size / 1024)} KB)`);
       } catch {}
