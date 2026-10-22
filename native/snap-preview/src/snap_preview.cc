@@ -61,6 +61,7 @@
 
 #include <windows.h>
 #include <dwmapi.h>
+#include <commctrl.h>
 #include <unknwn.h>
 #include <DispatcherQueue.h>
 #include <windows.ui.composition.interop.h>
@@ -341,6 +342,77 @@ void Cloak(HWND hwnd, bool on) {
   if (!hwnd || !IsWindow(hwnd)) return;
   BOOL value = on ? TRUE : FALSE;
   DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, &value, sizeof(value));
+}
+
+void SetTransitionsDisabled(HWND hwnd, bool disabled) {
+  if (!hwnd || !IsWindow(hwnd)) return;
+  BOOL value = disabled ? TRUE : FALSE;
+  DwmSetWindowAttribute(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, &value, sizeof(value));
+}
+
+void MinimizeKeepingPreview(HWND hwnd) {
+  if (!hwnd || !IsWindow(hwnd)) return;
+  WINDOWPLACEMENT before{};
+  before.length = sizeof(before);
+  if (!GetWindowPlacement(hwnd, &before)) {
+    Cloak(hwnd, false);
+    ShowWindow(hwnd, SW_MINIMIZE);
+    return;
+  }
+  SetTransitionsDisabled(hwnd, true);
+  SetWindowPos(hwnd, nullptr, -32000, -32000, 0, 0,
+               SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE | SWP_NOREDRAW);
+  Cloak(hwnd, false);
+  ShowWindow(hwnd, SW_MINIMIZE);
+  WINDOWPLACEMENT after{};
+  after.length = sizeof(after);
+  if (GetWindowPlacement(hwnd, &after)) {
+    after.rcNormalPosition = before.rcNormalPosition;
+    after.ptMaxPosition = before.ptMaxPosition;
+    after.showCmd = SW_SHOWMINIMIZED;
+    SetWindowPlacement(hwnd, &after);
+  }
+}
+
+constexpr UINT_PTR kRestoreTrapId = 0x4c4e5254;
+HWND g_restoreTrapArmed = nullptr;
+std::atomic<bool> g_restoredCloaked{false};
+
+void SpringRestoreTrap(HWND hwnd) {
+  if (g_restoreTrapArmed != hwnd) return;
+  g_restoreTrapArmed = nullptr;
+  Cloak(hwnd, true);
+  g_restoredCloaked = true;
+}
+
+LRESULT CALLBACK RestoreTrapProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR id, DWORD_PTR) {
+  switch (msg) {
+    case WM_QUERYOPEN:
+      SpringRestoreTrap(hwnd);
+      break;
+    case WM_WINDOWPOSCHANGING: {
+      auto const* pos = reinterpret_cast<WINDOWPOS const*>(lParam);
+      bool movesOnScreen = pos && !(pos->flags & SWP_NOMOVE) && pos->x > -30000 && pos->y > -30000;
+      if (IsIconic(hwnd) && movesOnScreen) SpringRestoreTrap(hwnd);
+      break;
+    }
+    case WM_NCDESTROY:
+      if (g_restoreTrapArmed == hwnd) g_restoreTrapArmed = nullptr;
+      RemoveWindowSubclass(hwnd, RestoreTrapProc, id);
+      break;
+  }
+  return DefSubclassProc(hwnd, msg, wParam, lParam);
+}
+
+void ArmRestoreTrap(HWND hwnd, bool armed) {
+  if (!hwnd || !IsWindow(hwnd)) return;
+  if (!armed) {
+    if (g_restoreTrapArmed == hwnd) g_restoreTrapArmed = nullptr;
+    return;
+  }
+  SetWindowSubclass(hwnd, RestoreTrapProc, kRestoreTrapId, 0);
+  g_restoredCloaked = false;
+  g_restoreTrapArmed = hwnd;
 }
 
 void PlaceThumb(HTHUMBNAIL thumb, RECT const& dest, BYTE opacity = 255) {
@@ -845,6 +917,38 @@ napi_value JsCloak(napi_env env, napi_callback_info info) {
   return Undefined(env);
 }
 
+napi_value JsSetTransitionsDisabled(napi_env env, napi_callback_info info) {
+  napi_value argv[2];
+  size_t argc;
+  if (!Args(env, info, argv, argc) || argc < 2) return Undefined(env);
+  bool disabled = false;
+  napi_get_value_bool(env, argv[1], &disabled);
+  SetTransitionsDisabled(HwndFrom(env, argv[0]), disabled);
+  return Undefined(env);
+}
+
+napi_value JsMinimizeKeepingPreview(napi_env env, napi_callback_info info) {
+  napi_value argv[1];
+  size_t argc;
+  if (!Args(env, info, argv, argc) || argc < 1) return Undefined(env);
+  MinimizeKeepingPreview(HwndFrom(env, argv[0]));
+  return Undefined(env);
+}
+
+napi_value JsArmRestoreTrap(napi_env env, napi_callback_info info) {
+  napi_value argv[2];
+  size_t argc;
+  if (!Args(env, info, argv, argc) || argc < 2) return Undefined(env);
+  bool armed = false;
+  napi_get_value_bool(env, argv[1], &armed);
+  ArmRestoreTrap(HwndFrom(env, argv[0]), armed);
+  return Undefined(env);
+}
+
+napi_value JsTakeRestoredCloaked(napi_env env, napi_callback_info) {
+  return Bool(env, g_restoredCloaked.exchange(false));
+}
+
 napi_value JsTransform(napi_env env, napi_callback_info info) {
   napi_value argv[8];
   size_t argc;
@@ -886,7 +990,9 @@ napi_value ModuleInit(napi_env env, napi_value exports) {
       {"cloak", JsCloak},                                       {"transform", JsTransform},
       {"endTransform", JsEndTransform},                         {"lastError", JsLastError},
       {"show", JsShow},         {"hide", JsHide},               {"animate", JsAnimate}, {"setTarget", JsSetTarget},
-      {"destroy", JsDestroy},
+      {"destroy", JsDestroy},   {"setTransitionsDisabled", JsSetTransitionsDisabled},
+      {"minimizeKeepingPreview", JsMinimizeKeepingPreview},
+      {"armRestoreTrap", JsArmRestoreTrap},                    {"takeRestoredCloaked", JsTakeRestoredCloaked},
   };
   for (auto const& fn : fns) {
     napi_value value;

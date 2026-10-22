@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { api, toClientTrack, mediaUrl, getAuthSession } from "@/shared/api";
+import { api, toClientTrack, mediaUrl } from "@/shared/api";
 import { queryCache } from "@/shared/cache/queryCache";
 import type { Track } from "@/shared/types";
 import type { CollectionPageData } from "@/features/collection/hooks/useCollection";
+import { loadWithRetry, useSessionOwner } from "./sessionAwareLoad";
 
 export interface DailyMix {
   id: string;
@@ -62,30 +63,26 @@ export function getDailyMixArtists(
 const cache = { data: [] as DailyMix[], timestamp: 0, owner: "" };
 const CACHE_TTL = 120_000;
 
-function currentOwner(): string {
-  return getAuthSession()?.user?.id ?? "";
-}
-
 function cachedMixesFor(owner: string): DailyMix[] {
   return cache.owner === owner ? cache.data : [];
 }
 
 export function useDailyMixes() {
-  const [data, setData] = useState<DailyMix[]>(() => cachedMixesFor(currentOwner()));
-  const [isLoading, setIsLoading] = useState(() => cachedMixesFor(currentOwner()).length === 0);
+  const owner = useSessionOwner();
+  const [data, setData] = useState<DailyMix[]>(() => cachedMixesFor(owner));
+  const [isLoading, setIsLoading] = useState(() => cachedMixesFor(owner).length === 0);
 
   useEffect(() => {
-    const owner = currentOwner();
     const cached = cachedMixesFor(owner);
+    setData(cached);
     if (cached.length > 0 && Date.now() - cache.timestamp < CACHE_TTL) {
-      setData(cached);
       setIsLoading(false);
       return;
     }
 
     let active = true;
-    api
-      .getDailyMixes()
+    setIsLoading(cached.length === 0);
+    loadWithRetry(() => api.getDailyMixes(), () => active)
       .then((res) => {
         if (!active) return;
         const mixes: DailyMix[] = (res.items || []).map((mix) => {
@@ -136,7 +133,7 @@ export function useDailyMixes() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [owner]);
 
   return { data, isLoading };
 }

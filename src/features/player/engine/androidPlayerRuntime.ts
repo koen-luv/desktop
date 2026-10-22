@@ -406,6 +406,14 @@ export class AndroidPlayerRuntime {
     usePlayerStore.getState().setStatus("paused");
   }
 
+  /**
+   * Full teardown (sign-out / reset): the native side clears its media
+   * session and notification when the audio is stopped.
+   */
+  public stop(): void {
+    this.cancelPendingLoad();
+  }
+
   public applyPlaybackRateAndPitch(): void {
     const store = usePlayerStore.getState();
     const rate = Math.min(2, Math.max(0.5, store.playbackRate || 1));

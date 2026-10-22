@@ -676,6 +676,16 @@ export class PlayerRuntime {
 
   private pendingStartPositionMs = 0;
 
+  public stop(): void {
+    this.cancelPendingLoad();
+    this.updateMediaSessionMetadata(null);
+    if (typeof navigator !== "undefined" && "mediaSession" in navigator) {
+      try {
+        navigator.mediaSession.playbackState = "none";
+      } catch {}
+    }
+  }
+
   public setPendingSeek(positionMs: number): void {
     this.pendingStartPositionMs = positionMs;
     usePlayerStore.getState().setPosition(positionMs);

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { api, toClientTrack, getAuthSession } from "@/shared/api";
+import { api, toClientTrack } from "@/shared/api";
 import type { PopularItem } from "./usePopularTracks";
+import { loadWithRetry, useSessionOwner } from "./sessionAwareLoad";
 
 export const recentlyPlayedKeys = {
   all: ["recently_played"] as const,
@@ -9,31 +10,32 @@ export const recentlyPlayedKeys = {
 const cache = new Map<string, { data: PopularItem[]; timestamp: number }>();
 const CACHE_TTL = 60_000;
 
-function cacheKey(limit: number): string {
-  return `recent_${getAuthSession()?.user?.id ?? ""}_${limit}`;
+function cacheKey(owner: string, limit: number): string {
+  return `recent_${owner}_${limit}`;
 }
 
 export function useRecentlyPlayed(limit = 20) {
+  const owner = useSessionOwner();
   const [data, setData] = useState<PopularItem[]>(
-    () => cache.get(cacheKey(limit))?.data ?? [],
+    () => cache.get(cacheKey(owner, limit))?.data ?? [],
   );
   const [isLoading, setIsLoading] = useState(
-    () => !cache.has(cacheKey(limit)),
+    () => !cache.has(cacheKey(owner, limit)),
   );
 
   useEffect(() => {
-    const key = cacheKey(limit);
+    const key = cacheKey(owner, limit);
     const cached = cache.get(key);
+    setData(cached?.data ?? []);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      setData(cached.data);
       setIsLoading(false);
       return;
     }
 
     let active = true;
+    setIsLoading(!cached);
     const fetchLimit = Math.min(100, Math.max(limit * 3, 60));
-    api
-      .getHistory(undefined, fetchLimit)
+    loadWithRetry(() => api.getHistory(undefined, fetchLimit), () => active)
       .then((res) => {
         if (!active) return;
         const seen = new Set<string>();
@@ -92,7 +94,7 @@ export function useRecentlyPlayed(limit = 20) {
     return () => {
       active = false;
     };
-  }, [limit]);
+  }, [owner, limit]);
 
   return { data, isLoading };
 }

@@ -14,14 +14,15 @@ import { HeartFill, HeartLine } from "@mingcute/react";
 import CoverImage from "@/features/covers/ui/CoverImage";
 import { ScrollableText } from "@/shared/ui/ScrollableText";
 import { useDisableButtonFocus } from "@/features/navigation/hooks/useDisableButtonFocus";
-import { getAuthSession } from "@/shared/api";
+import { getAuthSession } from "@/shared/api/auth-session";
 import type { OverlayAction, OverlayStatePayload } from "../contracts";
 import {
   useCustomizationStore,
   loadPersistedWallpaper,
   DEFAULT_GLASS_CONFIG,
-} from "@/features/settings";
-import { useShortcutsStore, matchesShortcut } from "@/features/shortcuts";
+} from "@/features/settings/store/customizationStore";
+import { useShortcutsStore } from "@/features/shortcuts/store/shortcutsStore";
+import { matchesShortcut } from "@/features/shortcuts/utils/shortcutMatching";
 
 const OVERLAY_CARD_TRANSITION = {
   duration: 0.08,
@@ -71,6 +72,11 @@ export function OverlayPlayer() {
       });
       return cleanupState;
     }
+  }, []);
+
+  useEffect(() => {
+    const signal = setTimeout(() => window.linerElectron?.overlayReady?.(), 0);
+    return () => clearTimeout(signal);
   }, []);
 
   useEffect(() => {

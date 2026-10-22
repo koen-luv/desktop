@@ -82,4 +82,38 @@ describe("useDailyMixes account switch", () => {
     expect(container.textContent).toBe("user-b mix");
     expect(getDailyMixes).toHaveBeenCalledTimes(2);
   });
+
+  it("refetches for the new account when the session changes while mounted", async () => {
+    session.userId = "user-c";
+    await act(async () => {
+      root.render(<Probe />);
+    });
+    expect(container.textContent).toBe("user-c mix");
+
+    session.userId = "user-d";
+    await act(async () => {
+      window.dispatchEvent(new Event("auth:changed"));
+    });
+    expect(container.textContent).toBe("user-d mix");
+  });
+
+  it("retries after a failed first load instead of staying empty", async () => {
+    vi.useFakeTimers();
+    try {
+      session.userId = "user-e";
+      getDailyMixes
+        .mockRejectedValueOnce(Object.assign(new Error("offline"), { status: 0 }))
+        .mockImplementationOnce(async () => mixesFor("user-e"));
+      await act(async () => {
+        root.render(<Probe />);
+      });
+      expect(container.textContent).toBe("");
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000);
+      });
+      expect(container.textContent).toBe("user-e mix");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

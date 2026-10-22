@@ -125,6 +125,7 @@ export interface PlayerStore extends PlayerState {
   setSleepTimer: (endsAtMs: number | null) => void;
   resetSpeedAndPitch: () => void;
   clearQueue: () => void;
+  resetPlayback: () => void;
 }
 
 const PLAYER_SESSION_STORAGE_KEY = "liner_player_session_v2";
@@ -223,6 +224,20 @@ export const usePlayerStore = create<PlayerStore>()(
       setSleepTimer: (sleepTimerEndsAtMs: number | null) =>
         set({ sleepTimerEndsAtMs }),
       resetSpeedAndPitch: () => set({ playbackRate: 1, pitchSemitones: 0 }),
+      resetPlayback: () =>
+        set({
+          status: "idle",
+          playbackMode: null,
+          error: null,
+          positionMs: 0,
+          durationMs: 0,
+          queue: [],
+          currentIndex: -1,
+          currentTrack: null,
+          playbackContext: null,
+          playbackContextCover: null,
+          fullscreen: false,
+        }),
       clearQueue: () => {
         const state = get();
         if (state.currentTrack) {

@@ -9,7 +9,7 @@ import { CoverSwRegistrar } from "@/features/covers";
 import { usePresenceSync } from "@/shared/presence";
 import { useThemeCustomizationSync } from "@/features/settings";
 import { useTouchBarSync } from "@/features/touchbar";
-import { OverlayPlayer, useOverlaySync } from "@/features/overlay";
+import { useOverlaySync } from "@/features/overlay";
 import { useDiscordSync } from "@/features/discord";
 import { useLastfmScrobbler } from "@/features/lastfm";
 import { useAutoSync } from "@/features/auto";
@@ -17,7 +17,6 @@ import { AppRoutes } from "./routes";
 import DeeplinkHandler from "./DeeplinkHandler";
 import EnvironmentWarning from "./EnvironmentWarning";
 import { ConnectivityWall } from "@/features/connectivity";
-import { getAuthSession } from "@/shared/api";
 import "./globals.css";
 
 function AppIconSync() {
@@ -61,27 +60,6 @@ function AutoSync() {
 }
 
 export default function App() {
-  const isOverlay = window.location.hash.startsWith("#/overlay");
-
-  if (isOverlay) {
-    if (!getAuthSession()) {
-      window.linerElectron?.closeOverlay?.();
-      return null;
-    }
-
-    return (
-      <ThemeProvider
-        attribute="data-theme"
-        defaultTheme="dark"
-        enableSystem={false}
-        forcedTheme="dark"
-      >
-        <GlobalTooltip />
-        <OverlayPlayer />
-      </ThemeProvider>
-    );
-  }
-
   useWindowDrag();
 
   return (
