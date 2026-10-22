@@ -1,4 +1,5 @@
 import { getClientVisitorData } from "@/shared/api/visitorSession";
+import { platformFetch } from "@/platform/http";
 
 export type InnertubeEndpoint = "search" | "browse" | "next" | "player";
 
@@ -78,7 +79,12 @@ export async function postInnertube(
 
   let response: Response;
   try {
-    response = await fetch(url, {
+    // `platformFetch` keeps the desktop behaviour (plain fetch) but sends the
+    // request through the native HTTP bridge on Android/iOS. YouTube Music is
+    // not CORS-enabled, so a browser-level fetch from the WebView is blocked
+    // before it leaves the page — which is exactly what the radio/autoplay
+    // queue refill needs (`youtubei/v1/next`).
+    response = await platformFetch(url, {
       method: "POST",
       headers: buildHeaders(profile, visitorData),
       body: JSON.stringify(payload),

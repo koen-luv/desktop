@@ -84,6 +84,20 @@ nonce. Nothing is signed with a secret baked into the APK.
   when the activity is backgrounded, promotes itself to foreground before the
   five second deadline, and stops itself when a load never turns into playback.
 
+### Radio and autoplay
+
+* "Autoplay similar tracks" (Settings → Playback) and the endless radio
+  station refill the queue from the Innertube `next` endpoint. YouTube Music
+  sends no CORS headers, so the renderer sends that request through the
+  platform HTTP layer (`platformFetch`): on Android it leaves through
+  `LinerBridge.httpRequest` (OkHttp), which mirrors the target's own `Origin`
+  header — YouTube answers "Origin doesn't match Host" otherwise. The plain
+  browser `fetch` is only used on the desktop, where Electron runs without
+  CORS restrictions.
+* The same path serves the client-side catalog (search, artist, album and
+  playlist pages), so those pages no longer need an `api.tryliner.fun`
+  round-trip on Android.
+
 ### Android Auto
 
 * `PlaybackService` is a `MediaLibraryService`; the manifest declares the
@@ -111,6 +125,7 @@ nonce. Nothing is signed with a secret baked into the APK.
 | Search | verified through the app API layer (35 real results for a live query) |
 | Artist / album / playlist / library pages | reused unchanged; library and playlist pages verified rendering real account data |
 | Player: play, pause, seek, next, previous, repeat, shuffle, queue edits | verified (native ExoPlayer is the source of truth) |
+| Autoplay similar tracks / radio queue refill | wired through the native Innertube bridge (`platformFetch` → `LinerBridge.httpRequest`), the same path the radio wave uses |
 | Synchronized lyrics (line + word level) | verified: active line follows position (42.6 s → "Ай, а-а-а", 48.1 s → "Услышь, как шумит моя кожа") with line/word highlight classes |
 | Background playback, notification, lock screen, Bluetooth buttons | verified |
 | Audio focus, headphone unplug, interruptions | handled by ExoPlayer (`setAudioAttributes`, `setHandleAudioBecomingNoisy`) |
