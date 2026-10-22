@@ -17,6 +17,14 @@
 /native/*/build/
 /native-build.log
 
+# ios (generated project, synced renderer bundle, build products)
+/ios/Web/
+/ios/Info.plist
+/ios/Liner.xcodeproj/
+/ios/build/
+/ios/*.ipa
+/ios/build/Payload/
+
 # testing
 /coverage
 

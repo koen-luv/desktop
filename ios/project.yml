@@ -1,0 +1,95 @@
+name: Liner
+options:
+  bundleIdPrefix: app.tryliner
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+    MARKETING_VERSION: "0.1.40"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    CLANG_ENABLE_MODULES: YES
+
+targets:
+  Liner:
+    type: application
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources:
+      # Swift shell (the native port of android/app/src/main/java/app/tryliner/android).
+      - path: Liner
+      # Renderer bundle. `pnpm build` output is copied here by CI / `ios/sync-web.sh`
+      # as a folder reference so the whole tree lands in the .app bundle verbatim.
+      - path: Web
+        type: folder
+        buildPhase: resources
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: Liner
+        CFBundleName: Liner
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+        CFBundlePackageType: APPL
+        CFBundleInfoDictionaryVersion: "6.0"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UIRequiresFullScreen: false
+        UIViewControllerBasedStatusBarAppearance: true
+        UIApplicationSupportsIndirectInputEvents: true
+        UIRequiredDeviceCapabilities:
+          - arm64
+        UIBackgroundModes:
+          - audio
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        ITSAppUsesNonExemptEncryption: false
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+          NSExceptionDomains:
+            127.0.0.1:
+              NSExceptionAllowsInsecureHTTPLoads: true
+              NSIncludesSubdomains: false
+            localhost:
+              NSExceptionAllowsInsecureHTTPLoads: true
+              NSIncludesSubdomains: false
+        CFBundleURLTypes:
+          - CFBundleURLName: app.tryliner.ios
+            CFBundleURLSchemes:
+              - liner
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.tryliner.ios
+        PRODUCT_NAME: Liner
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+        SUPPORTS_MACCATALYST: NO
+        SWIFT_EMIT_LOC_STRINGS: NO
+        # Unsigned CI archives pass CODE_SIGNING_ALLOWED=NO; a developer with a
+        # team can archive from Xcode instead and sign normally.
+        DEVELOPMENT_TEAM: ""
+
+schemes:
+  Liner:
+    build:
+      targets:
+        Liner: all
+    run:
+      config: Debug
+    archive:
+      config: Release
