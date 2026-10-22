@@ -24,16 +24,21 @@ export function AudioTab({ searchQuery }: { searchQuery?: string }) {
     setMounted(true);
   }, []);
 
-  // lossless is listed as unavailable, so the picker only offers live tiers
-  const quality: Exclude<AudioQuality, "lossless"> =
-    audioQuality === "lossless" ? "high" : audioQuality;
+  // Lossless asks the playback session for the FLAC/ALAC master; tracks without
+  // one keep playing from the best available stream instead of failing.
+  const quality: AudioQuality = audioQuality;
+  const qualityDescription =
+    quality === "lossless"
+      ? t("settings.audio.lossless_description") ||
+        "Plays the lossless master (FLAC/ALAC) when Liner has one; other tracks use the best available stream."
+      : t("settings.audio.description");
 
   return (
     <div className="flex flex-col gap-[16px]">
       <SettingSection>
         <SettingRow
           title={t("settings.audio.title")}
-          description={t("settings.audio.description")}
+          description={qualityDescription}
           titleKey="settings.audio.title"
           descKey="settings.audio.description"
           searchQuery={searchQuery}
@@ -48,6 +53,7 @@ export function AudioTab({ searchQuery }: { searchQuery?: string }) {
                   { value: "low", label: t("settings.audio.low") },
                   { value: "standard", label: t("settings.audio.standard") },
                   { value: "high", label: t("settings.audio.high") },
+                  { value: "lossless", label: t("settings.audio.lossless") },
                 ]}
               />
             ) : (

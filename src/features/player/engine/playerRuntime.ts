@@ -641,7 +641,11 @@ export class PlayerRuntime {
     const generation = audioCache.currentGeneration();
     const promise = (async () => {
       try {
-        const stream = await resolvePlaybackStream(track, controller.signal);
+        const stream = await resolvePlaybackStream(
+          track,
+          controller.signal,
+          usePlayerStore.getState().audioQuality,
+        );
         if (controller.signal.aborted) return;
         // Warm the in-memory stream cache only; never download/write audio to
         // disk during preload (files are saved only via the Download action).
@@ -814,7 +818,11 @@ export class PlayerRuntime {
         return;
       }
 
-      const stream = await resolvePlaybackStream(track, controller.signal);
+      const stream = await resolvePlaybackStream(
+        track,
+        controller.signal,
+        usePlayerStore.getState().audioQuality,
+      );
       this.ttfbMs = Math.round(performance.now() - this.loadStartTime);
 
       if (epoch !== this.loadEpoch || controller.signal.aborted) {

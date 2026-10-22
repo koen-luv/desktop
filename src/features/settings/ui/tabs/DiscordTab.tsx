@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/languages";
 import {
+  useDiscordCloudStore,
   useDiscordSettingsStore,
   type DiscordStatusDisplayType,
 } from "@/features/discord";
-import { ToggleSwitch, Select } from "@/shared/ui";
+import { Button, ToggleSwitch, Select } from "@/shared/ui";
 import { SettingRow, SettingSection } from "../controls";
 
 export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
@@ -17,6 +18,25 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
 
   const enabled = useDiscordSettingsStore((s) => s.enabled);
   const setEnabled = useDiscordSettingsStore((s) => s.setEnabled);
+
+  const cloudMode = useDiscordCloudStore((s) => s.mode);
+  const cloudLinked = useDiscordCloudStore((s) => s.linked);
+  const cloudUsername = useDiscordCloudStore((s) => s.username);
+  const cloudLinking = useDiscordCloudStore((s) => s.linking);
+  const cloudError = useDiscordCloudStore((s) => s.error);
+  const startCloudLink = useDiscordCloudStore((s) => s.startLink);
+  const unlinkCloud = useDiscordCloudStore((s) => s.unlink);
+
+  // A linked account is served from the backend, so it counts as connected even
+  // when this device has no local Discord client (always the case on phones).
+  const connected = cloudLinked || discordStatus.connected;
+  const connectedUser = cloudLinked ? cloudUsername : discordStatus.username;
+  const cloudErrorText =
+    cloudError === "expired"
+      ? t("settings.discord.cloud.error_expired") || "The sign-in expired. Try again."
+      : cloudError === "failed"
+        ? t("settings.discord.cloud.error_failed") || "Discord sign-in failed. Try again."
+        : "";
 
   const statusDisplayType = useDiscordSettingsStore((s) => s.statusDisplayType);
   const setStatusDisplayType = useDiscordSettingsStore((s) => s.setStatusDisplayType);
@@ -57,27 +77,81 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
 
   return (
     <div className="flex flex-col gap-[18px]">
+      {/* Linked account: the only path that reaches Discord from a phone */}
+      {cloudMode !== "unknown" && (
+        <SettingSection label={t("settings.discord.cloud.section") || "Discord Account"}>
+          <SettingRow
+            title={
+              cloudLinked
+                ? t("settings.discord.cloud.linked", { user: cloudUsername || "Discord" }) ||
+                  `Linked as ${cloudUsername || "Discord"}`
+                : t("settings.discord.cloud.title") || "Link your Discord account"
+            }
+            description={
+              cloudMode === "unavailable"
+                ? t("settings.discord.cloud.unavailable") ||
+                  "This server doesn't support cloud Discord presence yet."
+                : cloudLinking
+                  ? t("settings.discord.cloud.waiting") || "Finish the sign-in in your browser…"
+                  : cloudLinked
+                    ? t("settings.discord.cloud.linked_hint") ||
+                      "Liner updates your Discord activity from the cloud, on every device."
+                    : t("settings.discord.cloud.description") ||
+                      "Link Discord once so your activity also shows when you listen on your phone."
+            }
+            titleKey="settings.discord.cloud.title"
+            descKey="settings.discord.cloud.description"
+            searchQuery={searchQuery}
+            control={
+              cloudMode === "available" ? (
+                cloudLinked ? (
+                  <Button variant="outline" size="sm" onClick={() => void unlinkCloud()}>
+                    {t("settings.discord.cloud.unlink") || "Unlink"}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={cloudLinking}
+                    onClick={() => void startCloudLink()}
+                  >
+                    {cloudLinking
+                      ? t("settings.discord.cloud.waiting_button") || "Waiting…"
+                      : t("settings.discord.cloud.link") || "Link Discord account"}
+                  </Button>
+                )
+              ) : undefined
+            }
+          />
+          {cloudErrorText ? (
+            <div className="mx-[14px] mb-[10px] px-[10px] py-[8px] rounded-lg bg-red-500/10 text-[12px] text-red-400 break-words">
+              {cloudErrorText}
+            </div>
+          ) : null}
+        </SettingSection>
+      )}
+
       {/* Discord Connection Status */}
       <div className="flex items-center justify-between px-[14px] py-[10px] rounded-lg bg-border-alpha-10">
         <div className="flex items-center gap-[10px]">
           <span
             className={`w-[8px] h-[8px] rounded-full shrink-0 ${
-              discordStatus.connected
+              connected
                 ? "bg-[#23a55a] shadow-[0_0_8px_rgba(35,165,90,0.5)]"
                 : "bg-text-tertiary/40"
             }`}
           />
           <span className="text-[13px] text-text-primary font-medium">
-            {discordStatus.connected
+            {connected
               ? t("settings.discord.status.connected", {
-                  user: discordStatus.username || "Discord",
-                }) || `Connected to Discord (${discordStatus.username || "Active"})`
+                  user: connectedUser || "Discord",
+                }) || `Connected to Discord (${connectedUser || "Active"})`
               : t("settings.discord.status.disconnected") || "Discord not connected"}
           </span>
         </div>
         <span className="text-[12px] text-text-tertiary font-mono">
           {enabled
-            ? discordStatus.connected
+            ? connected
               ? t("settings.discord.status.ready") || "Ready"
               : t("settings.discord.status.waiting") || "Waiting for Discord"
             : t("settings.discord.status.disabled") || "Disabled"}

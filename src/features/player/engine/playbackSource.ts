@@ -9,6 +9,7 @@ import {
   type ResolvePlaybackOptions,
 } from "../sources/sourceResolver";
 import type { ResolvePurpose, ResolvedStream } from "../sources/types";
+import type { AudioQuality } from "../store/playerStore";
 
 /**
  * Resolver-backed stream acquisition used by the platform runtimes.
@@ -25,8 +26,11 @@ export function resolvePlaybackStream(
   track: Track,
   signal?: AbortSignal,
   purpose: ResolvePurpose = "playback",
+  quality: AudioQuality = "high",
 ): Promise<ResolvedStream> {
-  return resolvePlayback({ track, purpose, signal }).then((resolution) => resolution.stream);
+  return resolvePlayback({ track, purpose, signal, quality }).then(
+    (resolution) => resolution.stream,
+  );
 }
 
 export function resolvePlaybackWithFallback(

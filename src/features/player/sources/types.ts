@@ -1,4 +1,5 @@
 import type { Track } from "@/shared/types";
+import type { AudioQuality } from "../store/playerStore";
 
 /**
  * A fully resolved, playable audio stream produced by a source provider.
@@ -15,6 +16,8 @@ export interface ResolvedStream {
   expiresAtMs: number | null;
   /** Provider that produced this stream. */
   providerId: string;
+  /** Quality tier the stream was resolved for (missing on legacy entries). */
+  quality?: AudioQuality;
   /** The recording id the provider actually resolved (may differ on fallback). */
   providerTrackId: string;
   /** Wall-clock ms when this resolution completed. */
@@ -80,6 +83,8 @@ export interface ResolveContext {
   signal: AbortSignal;
   /** Force providers to bypass any cached stream. */
   forceRefresh: boolean;
+  /** Streaming tier selected in Settings → Audio. */
+  quality: AudioQuality;
 }
 
 export interface SourceProvider {
@@ -87,6 +92,8 @@ export interface SourceProvider {
   readonly id: string;
   /** Higher priority providers are attempted first. */
   readonly priority: number;
+  /** Can serve a lossless stream (Liner's own master can; YouTube never can). */
+  readonly losslessCapable?: boolean;
   /** Human readable label used in diagnostics UI. */
   readonly label: string;
   /** Cheap, synchronous gate (no network). Returns false to skip this provider. */

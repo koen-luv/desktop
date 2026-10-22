@@ -1,5 +1,6 @@
 import { getAuthSession, getValidAccessToken } from "@/shared/api/auth-session";
 import { getApiBaseUrl } from "@/shared/api/baseUrl";
+import type { AudioQuality } from "@/features/player/store/playerStore";
 import { isAbortError } from "@/shared/utils/abort";
 import { log } from "@/shared/utils/logger";
 
@@ -22,15 +23,26 @@ function pause(ms: number, reason: string): void {
 }
 
 // presigned r2 url, or null so the caller falls back to youtube
-export async function resolveLinerStream(videoId: string, signal?: AbortSignal): Promise<LinerAudioStream | null> {
+export async function resolveLinerStream(
+  videoId: string,
+  signal?: AbortSignal,
+  quality?: AudioQuality,
+): Promise<LinerAudioStream | null> {
   if (Date.now() < pausedUntil || !getAuthSession()?.accessToken) return null;
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   try {
     const token = await getValidAccessToken();
     if (!token) return null;
+    // "high" is the historical default (no body at all); only other tiers ask
+    // the backend for a specific master, so existing requests stay untouched.
+    const wantsTier = Boolean(quality && quality !== "high");
     const res = await fetch(`${getApiBaseUrl()}/v1/tracks/${encodeURIComponent(videoId)}/playback`, {
       method: "POST",
-      headers: { authorization: `Bearer ${token}` },
+      headers: {
+        authorization: `Bearer ${token}`,
+        ...(wantsTier ? { "content-type": "application/json" } : {}),
+      },
+      ...(wantsTier ? { body: JSON.stringify({ quality }) } : {}),
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });
     if (res.ok) return (await res.json()) as LinerAudioStream;

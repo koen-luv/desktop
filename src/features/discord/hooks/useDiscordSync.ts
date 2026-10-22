@@ -5,6 +5,8 @@ import { api, mediaUrl, toMaxQualityAvatarUrl } from "@/shared/api";
 import { getAuthSession } from "@/shared/api/auth-session";
 import type { DiscordRpcStatePayload } from "../contracts";
 import { useDiscordSettingsStore } from "../store/discordSettingsStore";
+import { useDiscordCloudStore } from "../store/discordCloudStore";
+import { buildPresenceNotification, cloudPresence } from "../cloud";
 
 const artistAvatarCache = new Map<string, string | null>();
 const pendingArtistAvatars = new Map<string, Promise<string | null>>();
@@ -30,6 +32,24 @@ export function useDiscordSync() {
   const currentTrack = player.currentTrack;
   const effectiveCover = useCoverSrc(currentTrack?.coverUrl);
   const [loadedAvatar, setLoadedAvatar] = useState<{ artistId: string; url: string | null } | null>(null);
+  const cloudLinked = useDiscordCloudStore((s) => s.linked);
+  const enabled = useDiscordSettingsStore((s) => s.enabled);
+
+  // Linked accounts report to the backend (the only path that reaches a phone);
+  // everything else keeps talking to the local Discord client.
+  useEffect(() => {
+    const refresh = () => {
+      void useDiscordCloudStore.getState().refresh();
+    };
+    refresh();
+    window.addEventListener("auth:changed", refresh);
+    return () => window.removeEventListener("auth:changed", refresh);
+  }, []);
+
+  useEffect(() => {
+    if (!cloudLinked) return;
+    if (!enabled) cloudPresence.clear(useDiscordSettingsStore.getState());
+  }, [cloudLinked, enabled]);
 
   const primaryArtistId =
     currentTrack?.artistId ||
@@ -104,9 +124,9 @@ export function useDiscordSync() {
     coverUrl: undefined,
   });
 
-  // Push updates to Electron
+  // Push updates to Electron, or to the backend when the account is linked
   useEffect(() => {
-    if (!window.linerElectron?.discordUpdateState) return;
+    if (!cloudLinked && !window.linerElectron?.discordUpdateState) return;
 
     const trackId = currentTrack?.id ?? null;
     const coverUrl = effectiveCover || currentTrack?.coverUrl;
@@ -174,7 +194,11 @@ export function useDiscordSync() {
       artistImageUrl: artistAvatar,
     };
 
-    window.linerElectron.discordUpdateState(payload);
+    if (cloudLinked) {
+      if (enabled) cloudPresence.queue(buildPresenceNotification(payload, useDiscordSettingsStore.getState()));
+    } else {
+      window.linerElectron?.discordUpdateState?.(payload);
+    }
   }, [
     player.status,
     player.positionMs,
@@ -183,5 +207,7 @@ export function useDiscordSync() {
     effectiveCover,
     artistAvatar,
     primaryArtistId,
+    cloudLinked,
+    enabled,
   ]);
 }

@@ -2,6 +2,7 @@ import type { Track } from "@/shared/types";
 import { log } from "@/shared/utils/logger";
 import { scoreRecordingMatch } from "./matchConfidence";
 import { defaultSourceProviders } from "./providers";
+import type { AudioQuality } from "../store/playerStore";
 import {
   MIN_AUTO_MATCH_CONFIDENCE,
   SourceError,
@@ -41,6 +42,8 @@ export interface ResolvePlaybackOptions {
   forceRefresh?: boolean;
   /** Caller-supplied signal; combined with internal supersede cancellation. */
   signal?: AbortSignal;
+  /** Streaming tier; `lossless` prefers providers that can serve a lossless master. */
+  quality?: AudioQuality;
 }
 
 export interface PlaybackResolution {
@@ -99,8 +102,8 @@ export function isStreamUsable(stream: ResolvedStream, now = Date.now()): boolea
   return stream.expiresAtMs - URL_SAFETY_MARGIN_MS > now;
 }
 
-function cacheKey(trackId: string, purpose: ResolvePurpose): string {
-  return `${purpose}:${trackId}`;
+function cacheKey(trackId: string, purpose: ResolvePurpose, quality: AudioQuality = "high"): string {
+  return `${purpose}:${quality}:${trackId}`;
 }
 
 export function invalidateCachedStream(trackId: string): void {
@@ -109,15 +112,23 @@ export function invalidateCachedStream(trackId: string): void {
   }
 }
 
-export function getCachedStream(trackId: string): ResolvedStream | null {
-  const entry =
-    urlCache.get(cacheKey(trackId, "playback")) ?? urlCache.get(cacheKey(trackId, "preload"));
-  if (!entry) return null;
-  if (!isStreamUsable(entry.stream)) {
-    invalidateCachedStream(trackId);
-    return null;
+export function getCachedStream(trackId: string, quality?: AudioQuality): ResolvedStream | null {
+  const qualities: AudioQuality[] = quality
+    ? [quality]
+    : ["lossless", "high", "standard", "low"];
+  const purposes: ResolvePurpose[] = ["playback", "preload"];
+  for (const purpose of purposes) {
+    for (const tier of qualities) {
+      const entry = urlCache.get(cacheKey(trackId, purpose, tier));
+      if (!entry) continue;
+      if (!isStreamUsable(entry.stream)) {
+        invalidateCachedStream(trackId);
+        return null;
+      }
+      return entry.stream;
+    }
   }
-  return entry.stream;
+  return null;
 }
 
 function purgeStaleCacheEntries(now: number): void {
@@ -171,9 +182,19 @@ export function computeBackoffDelay(attempt: number, random = Math.random): numb
   return Math.round(capped * jitter);
 }
 
-function orderedProviders(track: Track, overrides?: SourceProvider[]): SourceProvider[] {
+function orderedProviders(
+  track: Track,
+  overrides?: SourceProvider[],
+  quality: AudioQuality = "high",
+): SourceProvider[] {
   const pool = overrides ?? customProviders ?? defaultSourceProviders;
-  return [...pool].sort((a, b) => b.priority - a.priority);
+  const ranked = [...pool].sort((a, b) => b.priority - a.priority);
+  if (quality !== "lossless") return ranked;
+  // YouTube's best is ~256 kbps, so a lossless request has to try the Liner
+  // master first; the lossy providers stay as the fallback chain.
+  return ranked.sort(
+    (a, b) => Number(Boolean(b.losslessCapable)) - Number(Boolean(a.losslessCapable)),
+  );
 }
 
 let customProviders: SourceProvider[] | null = null;
@@ -225,9 +246,10 @@ async function resolveWithProviders(
   purpose: ResolvePurpose,
   forceRefresh: boolean,
   signal: AbortSignal,
+  quality: AudioQuality = "high",
   overrides?: SourceProvider[],
 ): Promise<PlaybackResolution> {
-  const providers = orderedProviders(track, overrides);
+  const providers = orderedProviders(track, overrides, quality);
   let attempts = 0;
   let lastError: SourceError | null = null;
   let usedFallback = false;
@@ -243,7 +265,7 @@ async function resolveWithProviders(
       if (signal.aborted) throw new SourceError("cancelled", "cancelled", provider.id);
       attempts += 1;
       try {
-        const stream = await provider.resolve({ track, purpose, signal, forceRefresh });
+        const stream = await provider.resolve({ track, purpose, signal, forceRefresh, quality });
         if (signal.aborted) throw new SourceError("cancelled", "cancelled", provider.id);
         if (!stream.url) {
           throw new SourceError("invalid_response", "empty stream url", provider.id);
@@ -310,7 +332,7 @@ async function resolveWithProviders(
  * can never apply a stale stream.
  */
 export function resolvePlayback(options: ResolvePlaybackOptions): Promise<PlaybackResolution> {
-  const { track, purpose = "playback", forceRefresh = false, signal } = options;
+  const { track, purpose = "playback", forceRefresh = false, signal, quality = "high" } = options;
   if (!track?.id) {
     return Promise.reject(new SourceError("invalid_response", "track id missing", "resolver"));
   }
@@ -318,7 +340,7 @@ export function resolvePlayback(options: ResolvePlaybackOptions): Promise<Playba
   purgeStaleCacheEntries(Date.now());
 
   if (!forceRefresh) {
-    const cached = getCachedStream(track.id);
+    const cached = getCachedStream(track.id, quality);
     if (cached && (purpose === "playback" || isStreamUsable(cached))) {
       stats.cacheHits += 1;
       return Promise.resolve({
@@ -334,7 +356,7 @@ export function resolvePlayback(options: ResolvePlaybackOptions): Promise<Playba
     cancelPendingResolution(track.id);
   }
 
-  const key = cacheKey(track.id, purpose);
+  const key = cacheKey(track.id, purpose, quality);
   const existing = inFlight.get(key);
   if (existing) {
     stats.deduped += 1;
@@ -358,6 +380,7 @@ export function resolvePlayback(options: ResolvePlaybackOptions): Promise<Playba
         purpose,
         forceRefresh,
         controllerSignal,
+        quality,
       );
       urlCache.set(key, { stream: resolution.stream, cachedAt: Date.now() });
       return resolution;
@@ -378,9 +401,9 @@ export function resolvePlayback(options: ResolvePlaybackOptions): Promise<Playba
  * Pre-resolves the next queued track. Failures are swallowed on purpose — a
  * failed preload must never affect current playback.
  */
-export function preResolveNext(track: Track): void {
-  if (!track?.id || urlCache.has(cacheKey(track.id, "preload"))) return;
-  void resolvePlayback({ track, purpose: "preload" }).catch((err) => {
+export function preResolveNext(track: Track, quality: AudioQuality = "high"): void {
+  if (!track?.id || urlCache.has(cacheKey(track.id, "preload", quality))) return;
+  void resolvePlayback({ track, purpose: "preload", quality }).catch((err) => {
     if (!(err instanceof SourceError) || err.code !== "cancelled") {
       log("yellow", "sources", `preload resolve failed for "${track.title}": ${err?.message ?? err}`);
     }

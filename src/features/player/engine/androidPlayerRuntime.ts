@@ -227,7 +227,12 @@ export class AndroidPlayerRuntime {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 12_000);
-      const stream = await resolvePlaybackStream(track, controller.signal);
+      const stream = await resolvePlaybackStream(
+        track,
+        controller.signal,
+        "playback",
+        usePlayerStore.getState().audioQuality,
+      );
       clearTimeout(timeout);
       if (stream.expiresAtMs !== null && Date.now() >= stream.expiresAtMs - 15_000) return;
       this.preloaded.set(track.id, { stream, at: Date.now() });
@@ -290,7 +295,12 @@ export class AndroidPlayerRuntime {
         stream = cached.stream;
         log("cyan", "playback", `using pre-resolved stream for "${track.title}"`);
       } else {
-        stream = await resolvePlaybackStream(track, controller.signal);
+        stream = await resolvePlaybackStream(
+          track,
+          controller.signal,
+          "playback",
+          usePlayerStore.getState().audioQuality,
+        );
       }
       this.preloaded.delete(track.id);
 

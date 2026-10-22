@@ -659,7 +659,7 @@
       "low": "Niedrige Qualität (Datensparmodus)",
       "standard": "Standardqualität (Opus 64kbps / MP3 128kbps)",
       "high": "Hohe Qualität (AAC 256kbps)",
-      "lossless": "Verlustfrei (FLAC/ALAC) – derzeit nicht verfügbar"
+      "lossless": "Verlustfrei (FLAC/ALAC)"
     },
     "profile": {
       "title": "Profil",

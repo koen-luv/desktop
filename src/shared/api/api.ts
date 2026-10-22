@@ -25,9 +25,13 @@ import type {
   UserProfile,
   LeaderboardResponse,
   DailyMixesResponse,
+  DiscordCloudStatus,
+  DiscordLinkSession,
+  DiscordLinkStatus,
+  DiscordPresenceNotification,
 } from "@/shared/contracts";
 
-import { usePlayerStore } from "@/features/player/store/playerStore";
+import { usePlayerStore, type AudioQuality } from "@/features/player/store/playerStore";
 import { showToast } from "@/shared/ui/Toast";
 import { createTranslatorSync, getStoredLocale } from "@/languages";
 import {
@@ -889,6 +893,7 @@ export const api = {
     preferredCodec?: "opus" | "aac",
     signal?: AbortSignal,
     transport?: "proxy" | "direct_innertube",
+    quality?: AudioQuality,
   ): Promise<PlaybackSession> {
     return request<PlaybackSession>(
       `/v1/tracks/${encodeURIComponent(id)}/playback`,
@@ -898,6 +903,9 @@ export const api = {
         body: JSON.stringify({
           ...(transport ? { transport } : {}),
           ...(preferredCodec ? { preferredCodec } : {}),
+          // "high" is the historical default and stays implicit; other tiers ask
+          // the server for a specific master (lossless = FLAC/ALAC).
+          ...(quality && quality !== "high" ? { quality } : {}),
         }),
       },
     );
@@ -1044,5 +1052,33 @@ export const api = {
 
   getDailyMixes(): Promise<DailyMixesResponse> {
     return request<DailyMixesResponse>("/v1/me/recommendations/daily-mixes");
+  },
+
+  // ---- Discord cloud presence -------------------------------------------------
+  // Mobile apps cannot reach Discord's local RPC (it only exists on the desktop
+  // client), so linked accounts report playback here and the backend keeps the
+  // presence through the Discord Social SDK. Contract: docs/discord-cloud.md.
+
+  getDiscordCloudStatus(): Promise<DiscordCloudStatus> {
+    return request<DiscordCloudStatus>("/v1/me/discord");
+  },
+
+  startDiscordLink(): Promise<DiscordLinkSession> {
+    return request<DiscordLinkSession>("/v1/me/discord/link", { method: "POST" });
+  },
+
+  getDiscordLinkStatus(id: string): Promise<DiscordLinkStatus> {
+    return request<DiscordLinkStatus>(`/v1/me/discord/link/${encodeURIComponent(id)}`);
+  },
+
+  unlinkDiscord(): Promise<void> {
+    return request<void>("/v1/me/discord", { method: "DELETE" });
+  },
+
+  sendDiscordPresence(notification: DiscordPresenceNotification): Promise<void> {
+    return request<void>("/v1/me/discord/presence", {
+      method: "POST",
+      body: JSON.stringify(notification),
+    });
   },
 };

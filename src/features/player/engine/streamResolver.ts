@@ -11,6 +11,7 @@ import {
   type PlaybackStream,
 } from "./playbackStream";
 import { findYoutubeStandIn } from "./youtubeStandIn";
+import type { AudioQuality } from "../store/playerStore";
 
 export type { BufferedPlaybackStream, PlayableTrack, PlaybackStream, UrlPlaybackStream } from "./playbackStream";
 
@@ -36,18 +37,29 @@ async function resolveSoundCloud(track: PlayableTrack, signal?: AbortSignal): Pr
   }
 }
 
-async function resolveYoutubeTrack(track: PlayableTrack, videoId: string, signal?: AbortSignal): Promise<PlaybackStream> {
-  const liner = await resolveLinerStream(videoId, signal);
+async function resolveYoutubeTrack(
+  track: PlayableTrack,
+  videoId: string,
+  signal?: AbortSignal,
+  quality: AudioQuality = "high",
+): Promise<PlaybackStream> {
+  // The R2 master is the only source that can be lossless; YouTube never is,
+  // so it stays the fallback when the backend has no lossless master.
+  const liner = await resolveLinerStream(videoId, signal, quality);
   if (liner) {
-    log("cyan", "playback", `playing liner audio (r2) for "${track.title}"`);
+    log("cyan", "playback", `playing liner audio (r2) for "${track.title}" (${quality})`);
     return fromLinerStream(liner, track);
   }
   return fromInnertubeStream(await resolveDirectAudioStream(track.id, { signal }));
 }
 
-export async function resolvePlaybackStream(track: PlayableTrack, signal?: AbortSignal): Promise<PlaybackStream> {
+export async function resolvePlaybackStream(
+  track: PlayableTrack,
+  signal?: AbortSignal,
+  quality: AudioQuality = "high",
+): Promise<PlaybackStream> {
   if (toSoundCloudTrackId(track.id)) return resolveSoundCloud(track, signal);
   const videoId = toVideoId(track.id);
-  if (videoId) return resolveYoutubeTrack(track, videoId, signal);
+  if (videoId) return resolveYoutubeTrack(track, videoId, signal, quality);
   return resolveYoutubeStandIn(track, signal);
 }

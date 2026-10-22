@@ -660,6 +660,20 @@
         "ready": "Ready",
         "waiting": "Waiting for Discord",
         "disabled": "Disabled"
+      },
+      "cloud": {
+        "section": "Discord Account",
+        "title": "Link your Discord account",
+        "description": "Link Discord once so your activity also shows when you listen on your phone.",
+        "linked": "Linked as {user}",
+        "linked_hint": "Liner updates your Discord activity from the cloud, on every device.",
+        "link": "Link Discord account",
+        "unlink": "Unlink",
+        "waiting": "Finish the sign-in in your browser…",
+        "waiting_button": "Waiting…",
+        "unavailable": "This server doesn't support cloud Discord presence yet.",
+        "error_expired": "The sign-in expired. Try again.",
+        "error_failed": "Discord sign-in failed. Try again."
       }
     },
     "customization": {
@@ -865,7 +879,8 @@
       "low": "Low Quality (Data Saver)",
       "standard": "Standard Quality (Opus 64kbps / MP3 128kbps)",
       "high": "High Quality (AAC 256kbps)",
-      "lossless": "Lossless (FLAC/ALAC) - Unavailable"
+      "lossless": "Lossless (FLAC/ALAC)",
+      "lossless_description": "Plays the lossless master (FLAC/ALAC) when Liner has one; other tracks use the best available stream."
     },
     "profile": {
       "title": "Profile",

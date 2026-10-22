@@ -3,12 +3,15 @@ import type { Track } from "@/shared/types";
 import type { PlaybackSession, PlaybackSessionResponse } from "@/shared/contracts/playback";
 import { getClientVisitorData } from "@/shared/api/visitorSession";
 import { SourceError, type ResolvedStream, type SourceErrorCode } from "../sources/types";
+import type { AudioQuality } from "../store/playerStore";
 
 export interface StreamResolveOptions {
   signal?: AbortSignal;
   /** Codec preference forwarded to the resolver endpoint. */
   preferredCodec?: "aac" | "opus";
   providerId?: string;
+  /** Streaming tier forwarded to the resolver endpoint (lossless asks for the master). */
+  quality?: AudioQuality;
 }
 
 /**
@@ -125,6 +128,7 @@ export async function executeDirectPlanStream(
       expiresAtMs,
       providerId,
       providerTrackId: result.videoId ?? session.videoId ?? track.id,
+      quality: options.quality,
       resolvedAt: Date.now(),
     };
   } finally {
@@ -152,6 +156,7 @@ export async function resolveDirectInnertubeStream(
     options.preferredCodec,
     options.signal,
     "direct_innertube",
+    options.quality,
   );
   if (session.transport !== "direct_innertube" || !session.endpoint) {
     throw new SourceError(
@@ -192,6 +197,7 @@ export function resolveProxySessionStream(
     expiresAtMs,
     providerId,
     providerTrackId: session.trackId ?? track.id,
+    quality: options.quality,
     resolvedAt: Date.now(),
   };
 }
@@ -211,6 +217,7 @@ export async function resolveProxyInnertubeStream(
     options.preferredCodec,
     options.signal,
     "proxy",
+    options.quality,
   );
   return resolveProxySessionStream(track, session, { ...options, providerId });
 }

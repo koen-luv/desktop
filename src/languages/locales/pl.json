@@ -721,7 +721,7 @@
       "low": "Niska jakość (oszczędzanie danych)",
       "standard": "Standardowa jakość (Opus 64kbps / MP3 128kbps)",
       "high": "Wysoka jakość (AAC 256kbps)",
-      "lossless": "Bezstratna (FLAC/ALAC) - Niedostępna"
+      "lossless": "Bezstratna (FLAC/ALAC)"
     },
     "profile": {
       "title": "Profil",

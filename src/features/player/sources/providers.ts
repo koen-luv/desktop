@@ -35,6 +35,8 @@ interface LinerProviderConfig {
   id: string;
   label: string;
   priority: number;
+  /** The server can answer with the lossless master for this provider. */
+  losslessCapable?: boolean;
   /** "auto" = let the server pick the transport in a single round-trip. */
   transport: "auto" | "direct" | "proxy";
   preferredCodec?: "aac" | "opus";
@@ -50,6 +52,7 @@ function createLinerProvider(config: LinerProviderConfig): SourceProvider {
     id: config.id,
     priority: config.priority,
     label: config.label,
+    losslessCapable: config.losslessCapable,
 
     supports(track: Track): boolean {
       if (!track?.id) return false;
@@ -70,6 +73,7 @@ function createLinerProvider(config: LinerProviderConfig): SourceProvider {
         signal: ctx.signal,
         preferredCodec: config.preferredCodec,
         providerId: config.id,
+        quality: ctx.quality,
       };
       try {
         if (config.transport === "auto") {
@@ -82,6 +86,7 @@ function createLinerProvider(config: LinerProviderConfig): SourceProvider {
             config.preferredCodec,
             ctx.signal,
             transport,
+            ctx.quality,
           );
           return await resolveSessionStream(ctx.track, session, options);
         }
@@ -97,11 +102,14 @@ function createLinerProvider(config: LinerProviderConfig): SourceProvider {
 }
 
 /** Server-selected transport — one round-trip, handles either response shape. */
+// The auto provider asks the server for the stream, so when the backend keeps a
+// lossless master it is the only source that can serve it.
 export const linerAutoProvider = createLinerProvider({
   id: "liner-auto",
   label: "Liner",
   priority: 100,
   transport: "auto",
+  losslessCapable: true,
 });
 
 export const linerDirectAacProvider = createLinerProvider({
@@ -173,6 +181,7 @@ export const innertubeClientProvider: SourceProvider = {
         expiresAtMs: streamExpiryMs(result.url),
         providerId: "innertube-client",
         providerTrackId: ctx.track.id,
+        quality: ctx.quality,
         resolvedAt: Date.now(),
       };
     } catch (err) {
