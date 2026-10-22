@@ -3,10 +3,10 @@ name: iOS IPA
 on:
   workflow_dispatch:
   push:
-    # The `apk` branch carries the mobile ports (Android + iOS); every push
+    # The `mobile` branch carries the mobile ports (Android + iOS); every push
     # there rebuilds the unsigned IPA.
     branches:
-      - apk
+      - mobile
     tags:
       - "v*"
 

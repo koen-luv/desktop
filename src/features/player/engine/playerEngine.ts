@@ -33,6 +33,10 @@ import { debouncedStorage } from "@/shared/utils/storage";
 import { showToast } from "@/shared/ui";
 import { createTranslatorSync, getStoredLocale } from "@/languages";
 import type { Track } from "@/shared/types";
+import {
+  isPlaybackLocked,
+  withPlaybackLockBypass,
+} from "@/features/party/playbackLock";
 
 const MAX_CONSECUTIVE_AUTO_SKIPS = 3;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -412,6 +416,8 @@ class PlayerEngine {
     queueIndex?: number,
     preserveQueue?: boolean,
   ): Promise<void> {
+    // Listen party guest: the host is authoritative for what plays.
+    if (isPlaybackLocked()) return;
     const store = usePlayerStore.getState();
     const nextQueue = this.normalizeQueue(queue ?? [track], track);
     const nextIndex =
@@ -481,6 +487,7 @@ class PlayerEngine {
     contextCover?: string | null,
     startIndex?: number,
   ): Promise<void> {
+    if (isPlaybackLocked()) return;
     if (!tracks || tracks.length === 0) return;
     const store = usePlayerStore.getState();
     const seedIndex =
@@ -524,6 +531,7 @@ class PlayerEngine {
   }
 
   public async startRadioStation(track: Track): Promise<void> {
+    if (isPlaybackLocked()) return;
     const store = usePlayerStore.getState();
     this.sessionId += 1;
     const mySession = this.sessionId;
@@ -581,6 +589,7 @@ class PlayerEngine {
   }
 
   public pause(): void {
+    if (isPlaybackLocked()) return;
     const store = usePlayerStore.getState();
     const wasLoading = store.status === "loading";
     if (wasLoading) {
@@ -597,6 +606,7 @@ class PlayerEngine {
   }
 
   public resume(): void {
+    if (isPlaybackLocked()) return;
     const store = usePlayerStore.getState();
     if (playerRuntime) {
       if (
@@ -612,6 +622,7 @@ class PlayerEngine {
   }
 
   public togglePlayPause(): void {
+    if (isPlaybackLocked()) return;
     const store = usePlayerStore.getState();
     if (store.status === "playing" || store.status === "loading") {
       this.pause();
@@ -621,6 +632,10 @@ class PlayerEngine {
   }
 
   public async skipNext(isAutoEnd: boolean = false): Promise<void> {
+    // Party guests don't pick tracks themselves, but natural track-end still
+    // advances: the queue is synced from the host, so the guest lands on the
+    // same track instead of idling until the host's next message arrives.
+    if (isPlaybackLocked() && !isAutoEnd) return;
     const store = usePlayerStore.getState();
     const nextIndex = this.computeNextIndex(isAutoEnd);
 
@@ -669,6 +684,7 @@ class PlayerEngine {
   }
 
   public async skipPrevious(): Promise<void> {
+    if (isPlaybackLocked()) return;
     const store = usePlayerStore.getState();
     if (store.queue.length === 0) return;
 
@@ -797,6 +813,7 @@ class PlayerEngine {
   }
 
   public seek(positionMs: number, autoPlay: boolean = false): void {
+    if (isPlaybackLocked()) return;
     const store = usePlayerStore.getState();
     const currentMs = store.positionMs;
     const durationMs = store.durationMs || store.currentTrack?.durationMs || 0;
@@ -992,7 +1009,12 @@ class PlayerEngine {
     showToast(translate("player.track_unavailable_title"), "error", {
       description: track.artists ? `${track.title} — ${track.artists}` : track.title,
     });
-    void this.skipNext(false);
+    // Internal recovery, not a user command: a party guest must still be able
+    // to skip past a failed track rather than wedging until the host's next
+    // state message.
+    withPlaybackLockBypass(() => {
+      void this.skipNext(false);
+    });
   }
 
   private computeNextIndex(isAutoEnd: boolean = false): number | null {

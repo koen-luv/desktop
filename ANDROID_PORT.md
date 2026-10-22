@@ -138,6 +138,8 @@ nonce. Nothing is signed with a secret baked into the APK.
 | Discord Rich Presence | verified (v2): the renderer pushes the desktop-parity state/settings payloads into `DiscordRpc.kt` (WebSocket to the signed-in Discord client's local endpoint, ports 6463-6472, `10.0.2.2` on the emulator); presence follows song transitions, artwork, status format and button settings exactly like desktop |
 | Last.fm scrobbling | verified: fully client-side scrobbler (`src/features/lastfm`) — Liner's own Last.fm app is built in (custom key/secret optional), out-of-band authorization, now-playing on first playing tick, scrobble at ≥ min(duration/2, 4 min) for tracks ≥ 30 s with the playback start timestamp; settings under Playback → Last.fm |
 | Android Auto | verified (CDP smoke on the release APK): `MediaLibraryService` with renderer-backed browse tree (Recents, Playlists, Queue, search) and play-through-the-renderer pipeline — queue and recents queries answered by the renderer (recents returned real server history with title/artists/artwork) and an `autoPlay` event with a served media id started normal playback (MiniPlayer playing with queue context); see "Android Auto" above |
+| Listen party (no backend) | client-side only: WebRTC data channel, host-authoritative sync (5 s heartbeat + 2 s guest drift tick, 2.5 s tolerance). Invite/answer SDP codes are deflate+base64url (`linerparty1.` prefix) and travel through the share sheet/clipboard; STUN-only ICE (no TURN relay — nothing to host). Guests' transport is disabled in the UI and guarded in the engine, including the Android notification/Bluetooth buttons. Unit-verified (26 tests: drift math, code round-trip/rejection, lock + nested bypass) |
+| UI smoothness pass | progress fills animate with `transform: scaleX` instead of width (TimelineSlider, MiniPlayer); Android drops `filter: blur()` from page transitions; the Auto renderer poll backs off 150 ms → 1000 ms while idle; cadence snap-back after natural track end |
 
 ## Verification performed
 
@@ -175,6 +177,15 @@ server's close code 4000, retried with the 2 s → 60 s backoff, and queued real
 track presence (`addiction (Slowed) — LONOWN`, with artwork) on playback; the
 settings category renders the Discord rows (and only those) on Android.
 
+Listen party / this change set: `tsc --noEmit` clean; new party suites green
+(26 tests: drift math incl. extrapolation and tolerance edges, SDP code
+round-trip incl. clipboard whitespace and all rejection paths, playback lock
+incl. nested bypass and throw safety); targeted regression set green
+(TimelineSlider 3, engine state-machine/radio/sign-out/transitions 32,
+locale/discord/md5 36). `SettingsModal.test.tsx` hangs under jsdom and was
+confirmed pre-existing by reproducing the hang in a clean worktree at HEAD
+(see limitations).
+
 ## Known limitations
 
 1. **Physical device network.** On the Xiaomi 23129RN51X (MIUI 14) used for
@@ -196,3 +207,13 @@ settings category renders the Discord rows (and only those) on Android.
    by the car) or the renderer is still loading, folders appear empty and play
    taps no-op. Events emitted before the WebView attaches are queued (bounded),
    so a cold start from the car usually recovers within a few seconds.
+6. **Listen party is STUN-only.** No TURN relay is bundled — hosting one would
+   require running a server, which this feature deliberately avoids — so two
+   peers behind strict/symmetric NATs may fail to open the data channel; the
+   handshake times out with a retry prompt. Codes travel out of band (share
+   sheet/clipboard), an invite can be answered once (add another friend = a new
+   invite), and a guest's local transport controls are disabled while synced.
+7. **`SettingsModal.test.tsx` hangs under jsdom** (pre-existing: reproduced at
+   HEAD in a clean worktree, unrelated to the listen-party work). The modal
+   itself works on-device; suspected jsdom-only render loop. The rest of the
+   suite is green.

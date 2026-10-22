@@ -13,6 +13,7 @@ import { useOverlaySync } from "@/features/overlay";
 import { useDiscordSync } from "@/features/discord";
 import { useLastfmScrobbler } from "@/features/lastfm";
 import { useAutoSync } from "@/features/auto";
+import { PartySheet, usePartySync } from "@/features/party";
 import { AppRoutes } from "./routes";
 import DeeplinkHandler from "./DeeplinkHandler";
 import EnvironmentWarning from "./EnvironmentWarning";
@@ -59,6 +60,11 @@ function AutoSync() {
   return null;
 }
 
+function PartySync() {
+  usePartySync();
+  return null;
+}
+
 export default function App() {
   useWindowDrag();
 
@@ -80,6 +86,7 @@ export default function App() {
         <DiscordSync />
         <LastfmSync />
         <AutoSync />
+        <PartySync />
         <AppleEmojiProvider>
           <I18nProvider>
             <ToastProvider>
@@ -87,6 +94,7 @@ export default function App() {
                 <WindowAnimationContainer>
                   <DeeplinkHandler />
                   <EnvironmentWarning />
+                  <PartySheet />
                   <ConnectivityWall />
                   <AuthLock>
                     <AppRoutes />

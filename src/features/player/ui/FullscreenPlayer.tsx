@@ -17,7 +17,8 @@ import {
 } from "@/features/lyrics";
 import { AnimatePresence, motion } from "framer-motion";
 import { PlayerUiElements } from "./PlayerUiElements";
-import { DownLine } from "@mingcute/react";
+import { DownLine, Group2Line } from "@mingcute/react";
+import { usePartyStore } from "@/features/party/store/partyStore";
 import { preloadCoverArt, useCoverSrc } from "@/features/covers";
 import "@braccato/core/element";
 import "@braccato/core/styles/variables.css";
@@ -371,6 +372,10 @@ export function FullscreenPlayer({
   const player = usePlayerState();
   const coverUrl = player.currentTrack?.coverUrl;
   const kawarpSrc = useCoverSrc(coverUrl);
+  // Highlight the party button while a session (or handshake) is running.
+  const partyActive = usePartyStore(
+    (s) => s.role !== null && s.phase !== "idle" && s.phase !== "error",
+  );
 
   useEffect(() => {
     if (!player.currentTrack) {
@@ -560,6 +565,19 @@ export function FullscreenPlayer({
         className="absolute top-[calc(var(--inset-top,0px)+12px)] left-[12px] z-30 inline-flex h-[32px] w-[32px] items-center justify-center rounded-lg border-none bg-black/50 backdrop-blur-xl text-white/80 hover:text-white hover:bg-white/10 active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto"
       >
         <DownLine size={18} />
+      </button>
+      <button
+        type="button"
+        aria-label={t("party.title")}
+        onClick={() => usePartyStore.getState().setOpen(true)}
+        data-no-window-drag
+        className={`absolute top-[calc(var(--inset-top,0px)+12px)] right-[12px] z-30 inline-flex h-[32px] w-[32px] items-center justify-center rounded-lg border-none backdrop-blur-xl active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto ${
+          partyActive
+            ? "bg-accent-primary/30 text-white ring-1 ring-accent-primary/60 hover:bg-accent-primary/40"
+            : "bg-black/50 text-white/80 hover:text-white hover:bg-white/10"
+        }`}
+      >
+        <Group2Line size={18} />
       </button>
     </div>
   );

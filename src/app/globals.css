@@ -280,6 +280,25 @@ img {
   }
 }
 
+/* Mobile GPUs re-rasterize the whole page for every frame of an animated
+   `filter`, which makes each navigation stutter on Android. Keep the same
+   fade/slide but drop the blur on the WebView; opacity + transform stay on
+   the compositor. */
+.platform-android .page-transition {
+  animation-name: page-enter-fast;
+}
+
+@keyframes page-enter-fast {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 .theme-logo {
   filter: invert(1) !important;
 }

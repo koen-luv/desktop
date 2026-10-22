@@ -33,6 +33,7 @@ import SongCard from "./SongCard";
 import { useTranslation } from "@/languages";
 import { useIsTrackLiked, useLikeTrack, useUnlikeTrack } from "@/features/library/hooks";
 import { usePlayerStore } from "../store/playerStore";
+import { usePartyStore } from "@/features/party/store/partyStore";
 import { toVolumeGain, toVolumeLevel } from "../engine/volume";
 import { VolumePicker } from "./VolumePicker";
 import { SpeedPitchPicker } from "./SpeedPitchPicker";
@@ -205,6 +206,8 @@ function MiniPlayer({
   isEdgeToEdge = false,
 }: MiniPlayerProps) {
   const player = usePlayerState();
+  // Transport is the host's while this device rides along as a guest.
+  const partyGuest = usePartyStore((s) => s.role === "guest");
   const { t } = useTranslation();
   const { resolvedTheme } = useTheme();
   const isLight =
@@ -685,15 +688,17 @@ function MiniPlayer({
       >
         {usesBackgroundProgress && (
           <div
-            className="absolute inset-y-0 left-0 z-0 pointer-events-none"
+            className="absolute inset-y-0 left-0 right-0 z-0 pointer-events-none"
             style={{
               backgroundColor: accentColor,
-              width: `${activeProgress * 100}%`,
-              willChange: "width",
+              // scaleX keeps the ~6x/s progress ticks off the layout path.
+              transform: `scaleX(${activeProgress})`,
+              transformOrigin: "left center",
+              willChange: "transform",
               transition:
                 scrubRatio !== null
                   ? "none"
-                  : "width 200ms cubic-bezier(0.22, 1, 0.36, 1)",
+                  : "transform 200ms cubic-bezier(0.22, 1, 0.36, 1)",
             }}
           />
         )}
@@ -816,7 +821,8 @@ function MiniPlayer({
             <button
               type="button"
               aria-label="Previous track"
-              className={`${iconButtonClass} !h-[38px] !w-[38px]`}
+              disabled={partyGuest}
+              className={`${iconButtonClass} !h-[38px] !w-[38px] disabled:opacity-40`}
               onClick={() => void playerEngine.skipPrevious()}
             >
               <SkipPrevious size={18} weight="Bold" />
@@ -824,7 +830,8 @@ function MiniPlayer({
             <button
               type="button"
               aria-label={isPlaying ? "Pause" : "Play"}
-              className="inline-flex h-[38px] w-[38px] items-center justify-center rounded-full bg-btn-primary-bg text-btn-primary-text active:scale-[0.95] border-none cursor-pointer"
+              disabled={partyGuest}
+              className="inline-flex h-[38px] w-[38px] items-center justify-center rounded-full bg-btn-primary-bg text-btn-primary-text active:scale-[0.95] border-none cursor-pointer disabled:opacity-40"
               onClick={() => void playerEngine.togglePlayPause()}
             >
               {isLoading ? (
@@ -836,7 +843,8 @@ function MiniPlayer({
             <button
               type="button"
               aria-label="Next track"
-              className={`${iconButtonClass} !h-[38px] !w-[38px]`}
+              disabled={partyGuest}
+              className={`${iconButtonClass} !h-[38px] !w-[38px] disabled:opacity-40`}
               onClick={() => void playerEngine.skipNext()}
             >
               <SkipNext size={18} weight="Bold" />
@@ -1004,24 +1012,26 @@ function MiniPlayer({
             <button
               type="button"
               aria-label="Previous track"
-              className={`${iconButtonClass} text-text-secondary hover:text-text-primary`}
+              disabled={partyGuest}
+              className={`${iconButtonClass} text-text-secondary hover:text-text-primary disabled:opacity-40`}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => {
                 void playerEngine.skipPrevious();
               }}
-              style={{ cursor: "pointer" }}
+              style={{ cursor: partyGuest ? "default" : "pointer" }}
             >
               <SkipPrevious size={18} weight="Bold" />
             </button>
             <button
               type="button"
               aria-label={isPlaying ? "Pause" : "Play"}
-              className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-full bg-btn-primary-bg text-btn-primary-text transition-all duration-150 ease-out hover:scale-105 active:scale-[0.96] border-none cursor-pointer shadow-sm"
+              disabled={partyGuest}
+              className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-full bg-btn-primary-bg text-btn-primary-text transition-all duration-150 ease-out hover:scale-105 active:scale-[0.96] border-none cursor-pointer shadow-sm disabled:opacity-40 disabled:hover:scale-100"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => {
                 void playerEngine.togglePlayPause();
               }}
-              style={{ cursor: "pointer" }}
+              style={{ cursor: partyGuest ? "default" : "pointer" }}
             >
               {/* keep the morph icon mounted through the loading state
                   (spinner overlays it) — swapping it out on "loading" would
@@ -1051,12 +1061,13 @@ function MiniPlayer({
             <button
               type="button"
               aria-label="Next track"
-              className={`${iconButtonClass} text-text-secondary hover:text-text-primary`}
+              disabled={partyGuest}
+              className={`${iconButtonClass} text-text-secondary hover:text-text-primary disabled:opacity-40`}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => {
                 void playerEngine.skipNext();
               }}
-              style={{ cursor: "pointer" }}
+              style={{ cursor: partyGuest ? "default" : "pointer" }}
             >
               <SkipNext size={18} weight="Bold" />
             </button>

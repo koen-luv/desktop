@@ -23,6 +23,7 @@ import { useIsTrackLiked, useLikeTrack, useUnlikeTrack } from "@/features/librar
 import { AnimatePresence, motion } from "framer-motion";
 import { ArtistLink } from "@/features/artist";
 import { useCoverReady, CoverImage } from "@/features/covers";
+import { usePartyStore } from "@/features/party/store/partyStore";
 import ExplicitBadge from "@/shared/ui/ExplicitBadge";
 import { VolumePicker } from "./VolumePicker";
 import { TimelineSlider } from "./TimelineSlider";
@@ -71,6 +72,8 @@ export function PlayerUiElements({
   onClose,
 }: PlayerUiElementsProps) {
   const player = usePlayerState();
+  // Transport is the host's while this device rides along as a guest.
+  const partyGuest = usePartyStore((s) => s.role === "guest");
   const [sleepOpen, setSleepOpen] = useState(false);
   const sleepRemaining = useSleepTimerRemainingMs();
 
@@ -224,8 +227,9 @@ export function PlayerUiElements({
         <button
           type="button"
           aria-label="Previous track"
+          disabled={partyGuest}
           onClick={() => void playerEngine.skipPrevious()}
-          className={iconButtonClass}
+          className={`${iconButtonClass} disabled:opacity-40`}
         >
           <SkipPrevious size={20} weight="Bold" />
         </button>
@@ -233,8 +237,9 @@ export function PlayerUiElements({
         <button
           type="button"
           aria-label={player.status === "playing" ? "Pause" : "Play"}
+          disabled={partyGuest}
           onClick={() => void playerEngine.togglePlayPause()}
-          className="inline-flex h-[36px] w-[36px] items-center justify-center text-white opacity-85 transition-all duration-150 ease-out hover:opacity-100 active:scale-[0.94] shrink-0 border-none bg-transparent cursor-pointer"
+          className="inline-flex h-[36px] w-[36px] items-center justify-center text-white opacity-85 transition-all duration-150 ease-out hover:opacity-100 active:scale-[0.94] shrink-0 border-none bg-transparent cursor-pointer disabled:opacity-40"
         >
           <PlayPauseIcon status={player.status} />
         </button>
@@ -242,8 +247,9 @@ export function PlayerUiElements({
         <button
           type="button"
           aria-label="Next track"
+          disabled={partyGuest}
           onClick={() => void playerEngine.skipNext()}
-          className={iconButtonClass}
+          className={`${iconButtonClass} disabled:opacity-40`}
         >
           <SkipNext size={20} weight="Bold" />
         </button>

@@ -50,6 +50,15 @@ export class AndroidPlayerRuntime {
   private currentSessionExpiresAt: number | null = null;
   private pendingStartPositionMs = 0;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  /**
+   * Native state poll cadence. Fast while something is audible (position,
+   * fades and caching all key off it), slow while paused/idle — a paused
+   * player still reconciles status and the sleep deadline, just once a
+   * second instead of ~7x/s.
+   */
+  private pollIntervalMs = 150;
+  private static readonly POLL_ACTIVE_MS = 150;
+  private static readonly POLL_IDLE_MS = 1000;
   private unsubscribe: (() => void) | null = null;
   private sleepUnsubscribe: (() => void) | null = null;
   private endedTrackId: string | null = null;
@@ -115,7 +124,7 @@ export class AndroidPlayerRuntime {
     });
 
     this.reconcileWithNative();
-    this.pollTimer = setInterval(() => this.poll(), 150);
+    this.pollTimer = setInterval(() => this.poll(), this.pollIntervalMs);
     log("green", "boot", "android native player runtime initialized");
   }
 
@@ -505,13 +514,29 @@ export class AndroidPlayerRuntime {
       default:
         break;
     }
+
+    this.setPollCadence(
+      state.status === "playing"
+        ? AndroidPlayerRuntime.POLL_ACTIVE_MS
+        : AndroidPlayerRuntime.POLL_IDLE_MS,
+    );
+  }
+
+  private setPollCadence(intervalMs: number): void {
+    if (intervalMs === this.pollIntervalMs || !this.pollTimer) return;
+    this.pollIntervalMs = intervalMs;
+    clearInterval(this.pollTimer);
+    this.pollTimer = setInterval(() => this.poll(), intervalMs);
   }
 
   private handleEnded(trackId: string): void {
     if (this.endedTrackId === trackId) return;
     this.endedTrackId = trackId;
-    log("cyan", "audio", "native playback ended — advancing queue");
+    log("cyan", "audio", "native playback ended - advancing queue");
     this.bridge.setKeepScreenOn(false);
+    // The queue advances immediately; poll fast again so the next track's
+    // position doesn't wait out an idle interval.
+    this.setPollCadence(AndroidPlayerRuntime.POLL_ACTIVE_MS);
     this.onEnded?.();
     usePlayerStore.getState().dispatch({ type: "SKIP_NEXT", isAutoEnd: true });
   }
