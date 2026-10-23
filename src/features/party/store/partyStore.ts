@@ -34,6 +34,8 @@ interface PartyState {
   /** Only guests with an open data channel — this count drives the host UI. */
   guests: PartyGuestInfo[];
   error: string | null;
+  /** Host: whether guests may edit the queue. Guest: last value received. */
+  allowGuestQueueControl: boolean;
 
   setOpen: (open: boolean) => void;
   setAnswerInput: (value: string) => void;
@@ -59,6 +61,7 @@ const initialState = {
   answerInput: "",
   guests: [] as PartyGuestInfo[],
   error: null,
+  allowGuestQueueControl: false,
 };
 
 export const usePartyStore = create<PartyState>((set, get) => ({

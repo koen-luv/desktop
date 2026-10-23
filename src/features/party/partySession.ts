@@ -37,6 +37,12 @@ export type PartyMessage =
     }
   /** Sent by each side once the channel opens, purely for display names. */
   | { t: "hello"; name: string }
+  /** Guest → host: a queue edit. Applied by the host only when it allows control. */
+  | { t: "queue-op"; op: "reorder"; from: number; to: number }
+  | { t: "queue-op"; op: "remove"; index: number }
+  | { t: "queue-op"; op: "add"; track: unknown; next: boolean }
+  /** Host → guest: whether guests may control the queue right now. */
+  | { t: "control"; queue: boolean }
   | { t: "bye" };
 
 const RTC_CONFIG: RTCConfiguration = {
@@ -140,22 +146,29 @@ function waitForIceGathering(pc: RTCPeerConnection): Promise<void> {
   });
 }
 
-export interface PartyConnectionHandlers {
-  onMessage?: (message: PartyMessage) => void;
+export interface PartyConnectionHandlers<M extends { t: string } = PartyMessage> {
+  onMessage?: (message: M) => void;
   onOpen?: () => void;
   onClose?: (reason: "local" | "remote" | "failed") => void;
   onError?: (error: Error) => void;
 }
 
-/** One peer-to-peer link (host side may hold several, one per guest). */
-export class PartyConnection {
+/**
+ * One peer-to-peer link (host side may hold several, one per guest).
+ *
+ * Generic over the wire message shape so other features (remote device
+ * control) reuse the same WebRTC + relay plumbing with their own protocol;
+ * party code keeps the default `PartyMessage`.
+ */
+export class PartyConnection<M extends { t: string } = PartyMessage> {
   readonly pc: RTCPeerConnection;
   private channel: RTCDataChannel | null = null;
   private closed = false;
 
   constructor(
-    private readonly handlers: PartyConnectionHandlers,
+    private readonly handlers: PartyConnectionHandlers<M>,
     asHost: boolean,
+    private readonly channelLabel: string = DATA_CHANNEL_LABEL,
   ) {
     this.pc = new RTCPeerConnection(RTC_CONFIG);
     this.pc.onconnectionstatechange = () => {
@@ -169,7 +182,7 @@ export class PartyConnection {
       }
     };
     if (asHost) {
-      const channel = this.pc.createDataChannel(DATA_CHANNEL_LABEL, {
+      const channel = this.pc.createDataChannel(this.channelLabel, {
         ordered: true,
       });
       this.attachChannel(channel);
@@ -189,10 +202,10 @@ export class PartyConnection {
     };
     channel.onmessage = (event) => {
       try {
-        const message = JSON.parse(String(event.data)) as PartyMessage;
+        const message = JSON.parse(String(event.data)) as M;
         this.handlers.onMessage?.(message);
       } catch {
-        // Ignore malformed frames rather than tearing down the party.
+        // Ignore malformed frames rather than tearing down the link.
       }
     };
   }
@@ -227,10 +240,15 @@ export class PartyConnection {
     await this.pc.setRemoteDescription(answer);
   }
 
-  send(message: PartyMessage): boolean {
+  send(message: M): boolean {
+    return this.sendPayload(message);
+  }
+
+  /** Untyped escape hatch for lifecycle frames (e.g. the closing "bye"). */
+  private sendPayload(payload: { t: string }): boolean {
     if (this.channel?.readyState !== "open") return false;
     try {
-      this.channel.send(JSON.stringify(message));
+      this.channel.send(JSON.stringify(payload));
       return true;
     } catch {
       return false;
@@ -244,7 +262,7 @@ export class PartyConnection {
   close(): void {
     if (this.closed) return;
     this.closingLocally = true;
-    this.send({ t: "bye" });
+    this.sendPayload({ t: "bye" });
     this.teardown();
   }
 

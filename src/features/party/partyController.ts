@@ -10,6 +10,7 @@ import { useAuthStore } from "@/features/auth";
 import { PartyConnection, type PartyMessage } from "./partySession";
 import { usePartyStore } from "./store/partyStore";
 import { broadcastHostState } from "./hooks/usePartySync";
+import { applyGuestQueueOp } from "./partyQueueControl";
 import {
   closeRelayRoom,
   createRelayRoom,
@@ -170,11 +171,20 @@ function onHostOpen(id: string, conn: PartyConnection): void {
     guests: [...store.guests, { id, name: tr("party.guest_default_name") }],
   });
   conn.send({ t: "hello", name: ownName() });
+  // Tell the guest right away whether it may edit the queue.
+  conn.send({
+    t: "control",
+    queue: usePartyStore.getState().allowGuestQueueControl,
+  });
   // Push full state immediately so the guest starts synced, not after 5s.
   broadcastHostState();
 }
 
 function onHostMessage(id: string, message: PartyMessage): void {
+  if (message.t === "queue-op") {
+    applyGuestQueueOp(message);
+    return;
+  }
   if (message.t === "hello") {
     const store = usePartyStore.getState();
     usePartyStore.setState({
@@ -289,7 +299,13 @@ export async function joinParty(inviteCode: string): Promise<void> {
           conn.send({ t: "hello", name: ownName() });
           usePartyStore.setState({ phase: "connected", error: null });
         },
-        onMessage: (message) => usePartyStore.getState().emitMessage(message),
+        onMessage: (message) => {
+          if (message.t === "control") {
+            usePartyStore.setState({ allowGuestQueueControl: message.queue });
+            return;
+          }
+          usePartyStore.getState().emitMessage(message);
+        },
         onClose: (reason) => {
           if (reason === "local") return;
           failGuest(
@@ -345,6 +361,14 @@ export function leaveParty(): void {
   const store = usePartyStore.getState();
   store.reset();
   store.setOpen(false);
+}
+
+/** Host: flip queue control for everyone and tell every open guest. */
+export function setAllowGuestQueueControl(enabled: boolean): void {
+  usePartyStore.setState({ allowGuestQueueControl: enabled });
+  for (const conn of usePartyStore.getState().hostConnections.values()) {
+    conn.send({ t: "control", queue: enabled });
+  }
 }
 
 /** Leave the error screen: guests always end; hosts keep whatever is healthy. */

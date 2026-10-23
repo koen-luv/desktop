@@ -8,3 +8,4 @@ export { AboutTab } from "./AboutTab";
 export { OverlayTab } from "./OverlayTab";
 export { DiscordTab } from "./DiscordTab";
 export { LastFmTab } from "./LastFmTab";
+export { DevicesTab } from "./DevicesTab";

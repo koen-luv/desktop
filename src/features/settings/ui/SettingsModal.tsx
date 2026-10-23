@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef, type ComponentType } from "react";
 import { motion } from "framer-motion";
-import { CloseLine, Search2Line, CloseCircleFill, ExitLine, ArrowLeftLine, RightLine, DiscordFill, KeyboardLine, MusicLine } from "@mingcute/react";
+import { CloseLine, Search2Line, CloseCircleFill, ExitLine, ArrowLeftLine, RightLine, DiscordFill, KeyboardLine, MusicLine, RemoteControlLine } from "@mingcute/react";
 import {
   Play,
   Palette,
@@ -29,6 +29,7 @@ import {
   OverlayTab,
   DiscordTab,
   LastFmTab,
+  DevicesTab,
 } from "./tabs";
 
 /**
@@ -49,7 +50,8 @@ type SectionId =
   | "Customization"
   | "Audio"
   | "Storage"
-  | "About";
+  | "About"
+  | "Devices";
 type CategoryId = "playback" | "appearance" | "overlay" | "storage" | "about";
 type GroupId = "preferences" | "application";
 
@@ -64,6 +66,7 @@ const SECTION_ICONS: Record<SectionId, typeof Play> = {
   Audio: HeadphonesRound,
   Storage: Database,
   About: InfoCircle,
+  Devices: RemoteControlLine,
 };
 
 const SECTION_COMPONENTS: Record<SectionId, ComponentType<{ searchQuery?: string }>> = {
@@ -77,10 +80,11 @@ const SECTION_COMPONENTS: Record<SectionId, ComponentType<{ searchQuery?: string
   Audio: AudioTab,
   Storage: StorageTab,
   About: AboutTab,
+  Devices: DevicesTab,
 };
 
 const CATEGORIES: { id: CategoryId; group: GroupId; sections: SectionId[] }[] = [
-  { id: "playback", group: "preferences", sections: ["Playback", "Shortcuts", "Audio", "LastFm"] },
+  { id: "playback", group: "preferences", sections: ["Playback", "Shortcuts", "Audio", "LastFm", "Devices"] },
   { id: "appearance", group: "preferences", sections: ["Appearance", "Customization"] },
   { id: "overlay", group: "preferences", sections: ["Overlay", "Discord"] },
   { id: "storage", group: "application", sections: ["Storage"] },
@@ -131,6 +135,9 @@ const SETTING_ITEMS: { sectionId: SectionId; titleKey: string; descKey?: string;
   { sectionId: "LastFm", titleKey: "settings.lastfm.api_secret.title", descKey: "settings.lastfm.api_secret.description" },
   { sectionId: "LastFm", titleKey: "settings.lastfm.account.title", descKey: "settings.lastfm.account.description" },
 
+  // Device control
+  { sectionId: "Devices", titleKey: "settings.devices.section_title", descKey: "settings.devices.section_desc" },
+
   // Appearance
   { sectionId: "Appearance", titleKey: "settings.language.label", descKey: "settings.language.description" },
   { sectionId: "Appearance", titleKey: "settings.theme.title", descKey: "settings.theme.description" },
@@ -166,6 +173,7 @@ const SECTION_LABEL_KEYS: Record<SectionId, string> = {
   Audio: "settings.tabs.audio",
   Storage: "settings.tabs.storage",
   About: "settings.tabs.about",
+  Devices: "settings.devices.section_title",
 };
 
 const SECTION_DESC_KEYS: Record<SectionId, string> = {
@@ -179,6 +187,7 @@ const SECTION_DESC_KEYS: Record<SectionId, string> = {
   Audio: "settings.audio.description",
   Storage: "settings.storage.description",
   About: "settings.about.tagline",
+  Devices: "settings.devices.section_desc",
 };
 
 const font = { fontFamily: "var(--font-inter), sans-serif" } as const;
@@ -241,6 +250,7 @@ export default function SettingsModal() {
     Audio: t("settings.tabs.audio"),
     Storage: t("settings.tabs.storage"),
     About: t("settings.tabs.about"),
+    Devices: t("settings.devices.section_title") || "Device control",
   };
 
   const sectionDescriptions: Record<SectionId, string> = {
@@ -254,6 +264,7 @@ export default function SettingsModal() {
     Audio: t("settings.audio.description"),
     Storage: t("settings.storage.description"),
     About: t("settings.about.tagline"),
+    Devices: t("settings.devices.section_desc") || "Control playback on another device from here, or let your devices control this one.",
   };
 
   const isSearching = searchQuery.trim().length > 0;

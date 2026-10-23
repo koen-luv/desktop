@@ -962,6 +962,49 @@ class PlayerEngine {
     this.preloadNextTrack(store);
   }
 
+  public removeFromQueue(index: number): void {
+    const store = usePlayerStore.getState();
+    const queue = store.queue;
+    if (index < 0 || index >= queue.length) return;
+
+    const removed = queue[index];
+    const nextQueue = queue.filter((_, i) => i !== index);
+
+    const masterIdx = this.masterPlaylist.findIndex((t) => t.id === removed.id);
+    if (masterIdx >= 0) this.masterPlaylist.splice(masterIdx, 1);
+    const upcomingIdx = this.originalUpcomingQueue.findIndex(
+      (t) => t.id === removed.id,
+    );
+    if (upcomingIdx >= 0) this.originalUpcomingQueue.splice(upcomingIdx, 1);
+
+    // Removing the playing track moves playback to the one taking its place.
+    if (index === store.currentIndex) {
+      if (nextQueue.length === 0) {
+        void this.stopAndClear();
+        return;
+      }
+      const nextIndex = Math.min(index, nextQueue.length - 1);
+      const nextTrack = nextQueue[nextIndex]!;
+      void this.playTrack(
+        nextTrack,
+        nextQueue,
+        store.playbackContext,
+        store.playbackContextCover,
+        nextIndex,
+        true,
+      );
+      return;
+    }
+
+    const newCurrentIndex =
+      index < store.currentIndex ? store.currentIndex - 1 : store.currentIndex;
+    store.setQueue(nextQueue);
+    if (newCurrentIndex !== store.currentIndex) {
+      store.setCurrentTrack(store.currentTrack, newCurrentIndex);
+    }
+    this.preloadNextTrack(usePlayerStore.getState());
+  }
+
   public snapshotQueue(): Track[] {
     return [...usePlayerStore.getState().queue];
   }

@@ -242,7 +242,19 @@ export function installAndroidPlatform(): void {
     if (type === "mediaCommand") {
       let command: NativeMediaCommand | null = null;
       try {
-        command = JSON.parse(payload) as NativeMediaCommand;
+        const parsed = JSON.parse(payload) as any;
+        if (parsed && typeof parsed === "object") {
+          if (parsed.type && typeof parsed.type === "string") {
+            command = parsed as NativeMediaCommand;
+          } else if (parsed.command && typeof parsed.command === "string") {
+            const c = parsed.command;
+            if (c === "next" || c === "previous") {
+              command = { type: c === "previous" ? "prev" : "next" } as NativeMediaCommand;
+            } else if (c === "play" || c === "pause" || c === "prev") {
+              command = { type: c } as NativeMediaCommand;
+            }
+          }
+        }
       } catch {
         return;
       }

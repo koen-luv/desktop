@@ -16,10 +16,12 @@ import {
   dismissPartyError,
   joinParty,
   leaveParty,
+  setAllowGuestQueueControl,
   startHostParty,
   submitHostAnswer,
 } from "../partyController";
 import { PARTY_JOIN_CODE_LENGTH, isPartyRelayEnabled } from "../partyRelay";
+import { ToggleSwitch } from "@/shared/ui";
 
 const font = { fontFamily: "var(--font-inter), sans-serif" } as const;
 
@@ -160,6 +162,7 @@ export function PartySheet() {
   const guests = usePartyStore((s) => s.guests);
   const answerInput = usePartyStore((s) => s.answerInput);
   const setAnswerInput = usePartyStore((s) => s.setAnswerInput);
+  const allowGuestQueueControl = usePartyStore((s) => s.allowGuestQueueControl);
 
   // The join paste box stays component-local: it survives sheet toggles
   // without being worth a store field.
@@ -373,6 +376,27 @@ export function PartySheet() {
 
         {guests.length > 0 && <GuestList guests={guests} />}
 
+        {(phase === "invite-ready" || phase === "connected") && (
+          <div
+            className="flex items-center justify-between gap-[10px] rounded-lg border border-border-primary bg-bg-primary px-[12px] py-[9px]"
+            style={font}
+          >
+            <div className="min-w-0">
+              <span className="text-[13px] text-text-primary">
+                {t("party.queue_control_title")}
+              </span>
+              <p className="m-0 text-[12px] text-text-tertiary">
+                {t("party.queue_control_desc")}
+              </p>
+            </div>
+            <ToggleSwitch
+              checked={allowGuestQueueControl}
+              onChange={setAllowGuestQueueControl}
+              ariaLabel={t("party.queue_control_title")}
+            />
+          </div>
+        )}
+
         {phase === "connected" && (
           <Button
             type="button"
@@ -416,15 +440,22 @@ export function PartySheet() {
 
         {phase === "connecting" && (
           <SpinnerRow label={t("party.connecting")} />
-        )}
-
-        {phase === "connected" && (
-          <div
-            className="flex items-center gap-[8px] rounded-lg border border-border-primary bg-bg-primary px-[12px] py-[10px] text-[13px] text-text-primary"
+        )}        {phase === "connected" && (
+          <div className="flex items-center gap-[8px] rounded-lg border border-border-primary bg-bg-primary px-[12px] py-[10px] text-[13px] text-text-primary"
             style={font}
           >
             <CheckLine size={16} className="shrink-0 text-accent-primary" />
             {t("party.synced_hint")}
+          </div>
+        )}
+
+        {phase === "connected" && allowGuestQueueControl && (
+          <div
+            className="flex items-center gap-[8px] rounded-lg border border-border-primary bg-bg-primary px-[12px] py-[9px] text-[12px] text-text-secondary"
+            style={font}
+          >
+            <Group2Line size={14} className="shrink-0 text-accent-primary" />
+            {t("party.queue_control_hint")}
           </div>
         )}
 

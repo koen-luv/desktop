@@ -15,6 +15,7 @@ import { useDiscordSync } from "@/features/discord";
 import { useLastfmScrobbler } from "@/features/lastfm";
 import { useAutoSync } from "@/features/auto";
 import { PartySheet, usePartySync } from "@/features/party";
+import { DeviceControlSheet } from "@/features/deviceControl";
 import { AppRoutes, prefetchRoutes } from "./routes";
 import DeeplinkHandler from "./DeeplinkHandler";
 import EnvironmentWarning from "./EnvironmentWarning";
@@ -100,6 +101,7 @@ export default function App() {
                   <DeeplinkHandler />
                   <EnvironmentWarning />
                   <PartySheet />
+                  <DeviceControlSheet />
                   <ConnectivityWall />
                   <AuthLock>
                     <AppRoutes />
