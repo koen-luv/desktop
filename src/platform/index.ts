@@ -67,6 +67,18 @@ export interface LinerAndroidBridge {
    * screen off / app backgrounded, then emitted as a `sleepTimerFired` event.
    */
   audioSleepAt(deadlineMs: number): void;
+  /**
+   * Overlapping crossfade support: `audioCrossfadeLoad` prepares the incoming
+   * song on a hidden second ExoPlayer (audible only at volume), then
+   * `audioCrossfadeStart` runs the equal-power blend + EQ sweep natively over
+   * `durationMs` and, at the end, promotes the incoming player to main (the
+   * MediaSession follows via LinerForwardingPlayer) and emits a
+   * `crossfadeCompleted` event with the new track id. `audioCrossfadeCancel`
+   * aborts the blend and restores the main player's volume.
+   */
+  audioCrossfadeLoad(payload: string): void;
+  audioCrossfadeStart(durationMs: number): void;
+  audioCrossfadeCancel(): void;
   audioState(): string;
   audioCache(url: string, trackId: string, mimeType: string, limitBytes: number): void;
   audioSetCacheLimit(limitBytes: number): void;
