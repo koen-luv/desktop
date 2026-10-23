@@ -781,7 +781,8 @@
     },
     "transitions": {
       "title": "Track transition",
-      "description": "Fade effect applied when the next song starts, whether it begins on its own or you skip manually.",
+      "description": "How one song flows into the next. Auto blends them like a DJ crossfade, sized to fit both songs.",
+      "auto": "Auto crossfade",
       "off": "None (instant)",
       "fade-in": "Fade in",
       "fade-out": "Fade out",

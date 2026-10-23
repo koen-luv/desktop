@@ -3,6 +3,14 @@ package app.tryliner.android
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.Player
 
+/**
+ * Session-facing wrapper that turns Media3's next/previous commands into
+ * renderer-side queue advances (the queue lives in JS, not in the player).
+ *
+ * One instance wraps whichever ExoPlayer is currently main: the crossfade
+ * engine builds a fresh wrapper for the promoted transition player and hands
+ * it to the session with MediaSession.setPlayer().
+ */
 class LinerForwardingPlayer(player: Player) : ForwardingPlayer(player) {
     private val extendedCommands: Player.Commands = super.getAvailableCommands().buildUpon()
         .add(Player.COMMAND_SEEK_TO_NEXT)

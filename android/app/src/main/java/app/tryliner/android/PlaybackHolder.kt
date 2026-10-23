@@ -13,6 +13,7 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
+import android.media.audiofx.Equalizer
 import android.media.audiofx.PresetReverb
 import android.net.Uri
 import org.json.JSONObject
@@ -47,6 +48,51 @@ object PlaybackHolder {
     private var sleepRunnable: Runnable? = null
     @Volatile private var sleepDeadlineMs: Long = 0L
 
+    // ---- Overlapping crossfade (two players audible at once) ----
+    /** Session wrapper around whichever ExoPlayer is currently main. */
+    @Volatile private var sessionPlayer: LinerForwardingPlayer? = null
+    @Volatile private var transitionPlayer: ExoPlayer? = null
+    /** Track prepared on the transition player; null when no blend is armed/running. */
+    @Volatile private var crossfadeTrackId: String? = null
+    /** Bumped on every start/cancel/promote so stale ramp ticks exit early. */
+    private var crossfadeEpoch = 0
+    private var crossfadeRunnable: Runnable? = null
+    private var crossfadeDurationMs = 0L
+    private var crossfadeStartedAt = 0L
+    private var lastEqSweepAt = 0L
+    private var mainEqualizer: Equalizer? = null
+    private var transitionEqualizer: Equalizer? = null
+
+    private val playerListener = object : Player.Listener {
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == Player.STATE_ENDED) {
+                // During a crossfade the blend's completion — not the outgoing
+                // player's end — drives the queue advance.
+                if (crossfadeTrackId == null) {
+                    val id = currentTrackId
+                    if (id != null) {
+                        NativeEvents.emit("playbackEnded", JSONObject.quote(id))
+                    }
+                }
+            }
+            updateState()
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            updateState()
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            lastError = describePlaybackError(error)
+            updateState()
+            NativeEvents.emit("playbackError", stateJson())
+        }
+
+        override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
+            updateState()
+        }
+    }
+
     fun ensureService(context: Context) {
         if (service != null) return
         val app = context.applicationContext
@@ -63,37 +109,19 @@ object PlaybackHolder {
         }
     }
 
-    internal fun attach(service: PlaybackService, player: ExoPlayer, session: MediaSession) {
+    internal fun attach(
+        service: PlaybackService,
+        player: ExoPlayer,
+        session: MediaSession,
+        forwarding: LinerForwardingPlayer,
+    ) {
         this.service = service
         this.player = player
         this.session = session
+        this.sessionPlayer = forwarding
         player.volume = volume
         applyPlaybackParams(player)
-        player.addListener(object : Player.Listener {
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED) {
-                    val id = currentTrackId
-                    if (id != null) {
-                        NativeEvents.emit("playbackEnded", JSONObject.quote(id))
-                    }
-                }
-                updateState()
-            }
-
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                updateState()
-            }
-
-            override fun onPlayerError(error: PlaybackException) {
-                lastError = describePlaybackError(error)
-                updateState()
-                NativeEvents.emit("playbackError", stateJson())
-            }
-
-            override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
-                updateState()
-            }
-        })
+        player.addListener(playerListener)
 
         startTicker()
         val queued = pendingActions.toList()
@@ -107,9 +135,11 @@ object PlaybackHolder {
 
     internal fun detach(player: ExoPlayer) {
         if (this.player === player) {
+            cancelCrossfadeLocked()
             this.player = null
             this.session = null
             this.service = null
+            this.sessionPlayer = null
             ticker?.let { main.removeCallbacks(it) }
             ticker = null
             cancelSleep()
@@ -139,7 +169,11 @@ object PlaybackHolder {
 
     fun pause() {
         playWhenReadyIntent = false
-        runOnPlayer { it.pause() }
+        cancelCrossfadeLocked()
+        runOnPlayer {
+            it.volume = volume
+            it.pause()
+        }
     }
 
     fun resume() {
@@ -147,11 +181,21 @@ object PlaybackHolder {
         runOnPlayer { it.play() }
     }
 
-    fun seek(positionMs: Long) = runOnPlayer { it.seekTo(positionMs.coerceAtLeast(0L)) }
+    fun seek(positionMs: Long) {
+        cancelCrossfadeLocked()
+        runOnPlayer {
+            it.volume = volume
+            it.seekTo(positionMs.coerceAtLeast(0L))
+        }
+    }
 
     fun setVolume(next: Float) {
         volume = next.coerceIn(0f, 1f)
-        runOnPlayer { it.volume = volume }
+        runOnPlayer { p ->
+            // Mid-crossfade the ramp loop owns both players' volumes and will
+            // rescale them with the new user volume on its next tick.
+            if (crossfadeTrackId == null) p.volume = volume
+        }
     }
 
     fun setSpeed(next: Float) {
@@ -206,7 +250,9 @@ object PlaybackHolder {
     }
 
     fun stop() = runOnPlayer {
+        cancelCrossfadeLocked()
         playWhenReadyIntent = false
+        it.volume = volume
         it.stop()
         it.clearMediaItems()
         currentTrackId = null
@@ -240,6 +286,239 @@ object PlaybackHolder {
     }
 
     fun sleepDeadlineMs(): Long = sleepDeadlineMs
+
+    // ---------------------------------------------------------------------
+    // Overlapping crossfade
+    //
+    // JS resolves the incoming song's stream and hands it over with
+    // crossfadeLoad (prepared on a hidden second ExoPlayer at volume 0), then
+    // crossfadeStart(durationMs) runs the blend natively: equal-power volume
+    // ramps on both players plus a band-scoop EQ sweep that morphs the
+    // outgoing song out and opens the incoming one up — the DJ effect. The
+    // ramp runs on the main Handler so it survives the screen turning off and
+    // the app being backgrounded. At the end the transition player is
+    // promoted to main (MediaSession follows via LinerForwardingPlayer) and a
+    // crossfadeCompleted event tells JS to advance its queue without
+    // reloading the now-playing track.
+    // ---------------------------------------------------------------------
+
+    /**
+     * Prepares the incoming song on the transition player, silently. The
+     * player takes the service's data-source factory (same redirects/headers
+     * as main) and deliberately does NOT request audio focus — main holds it.
+     */
+    fun crossfadeLoad(context: Context, payloadJson: String) {
+        ensureService(context)
+        main.post {
+            cancelCrossfadeLocked()
+            val svc = service ?: return@post
+            try {
+                val payload = JSONObject(payloadJson)
+                val url = payload.optString("url")
+                val trackId = payload.optString("trackId")
+                if (url.isBlank() || trackId.isBlank()) return@post
+
+                val cached: File? = AudioCache.find(trackId)
+                val uri = if (cached != null) Uri.fromFile(cached) else Uri.parse(url)
+                val resolvedMime = if (cached != null) AudioCache.mimeOf(cached)
+                    else payload.optString("mimeType").ifBlank { null }
+                val metadata = MediaMetadata.Builder()
+                    .setTitle(payload.optString("title").ifBlank { null })
+                    .setArtist(payload.optString("artist").ifBlank { null })
+                    .setAlbumTitle(payload.optString("album").ifBlank { null })
+                    .setArtworkUri(
+                        payload.optString("coverUrl").takeIf { it.startsWith("http") }?.let(Uri::parse),
+                    )
+                    .build()
+                val item = MediaItem.Builder()
+                    .setUri(uri)
+                    .setMediaMetadata(metadata)
+                    .apply { if (resolvedMime != null) setMimeType(resolvedMime) }
+                    .build()
+
+                val transition = svc.buildCrossfadePlayer()
+                transition.volume = 0f
+                transition.setMediaItem(item, payload.optLong("startMs", 0L).coerceAtLeast(0L))
+                transition.playWhenReady = true // audible only through volume
+                transition.prepare()
+                transitionPlayer = transition
+                crossfadeTrackId = trackId
+            } catch (error: Exception) {
+                lastError = "crossfade load failed: " + (error.message ?: "invalid payload")
+                cancelCrossfadeLocked()
+            }
+        }
+    }
+
+    /** Starts (or restarts) the blend once the transition player is ready. */
+    fun crossfadeStart(durationMs: Long) {
+        main.post {
+            if (transitionPlayer == null || player == null || durationMs <= 0L) {
+                cancelCrossfadeLocked()
+                return@post
+            }
+            crossfadeEpoch += 1
+            val epoch = crossfadeEpoch
+            crossfadeDurationMs = durationMs
+            crossfadeStartedAt = 0L
+            lastEqSweepAt = 0L
+
+            val waitReady = object : Runnable {
+                var waitedMs = 0L
+                override fun run() {
+                    if (epoch != crossfadeEpoch) return
+                    val transition = transitionPlayer ?: return
+                    val ready = transition.isPlaying ||
+                        transition.playbackState == Player.STATE_READY
+                    if (!ready) {
+                        if (waitedMs < 5_000L) {
+                            waitedMs += 50L
+                            main.postDelayed(this, 50L)
+                        } else {
+                            cancelCrossfadeLocked() // fall back to the sequential path
+                        }
+                        return
+                    }
+                    crossfadeStartedAt = System.currentTimeMillis()
+                    scheduleRampTick(epoch)
+                }
+            }
+            main.post(waitReady)
+        }
+    }
+
+    fun crossfadeCancel() = main.post { cancelCrossfadeLocked() }
+
+    private fun scheduleRampTick(epoch: Int) {
+        crossfadeRunnable?.let { main.removeCallbacks(it) }
+        val tick = Runnable { runRampTick(epoch) }
+        crossfadeRunnable = tick
+        main.postDelayed(tick, 16L)
+    }
+
+    private fun runRampTick(epoch: Int) {
+        if (epoch != crossfadeEpoch) return
+        val mainPlayer = player ?: return
+        val transition = transitionPlayer ?: return
+        val elapsed = System.currentTimeMillis() - crossfadeStartedAt
+        val t = (elapsed.toFloat() / crossfadeDurationMs.toFloat()).coerceIn(0f, 1f)
+
+        // Equal-power blend scaled by the user volume.
+        val angle = t * Math.PI.toFloat() / 2f
+        mainPlayer.volume = volume * kotlin.math.cos(angle)
+        transition.volume = volume * kotlin.math.sin(angle)
+        sweepEqualizers(t, elapsed)
+
+        if (t >= 1f) {
+            promoteCrossfade(epoch)
+            return
+        }
+        scheduleRampTick(epoch)
+    }
+
+    /**
+     * The effect half of the transition: the outgoing song loses its highs
+     * first and its bass last (a filter-morph feel), while the incoming song
+     * starts scooped and opens up just before the blend completes.
+     */
+    private fun sweepEqualizers(t: Float, elapsed: Long) {
+        if (elapsed - lastEqSweepAt < 80L) return
+        lastEqSweepAt = elapsed
+
+        equalizerFor(player, isMain = true)?.let { eq ->
+            val high = eq.numberOfBands - 1
+            setBand(eq, high, -1400f * (t * 1.6f).coerceAtMost(1f))
+            if (high > 0) setBand(eq, high - 1, -1200f * (t * 1.6f).coerceAtMost(1f))
+            setBand(eq, 0, -1600f * ((t - 0.55f) / 0.45f).coerceIn(0f, 1f))
+        }
+        equalizerFor(transitionPlayer, isMain = false)?.let { eq ->
+            val open = (t / 0.85f).coerceAtMost(1f)
+            val high = eq.numberOfBands - 1
+            setBand(eq, 0, -1000f * (1f - open))
+            setBand(eq, high, -1200f * (1f - open))
+            if (high > 1) setBand(eq, high / 2, -300f * (1f - open))
+        }
+    }
+
+    private fun equalizerFor(target: ExoPlayer?, isMain: Boolean): Equalizer? {
+        if (target == null) return null
+        val existing = if (isMain) mainEqualizer else transitionEqualizer
+        if (existing != null) return existing
+        val sessionId = target.audioSessionId
+        if (sessionId == C.AUDIO_SESSION_ID_UNSET || sessionId == 0) return null
+        return try {
+            val eq = Equalizer(1000, sessionId).apply { enabled = true }
+            if (isMain) mainEqualizer = eq else transitionEqualizer = eq
+            eq
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun setBand(eq: Equalizer, band: Int, millibel: Float) {
+        try {
+            val range = eq.bandLevelRange
+            val clamped = millibel.toInt().coerceIn(range[0].toInt(), range[1].toInt())
+            eq.setBandLevel(band.coerceIn(0, eq.numberOfBands - 1).toShort(), clamped.toShort())
+        } catch (_: Exception) {
+        }
+    }
+
+    /** Hands the session and all state over to the transition player, gapless. */
+    private fun promoteCrossfade(epoch: Int) {
+        if (epoch != crossfadeEpoch) return
+        val mainPlayer = player ?: return
+        val transition = transitionPlayer ?: return
+        val promotedId = crossfadeTrackId
+
+        crossfadeEpoch += 1
+        crossfadeRunnable?.let { main.removeCallbacks(it) }
+        crossfadeRunnable = null
+
+        try { mainPlayer.removeListener(playerListener) } catch (_: Exception) {}
+        try {
+            mainEqualizer?.enabled = false
+            mainEqualizer?.release()
+        } catch (_: Exception) {}
+        mainEqualizer = transitionEqualizer
+        transitionEqualizer = null
+
+        transition.volume = volume
+        transition.addListener(playerListener)
+        player = transition
+        currentTrackId = promotedId ?: currentTrackId
+        val duration = transition.duration
+        if (duration > 0 && duration != C.TIME_UNSET) loadedDurationMs = duration
+        lastError = null
+
+        // Hand the session (notification, lock screen, other controllers) to
+        // the promoted player through a fresh command-wiring wrapper.
+        val promotedSessionPlayer = LinerForwardingPlayer(transition)
+        sessionPlayer = promotedSessionPlayer
+        try { session?.setPlayer(promotedSessionPlayer) } catch (_: Exception) {}
+        transitionPlayer = null
+        crossfadeTrackId = null
+
+        try { mainPlayer.stop(); mainPlayer.clearMediaItems() } catch (_: Exception) {}
+        try { mainPlayer.release() } catch (_: Exception) {}
+
+        updateState()
+        promotedId?.let { NativeEvents.emit("crossfadeCompleted", JSONObject.quote(it)) }
+    }
+
+    private fun cancelCrossfadeLocked() {
+        crossfadeEpoch += 1
+        crossfadeRunnable?.let { main.removeCallbacks(it) }
+        crossfadeRunnable = null
+        crossfadeTrackId = null
+        transitionPlayer?.let { transition ->
+            try { transition.stop() } catch (_: Exception) {}
+            try { transition.release() } catch (_: Exception) {}
+        }
+        transitionPlayer = null
+        try { transitionEqualizer?.release() } catch (_: Exception) {}
+        transitionEqualizer = null
+    }
 
     private fun applyLoad(json: String) {
         val p = player ?: run { pendingLoad = json; return }

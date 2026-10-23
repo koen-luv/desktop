@@ -199,6 +199,17 @@ class LinerBridge(private val activity: MainActivity) {
     }
 
     @JavascriptInterface
+    fun audioCrossfadeLoad(payload: String) {
+        PlaybackHolder.crossfadeLoad(activity.applicationContext, payload)
+    }
+
+    @JavascriptInterface
+    fun audioCrossfadeStart(durationMs: Float) = PlaybackHolder.crossfadeStart(durationMs.toLong())
+
+    @JavascriptInterface
+    fun audioCrossfadeCancel() = PlaybackHolder.crossfadeCancel()
+
+    @JavascriptInterface
     fun audioPause() = PlaybackHolder.pause()
 
     @JavascriptInterface

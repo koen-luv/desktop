@@ -8,7 +8,8 @@ import type { Track } from "@/shared/types";
 import { pitchShifter } from "./pitchShifter";
 import { resolvePlaybackStream, type PlaybackStream } from "./streamResolver";
 import { downloadAudioBytes } from "@/shared/media/innertube";
-import { transitionSpec } from "./transitions";
+import { autoCrossfadeWindowMs, equalPowerBlend, transitionSpec, CROSSFADE_MAX_MS } from "./transitions";
+import { peekAutoNextTrack } from "./queueNext";
 
 /**
  * When false, playback streams directly and never writes audio to disk; files
@@ -31,6 +32,18 @@ export class PlayerRuntime {
   private sleepTimerId: ReturnType<typeof setTimeout> | null = null;
   /** Track id whose end-of-song fade-out is already running (once per track). */
   private endFadeTrackId: string | null = null;
+  /** Second element carrying the overlapping half of a crossfade. */
+  private xAudio: HTMLAudioElement | null = null;
+  private crossfade: {
+    trackId: string;
+    element: HTMLAudioElement;
+    windowMs: number;
+    startedAt: number;
+    timer: ReturnType<typeof setTimeout> | null;
+  } | null = null;
+  private crossfadeEpoch = 0;
+  /** Track already promoted from a crossfade; its queue advance adopts it. */
+  private adoptTrackId: string | null = null;
   private stallStartTime: number | null = null;
   private loadStartTime = 0;
   private ttfbMs = 0;
@@ -86,7 +99,16 @@ export class PlayerRuntime {
       }
       if (state.volume !== prevState.volume) {
         this.cancelFade();
-        if (!this.audio.paused) {
+        if (this.crossfade) {
+          // Re-apply the running blend at the new user volume.
+          const t = Math.min(
+            1,
+            (performance.now() - this.crossfade.startedAt) / this.crossfade.windowMs,
+          );
+          const { outgoing, incoming } = equalPowerBlend(t);
+          if (!this.audio.paused) this.audio.volume = state.volume * outgoing;
+          this.crossfade.element.volume = state.volume * incoming;
+        } else if (!this.audio.paused) {
           this.audio.volume = state.volume;
         }
       }
@@ -256,6 +278,7 @@ export class PlayerRuntime {
         this.recoveryHoldUntilMs = null;
         this.recoveryAttempts = 0;
       }
+      this.maybeStartCrossfade(audioEl);
       this.maybeStartEndFade(audioEl);
     });
 
@@ -304,6 +327,9 @@ export class PlayerRuntime {
       if (this.isResetting || audioEl !== this.audio) return;
       if (!this.currentTrackId) return;
       if (this.attachedTrackId !== this.currentTrackId) return;
+      // An active crossfade owns the handover; its completion advances the
+      // queue exactly once.
+      if (this.crossfade) return;
 
       // Ensure the track truly finished playing (not an empty media load or teardown artefact)
       const duration = audioEl.duration;
@@ -551,6 +577,9 @@ export class PlayerRuntime {
    * at most once per track. Called from the `timeupdate` handler.
    */
   private maybeStartEndFade(audioEl: HTMLAudioElement): void {
+    // An active overlapping crossfade owns the tail; the sequential fade is
+    // only the fallback for when no blend could start.
+    if (this.crossfade) return;
     const fadeOutMs = transitionSpec(
       usePlayerStore.getState().transitionPreset,
     ).fadeOutMs;
@@ -567,6 +596,157 @@ export class PlayerRuntime {
     this.endFadeTrackId = this.currentTrackId;
     log("cyan", "audio", `end-of-song fade-out (${fadeOutMs}ms)`);
     this.fadeVolume(0, fadeOutMs);
+  }
+
+  /**
+   * Overlapping-crossfade trigger (the web/Electron counterpart of the
+   * Android runtime's blend): once the outgoing song enters the possible
+   * blend window, the incoming song starts playing on a second element and
+   * both are blended on an equal-power curve, sized to fit both songs.
+   */
+  private maybeStartCrossfade(audioEl: HTMLAudioElement): void {
+    const spec = transitionSpec(usePlayerStore.getState().transitionPreset);
+    if (!spec.overlap || this.crossfade) return;
+    const duration = audioEl.duration;
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    const remainingMs = (duration - audioEl.currentTime) * 1000;
+    if (remainingMs <= 0 || remainingMs > CROSSFADE_MAX_MS) return;
+    const next = peekAutoNextTrack(usePlayerStore.getState());
+    if (!next) return;
+    const windowMs = autoCrossfadeWindowMs(remainingMs, next.durationMs);
+    if (windowMs <= 0) return;
+    void this.startCrossfade(next, windowMs);
+  }
+
+  private async startCrossfade(next: Track, windowMs: number): Promise<void> {
+    const epoch = ++this.crossfadeEpoch;
+    log("cyan", "audio", `crossfade starting into "${next.title}" (${windowMs}ms window)`);
+    try {
+      const element = this.xAudio ?? this.createCrossfadeElement();
+      this.xAudio = element;
+
+      const stream = await resolvePlaybackStream(
+        next,
+        undefined,
+        usePlayerStore.getState().audioQuality,
+      );
+      if (epoch !== this.crossfadeEpoch) return;
+      if (!this.currentTrackId) return;
+      if (!stream.url) return;
+
+      const isBlob = stream.url.startsWith("blob:");
+      const previousBlob = element.src.startsWith("blob:") ? element.src : null;
+      element.src = stream.url;
+      (element as HTMLAudioElement & { __linerIsBlob?: boolean }).__linerIsBlob = isBlob;
+      element.playbackRate = this.audio.playbackRate;
+      element.volume = 0;
+      element.load();
+      if (previousBlob && previousBlob !== stream.url) URL.revokeObjectURL(previousBlob);
+
+      await element.play();
+      if (epoch !== this.crossfadeEpoch) {
+        element.pause();
+        return;
+      }
+
+      // Fit the blend to the time that is actually left now that both songs
+      // are audible.
+      const remainingNow = (this.audio.duration - this.audio.currentTime) * 1000;
+      const window = Math.max(
+        1_000,
+        Math.min(windowMs, Number.isFinite(remainingNow) && remainingNow > 0 ? remainingNow : windowMs),
+      );
+
+      const state = {
+        trackId: next.id,
+        element,
+        windowMs: window,
+        startedAt: performance.now(),
+        timer: null as ReturnType<typeof setTimeout> | null,
+      };
+      this.crossfade = state;
+      const tick = () => {
+        if (this.crossfade !== state) return;
+        const t = Math.min(1, (performance.now() - state.startedAt) / state.windowMs);
+        const { outgoing, incoming } = equalPowerBlend(t);
+        const volume = usePlayerStore.getState().volume;
+        this.audio.volume = volume * outgoing;
+        state.element.volume = volume * incoming;
+        if (t < 1) {
+          state.timer = setTimeout(tick, 16);
+        } else {
+          state.timer = null;
+          this.completeCrossfade(state.element, next);
+        }
+      };
+      tick();
+    } catch (err) {
+      if (epoch === this.crossfadeEpoch) {
+        log(
+          "yellow",
+          "audio",
+          `crossfade skipped for "${next.title}": ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Promotes the incoming element to primary. The old element's listeners
+   * guard on `audioEl !== this.audio`, so they go inert by themselves; the
+   * parked element is reused as the next crossfade's incoming side.
+   */
+  private completeCrossfade(element: HTMLAudioElement, next: Track): void {
+    if (!this.crossfade || this.crossfade.element !== element) return;
+    this.crossfade = null;
+
+    const old = this.audio;
+    const oldBlob = this.activeBlobUrl;
+
+    this.audio = element;
+    this.audio.id = "liner-audio";
+    old.id = "";
+    this.attachedTrackId = next.id;
+    this.activeBlobUrl = (element as HTMLAudioElement & { __linerIsBlob?: boolean }).__linerIsBlob
+      ? element.src
+      : null;
+    if (typeof window !== "undefined") {
+      (window as unknown as { __liner_audio: HTMLAudioElement }).__liner_audio = element;
+    }
+    this.setupAudioListeners(element);
+    this.applyPlaybackRateAndPitch();
+
+    try {
+      old.pause();
+      old.removeAttribute("src");
+      old.load();
+    } catch {}
+    if (oldBlob && oldBlob !== this.activeBlobUrl) URL.revokeObjectURL(oldBlob);
+
+    this.adoptTrackId = next.id;
+    log("green", "audio", `crossfade completed - "${next.title}" promoted`);
+    usePlayerStore.getState().dispatch({ type: "SKIP_NEXT", isAutoEnd: true });
+  }
+
+  private createCrossfadeElement(): HTMLAudioElement {
+    const element = new Audio();
+    element.preload = "auto";
+    element.crossOrigin = "anonymous";
+    return element;
+  }
+
+  private cancelCrossfade(): void {
+    this.crossfadeEpoch += 1;
+    const state = this.crossfade;
+    this.crossfade = null;
+    if (state?.timer) clearTimeout(state.timer);
+    if (state) {
+      try {
+        state.element.pause();
+        state.element.removeAttribute("src");
+        state.element.load();
+      } catch {}
+    }
   }
 
   private safeResetAudioElement() {
@@ -612,6 +792,7 @@ export class PlayerRuntime {
   }
 
   public cancelPendingLoad(): void {
+    this.cancelCrossfade();
     this.loadEpoch += 1;
     this.loadAbortController?.abort();
     this.loadAbortController = null;
@@ -713,6 +894,18 @@ export class PlayerRuntime {
     startPositionMs: number = 0,
     bypassCache: boolean = false,
   ) {
+    if (this.adoptTrackId === track.id) {
+      // Queue advance after a completed crossfade: the promoted element is
+      // already playing this track — adopt it instead of reloading.
+      this.adoptTrackId = null;
+      if (this.attachedTrackId === track.id && !this.audio.paused && !this.audio.ended) {
+        usePlayerStore.getState().setStatus("playing");
+        this.updateMediaSessionMetadata(track);
+        log("green", "playback", `adopted crossfaded track "${track.title}"`);
+        return;
+      }
+    }
+    this.cancelCrossfade();
     this.cancelFade();
     this.pendingStartPositionMs = startPositionMs;
     const epoch = ++this.loadEpoch;
@@ -963,6 +1156,7 @@ export class PlayerRuntime {
   }
 
   public pause() {
+    this.cancelCrossfade();
     const epoch = ++this.loadEpoch;
     this.loadAbortController?.abort();
     this.loadAbortController = null;
@@ -1070,6 +1264,14 @@ export class PlayerRuntime {
 
   public seek(positionMs: number) {
     if (!this.audio.src || this.audio.src === window.location.href) return;
+    // A seek moves away from the blend window: end an active crossfade early
+    // and snap the primary back to the user volume.
+    if (this.crossfade) {
+      this.cancelCrossfade();
+      if (!this.audio.paused) {
+        this.audio.volume = usePlayerStore.getState().volume;
+      }
+    }
     // Seeking away from the tail cancels an in-progress end-of-song fade so
     // the track isn't left muted; timeupdate restarts it if we land back in
     // the fade-out window.

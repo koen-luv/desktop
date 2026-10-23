@@ -29,7 +29,7 @@ const EMPTY_STATE: PlayerState = {
   keepSpeedAcrossTracks: true,
   isReverbEnabled: false,
   reverbLevel: 0.35,
-  transitionPreset: "off",
+  transitionPreset: "auto",
   sleepTimerEndsAtMs: null,
 };
 

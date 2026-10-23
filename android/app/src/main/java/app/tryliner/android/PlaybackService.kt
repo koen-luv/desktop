@@ -45,6 +45,36 @@ class PlaybackService : MediaLibraryService() {
     @Volatile private var currentArtwork: Bitmap? = null
     @Volatile private var currentArtworkUrl: String? = null
 
+    private val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+        .setUserAgent(Http.userAgent)
+        .setConnectTimeoutMs(20_000)
+        .setReadTimeoutMs(45_000)
+        .setAllowCrossProtocolRedirects(true)
+        .setDefaultRequestProperties(
+            mapOf(
+                "Accept-Language" to "en-US,en;q=0.9",
+                "Range" to "bytes=0-",
+            ),
+        )
+
+    private val dataSourceFactory = DefaultDataSource.Factory(this, httpDataSourceFactory)
+
+    private val audioAttributes = AudioAttributes.Builder()
+        .setUsage(C.USAGE_MEDIA)
+        .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+        .build()
+
+    /**
+     * The second player for overlapping crossfades: same data source wiring as
+     * main, but it never requests audio focus (main holds it) and never shows
+     * in the notification — it exists purely to be blended in and promoted.
+     */
+    fun buildCrossfadePlayer(): ExoPlayer = ExoPlayer.Builder(this)
+        .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+        .setAudioAttributes(audioAttributes, false)
+        .setWakeMode(C.WAKE_MODE_NETWORK)
+        .build()
+
     override fun onCreate() {
         super.onCreate()
         PlaybackHolder.service = this
@@ -64,25 +94,6 @@ class PlaybackService : MediaLibraryService() {
                 )
             }
         }
-
-        val audioAttributes = AudioAttributes.Builder()
-            .setUsage(C.USAGE_MEDIA)
-            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-            .build()
-
-        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent(Http.userAgent)
-            .setConnectTimeoutMs(20_000)
-            .setReadTimeoutMs(45_000)
-            .setAllowCrossProtocolRedirects(true)
-            .setDefaultRequestProperties(
-                mapOf(
-                    "Accept-Language" to "en-US,en;q=0.9",
-                    "Range" to "bytes=0-",
-                ),
-            )
-
-        val dataSourceFactory = DefaultDataSource.Factory(this, httpDataSourceFactory)
 
         val exoPlayer = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
@@ -122,7 +133,7 @@ class PlaybackService : MediaLibraryService() {
         notificationProvider.setSmallIcon(R.drawable.ic_notification)
         setMediaNotificationProvider(notificationProvider)
 
-        PlaybackHolder.attach(this, exoPlayer, mediaSession)
+        PlaybackHolder.attach(this, exoPlayer, mediaSession, forwarding)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session

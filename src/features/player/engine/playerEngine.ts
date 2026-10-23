@@ -7,6 +7,7 @@ import {
 } from "../store/playerStore";
 import { playerRuntime } from "./runtime";
 import { isRadioContext, shouldRefillRadio } from "./radioMode";
+import { computeNextIndex } from "./queueNext";
 import { pitchShifter } from "./pitchShifter";
 import {
   api,
@@ -1018,16 +1019,9 @@ class PlayerEngine {
   }
 
   private computeNextIndex(isAutoEnd: boolean = false): number | null {
-    const store = usePlayerStore.getState();
-    const queueSize = store.queue.length;
-    if (queueSize === 0 || store.currentIndex < 0) return null;
-    if (isAutoEnd && store.repeat === "one") return store.currentIndex;
-
-    if (store.currentIndex + 1 < queueSize) return store.currentIndex + 1;
-    // radio never wraps to its first track; skipNext refills it instead
-    if (isRadioContext(store.playbackContext)) return null;
-    if (store.repeat === "all" || store.repeat === "one") return 0;
-    return null;
+    // Shared with the runtimes (crossfade trigger) via queueNext.ts so the
+    // blended handover song and the queue's actual landing track never drift.
+    return computeNextIndex(usePlayerStore.getState(), isAutoEnd);
   }
 
   /** queue refill trigger: radio refills early (one track left), autoplay-similar on the last track */

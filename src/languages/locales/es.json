@@ -627,7 +627,8 @@
     },
     "transitions": {
       "title": "Transición entre canciones",
-      "description": "Efecto de fundido al empezar la siguiente canción, ya sea sola o al saltar manualmente.",
+      "description": "Cómo pasa una canción a la siguiente. La mezcla automática las combina como una mezcla de DJ, ajustada a ambas canciones.",
+      "auto": "Fundido automático (DJ)",
       "off": "Ninguna (instantáneo)",
       "fade-in": "Fundido de entrada",
       "fade-out": "Fundido de salida",

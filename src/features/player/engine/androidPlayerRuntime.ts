@@ -5,7 +5,8 @@ import { audioCache } from "@/shared/storage/audioCache";
 import { getAndroidBridge, onNativeEvent, registerMediaCommandHandler } from "@/platform";
 import type { Track } from "@/shared/types";
 import { resolvePlaybackStream, type ResolvedPlaybackStream } from "./playbackSource";
-import { transitionSpec } from "./transitions";
+import { autoCrossfadeWindowMs, transitionSpec, CROSSFADE_MAX_MS } from "./transitions";
+import { peekAutoNextTrack } from "./queueNext";
 
 /** When false, native playback never caches audio to disk (only Download saves). */
 const AUTO_CACHE_AUDIO = false;
@@ -71,6 +72,14 @@ export class AndroidPlayerRuntime {
   private rampTimer: ReturnType<typeof setTimeout> | null = null;
   /** Track whose end-of-song fade-out already ran (once per track). */
   private endFadeTrackId: string | null = null;
+  /** Incoming track prepared/blended on the native transition player. */
+  private crossfadeTrackId: string | null = null;
+  /** Guards overlapping async starts while an incoming stream resolves. */
+  private crossfadeInFlight = false;
+  private crossfadeEpoch = 0;
+  /** Track the native side already plays after a crossfade promotion; the
+   *  queue advance must adopt it instead of reloading it. */
+  private adoptTrackId: string | null = null;
   public onEnded?: () => void;
   public onError?: (info: { trackId: string; message: string }) => void;
 
@@ -121,6 +130,28 @@ export class AndroidPlayerRuntime {
     // already flipped status to paused, this just clears the countdown).
     this.sleepUnsubscribe = onNativeEvent("sleepTimerFired", () => {
       usePlayerStore.getState().setSleepTimer(null);
+    });
+
+    onNativeEvent("crossfadeCompleted", (payload) => {
+      let trackId: string | null = null;
+      if (typeof payload === "string") {
+        try {
+          const parsed: unknown = JSON.parse(payload);
+          trackId = typeof parsed === "string" ? parsed : null;
+        } catch {
+          trackId = payload;
+        }
+      } else if (payload && typeof payload === "object" && "trackId" in payload) {
+        trackId = String((payload as { trackId: unknown }).trackId);
+      }
+      if (!trackId || trackId !== this.crossfadeTrackId) return;
+      this.crossfadeTrackId = null;
+      this.crossfadeInFlight = false;
+      const store = usePlayerStore.getState();
+      this.nativeVolume = store.volume;
+      this.adoptTrackId = trackId;
+      log("green", "audio", "native crossfade completed - advancing queue");
+      store.dispatch({ type: "SKIP_NEXT", isAutoEnd: true });
     });
 
     this.reconcileWithNative();
@@ -211,6 +242,9 @@ export class AndroidPlayerRuntime {
 
   /** Starts the outgoing fade-out over the final stretch of the current song. */
   private maybeStartEndFade(state: NativeAudioState): void {
+    // An active overlapping crossfade owns the tail; the sequential fade is
+    // only the fallback for when no blend could start.
+    if (this.crossfadeTrackId !== null) return;
     const fadeOutMs = transitionSpec(
       usePlayerStore.getState().transitionPreset,
     ).fadeOutMs;
@@ -228,6 +262,96 @@ export class AndroidPlayerRuntime {
     this.endFadeTrackId = this.currentTrackId;
     log("cyan", "audio", `native end-of-song fade-out (${fadeOutMs}ms)`);
     void this.rampNativeVolume(0, remainingMs);
+  }
+
+  /**
+   * Overlapping-crossfade trigger: once the outgoing song enters the possible
+   * blend window, resolve the incoming stream and hand it to the native
+   * transition player, which blends and promotes it natively (works with the
+   * screen off). The window is fitted to both songs up front and re-fitted to
+   * the real remaining time at the moment the blend is armed.
+   */
+  private maybeStartCrossfade(state: NativeAudioState): void {
+    const spec = transitionSpec(usePlayerStore.getState().transitionPreset);
+    if (!spec.overlap || this.crossfadeTrackId || this.crossfadeInFlight) return;
+
+    const duration = state.durationMs ?? 0;
+    const position = state.positionMs ?? 0;
+    if (duration <= 0) return;
+    const remainingMs = duration - position;
+    if (remainingMs <= 0 || remainingMs > CROSSFADE_MAX_MS) return;
+
+    const next = peekAutoNextTrack(usePlayerStore.getState());
+    if (!next) return;
+    const windowMs = autoCrossfadeWindowMs(remainingMs, next.durationMs);
+    if (windowMs <= 0) return;
+    void this.startCrossfade(next, windowMs);
+  }
+
+  private async startCrossfade(next: Track, windowMs: number): Promise<void> {
+    this.crossfadeInFlight = true;
+    const epoch = ++this.crossfadeEpoch;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8_000);
+      const stream = await resolvePlaybackStream(
+        next,
+        controller.signal,
+        "playback",
+        usePlayerStore.getState().audioQuality,
+      );
+      clearTimeout(timeout);
+      if (epoch !== this.crossfadeEpoch) return;
+      if (stream.expiresAtMs !== null && Date.now() >= stream.expiresAtMs - 15_000) return;
+      if (usePlayerStore.getState().status !== "playing") return;
+
+      const payload: NativeLoadPayload = {
+        url: stream.url,
+        mimeType: stream.mimeType,
+        trackId: next.id,
+        title: next.title,
+        artist: next.artists || "",
+        album:
+          typeof next.album === "string"
+            ? next.album
+            : (next.album as { title?: string } | undefined)?.title || "Liner",
+        coverUrl: next.coverUrl || "",
+        durationMs: next.durationMs || 0,
+        startMs: 0,
+      };
+      this.bridge.audioCrossfadeLoad(JSON.stringify(payload));
+
+      // Fit the blend to the time actually left right now, not when we decided.
+      const live = this.readState();
+      const remainingNow = (live?.durationMs ?? 0) - (live?.positionMs ?? 0);
+      const window = Math.max(
+        1_000,
+        Math.min(windowMs, remainingNow > 0 ? remainingNow : windowMs),
+      );
+      this.bridge.audioCrossfadeStart(window);
+      this.crossfadeTrackId = next.id;
+      log("cyan", "audio", `native crossfade armed (${window}ms into "${next.title}")`);
+    } catch (err) {
+      if (epoch === this.crossfadeEpoch) {
+        log(
+          "yellow",
+          "audio",
+          `crossfade skipped for "${next.title}": ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    } finally {
+      this.crossfadeInFlight = false;
+    }
+  }
+
+  private cancelCrossfade(): void {
+    this.crossfadeEpoch += 1;
+    this.crossfadeInFlight = false;
+    if (this.crossfadeTrackId === null) return;
+    this.crossfadeTrackId = null;
+    this.bridge.audioCrossfadeCancel();
+    this.nativeVolume = usePlayerStore.getState().volume;
+    log("cyan", "audio", "native crossfade cancelled");
   }
 
   public async preloadTrack(track: Track): Promise<void> {
@@ -261,6 +385,22 @@ export class AndroidPlayerRuntime {
   }
 
   public async loadAndPlay(track: Track, startPositionMs = 0): Promise<void> {
+    if (this.adoptTrackId === track.id) {
+      // Queue advance after a completed crossfade: the native side is already
+      // playing this track mid-song — adopt it instead of reloading.
+      this.adoptTrackId = null;
+      const live = this.readState();
+      const store = usePlayerStore.getState();
+      if (live?.trackId === track.id && live.status === "playing") {
+        if (typeof live.positionMs === "number" && live.positionMs >= 0) {
+          store.setPosition(live.positionMs);
+        }
+        store.setStatus("playing");
+        log("green", "playback", `adopted crossfaded track "${track.title}"`);
+        return;
+      }
+    }
+    this.cancelCrossfade();
     const epoch = ++this.loadEpoch;
 
     if (this.currentTrackId !== track.id) {
@@ -357,6 +497,7 @@ export class AndroidPlayerRuntime {
   }
 
   public pause(): void {
+    this.cancelCrossfade();
     this.loadEpoch += 1;
     this.loadAbort?.abort();
     this.loadAbort = null;
@@ -380,6 +521,7 @@ export class AndroidPlayerRuntime {
   }
 
   public seek(positionMs: number): void {
+    this.cancelCrossfade();
     const store = usePlayerStore.getState();
     // Seeking away from the tail cancels an in-progress end-of-song fade so the
     // track isn't left muted; the next poll restarts it if we land back in the
@@ -401,6 +543,7 @@ export class AndroidPlayerRuntime {
   }
 
   public cancelPendingLoad(): void {
+    this.cancelCrossfade();
     this.loadEpoch += 1;
     this.loadAbort?.abort();
     this.loadAbort = null;
@@ -490,6 +633,7 @@ export class AndroidPlayerRuntime {
     switch (state.status) {
       case "playing":
         if (store.status !== "playing") store.setStatus("playing");
+        this.maybeStartCrossfade(state);
         this.maybeStartEndFade(state);
         this.maybeCacheAudio();
         break;
