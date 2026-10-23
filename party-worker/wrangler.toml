@@ -1,0 +1,13 @@
+name = "liner-party"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+
+# One Durable Object per six-digit code: strongly consistent reads, and the
+# room deletes itself from an alarm after ten minutes.
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]

@@ -10,6 +10,16 @@ import { useAuthStore } from "@/features/auth";
 import { PartyConnection, type PartyMessage } from "./partySession";
 import { usePartyStore } from "./store/partyStore";
 import { broadcastHostState } from "./hooks/usePartySync";
+import {
+  closeRelayRoom,
+  createRelayRoom,
+  fetchRelayOffer,
+  isAbortError,
+  isPartyRelayEnabled,
+  normalizeJoinCode,
+  submitRelayAnswer,
+  waitForRelayAnswer,
+} from "./partyRelay";
 
 /**
  * ICE either establishes within a few seconds or never will (STUN-only, no
@@ -21,6 +31,10 @@ const CONNECT_TIMEOUT_MS = 25_000;
 let pendingHostId: string | null = null;
 let hostTimer: number | null = null;
 let guestTimer: number | null = null;
+
+/** Relay mode: the six-digit room and the poll waiting for the guest's answer. */
+let hostRelayCode: string | null = null;
+let hostRelayAbort: AbortController | null = null;
 
 function tr(key: string, vars?: Record<string, string | number>): string {
   return createTranslatorSync(getStoredLocale())(key, vars);
@@ -34,6 +48,16 @@ function clearHostTimer(): void {
 function clearGuestTimer(): void {
   if (guestTimer !== null) window.clearTimeout(guestTimer);
   guestTimer = null;
+}
+
+/** Drop the relay room and stop polling it — the invite is no longer useful. */
+function clearHostRelay(): void {
+  hostRelayAbort?.abort();
+  hostRelayAbort = null;
+  if (hostRelayCode) {
+    void closeRelayRoom(hostRelayCode);
+    hostRelayCode = null;
+  }
 }
 
 function ownName(): string {
@@ -60,6 +84,7 @@ export function startHostParty(): void {
   const store = usePartyStore.getState();
   if (store.role === "guest") return;
   clearHostTimer();
+  clearHostRelay();
 
   if (pendingHostId) {
     const stale = store.hostConnections.get(pendingHostId);
@@ -95,19 +120,41 @@ export function startHostParty(): void {
   store.hostConnections.set(id, conn);
   pendingHostId = id;
 
-  conn
-    .createInviteCode()
-    .then((code) => {
+  void (async () => {
+    try {
+      const invite = await conn.createInviteCode();
       // A newer invite may have superseded this one while ICE gathered.
       if (pendingHostId !== id) return;
-      usePartyStore.setState({ phase: "invite-ready", code });
-    })
-    .catch(() => {
-      if (pendingHostId === id) pendingHostId = null;
+
+      if (!isPartyRelayEnabled()) {
+        usePartyStore.setState({ phase: "invite-ready", code: invite });
+        return;
+      }
+
+      const joinCode = await createRelayRoom(invite);
+      if (pendingHostId !== id) {
+        void closeRelayRoom(joinCode);
+        return;
+      }
+
+      hostRelayCode = joinCode;
+      usePartyStore.setState({ phase: "invite-ready", code: joinCode });
+
+      const abort = new AbortController();
+      hostRelayAbort = abort;
+      const answer = await waitForRelayAnswer(joinCode, abort.signal);
+      if (pendingHostId !== id) return;
+      await acceptAnswer(id, conn, answer);
+    } catch (error) {
+      if (isAbortError(error)) return;
+      if (pendingHostId !== id) return;
+      pendingHostId = null;
       usePartyStore.getState().hostConnections.delete(id);
       conn.close();
+      clearHostRelay();
       failHost(tr("party.error_invite_failed"));
-    });
+    }
+  })();
 }
 
 function onHostOpen(id: string, conn: PartyConnection): void {
@@ -172,15 +219,12 @@ function onHostClose(id: string): void {
   });
 }
 
-/** Host: apply the pasted reply; the channel opens once ICE connects. */
-export async function submitHostAnswer(): Promise<void> {
-  const store = usePartyStore.getState();
-  const answer = store.answerInput.trim();
-  const connId = pendingHostId;
-  if (!answer || !connId) return;
-  const conn = store.hostConnections.get(connId);
-  if (!conn) return;
-
+/** Host: apply the guest's answer; the channel opens once ICE connects. */
+async function acceptAnswer(
+  connId: string,
+  conn: PartyConnection,
+  answer: string,
+): Promise<void> {
   clearHostTimer();
   usePartyStore.setState({ phase: "connecting", error: null });
 
@@ -195,6 +239,9 @@ export async function submitHostAnswer(): Promise<void> {
     return;
   }
 
+  // The room has served its purpose; free it rather than waiting for expiry.
+  clearHostRelay();
+
   hostTimer = window.setTimeout(() => {
     if (conn.isOpen) return;
     if (pendingHostId === connId) pendingHostId = null;
@@ -204,6 +251,18 @@ export async function submitHostAnswer(): Promise<void> {
     conn.close();
     failHost(tr("party.error_timeout"));
   }, CONNECT_TIMEOUT_MS);
+}
+
+/** Host: apply the pasted reply (manual mode, no relay configured). */
+export async function submitHostAnswer(): Promise<void> {
+  const store = usePartyStore.getState();
+  const answer = store.answerInput.trim();
+  const connId = pendingHostId;
+  if (!answer || !connId) return;
+  const conn = store.hostConnections.get(connId);
+  if (!conn) return;
+
+  await acceptAnswer(connId, conn, answer);
 }
 
 // --- Guest ----------------------------------------------------------------
@@ -251,10 +310,22 @@ export async function joinParty(inviteCode: string): Promise<void> {
 
   usePartyStore.setState({ guestConnection: conn });
 
+  // Six digits mean relay mode; anything else is still a pasted invite card.
+  const joinCode = isPartyRelayEnabled() ? normalizeJoinCode(code) : null;
+
   try {
-    const answer = await conn.createAnswerCode(code);
-    usePartyStore.setState({ phase: "answer-ready", code: answer });
-    // The host may never paste the reply — don't wait forever.
+    const invite = joinCode ? await fetchRelayOffer(joinCode) : code;
+    const answer = await conn.createAnswerCode(invite);
+
+    if (joinCode) {
+      await submitRelayAnswer(joinCode, answer);
+      // Nothing left to hand over — the host picks the answer up itself.
+      usePartyStore.setState({ phase: "connecting", code: null });
+    } else {
+      usePartyStore.setState({ phase: "answer-ready", code: answer });
+    }
+
+    // The other side may never connect — don't wait forever.
     guestTimer = window.setTimeout(() => {
       if (conn.isOpen) return;
       failGuest(tr("party.error_timeout"));
@@ -270,6 +341,7 @@ export async function joinParty(inviteCode: string): Promise<void> {
 export function leaveParty(): void {
   clearHostTimer();
   clearGuestTimer();
+  clearHostRelay();
   const store = usePartyStore.getState();
   store.reset();
   store.setOpen(false);

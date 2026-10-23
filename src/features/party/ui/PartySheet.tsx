@@ -19,6 +19,7 @@ import {
   startHostParty,
   submitHostAnswer,
 } from "../partyController";
+import { PARTY_JOIN_CODE_LENGTH, isPartyRelayEnabled } from "../partyRelay";
 
 const font = { fontFamily: "var(--font-inter), sans-serif" } as const;
 
@@ -165,6 +166,10 @@ export function PartySheet() {
   const [inviteInput, setInviteInput] = useState("");
   const [joinForm, setJoinForm] = useState(false);
 
+  // With a relay deployed the whole handshake is one six-digit code; without
+  // one the sheet keeps the original paste-the-code flow untouched.
+  const relay = isPartyRelayEnabled();
+
   useEffect(() => {
     if (phase === "idle") setJoinForm(false);
     else if (phase === "joining") setInviteInput("");
@@ -236,15 +241,35 @@ export function PartySheet() {
               void joinParty(inviteInput);
             }}
           >
-            <textarea
-              autoFocus
-              rows={4}
-              placeholder={t("party.invite_placeholder")}
-              value={inviteInput}
-              onChange={(e) => setInviteInput(e.target.value)}
-              className={inputClass}
-              style={font}
-            />
+            {relay ? (
+              <input
+                autoFocus
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={PARTY_JOIN_CODE_LENGTH}
+                placeholder={t("party.join_code_placeholder")}
+                value={inviteInput}
+                onChange={(e) =>
+                  setInviteInput(
+                    e.target.value
+                      .replace(/\D/g, "")
+                      .slice(0, PARTY_JOIN_CODE_LENGTH),
+                  )
+                }
+                className={`${inputClass} text-center text-[22px] tracking-[0.3em]`}
+                style={font}
+              />
+            ) : (
+              <textarea
+                autoFocus
+                rows={4}
+                placeholder={t("party.invite_placeholder")}
+                value={inviteInput}
+                onChange={(e) => setInviteInput(e.target.value)}
+                className={inputClass}
+                style={font}
+              />
+            )}
             <div className="flex justify-end gap-[8px]">
               <Button
                 type="button"
@@ -258,7 +283,11 @@ export function PartySheet() {
                 type="submit"
                 variant="primary"
                 size="sm"
-                disabled={!inviteInput.trim()}
+                disabled={
+                  relay
+                    ? inviteInput.length !== PARTY_JOIN_CODE_LENGTH
+                    : !inviteInput.trim()
+                }
               >
                 {t("party.continue")}
               </Button>
@@ -274,39 +303,59 @@ export function PartySheet() {
           <SpinnerRow label={t("party.creating_invite")} />
         )}
 
-        {phase === "invite-ready" && code && (
-          <div className="flex flex-col gap-[8px]">
-            <StepLabel>{t("party.step_share_invite")}</StepLabel>
-            <CodeBox value={code} />
-            <ShareCopyRow text={code} />
-            <StepLabel className="mt-[6px]">
-              {t("party.step_paste_reply")}
-            </StepLabel>
-            <textarea
-              rows={4}
-              placeholder={t("party.reply_placeholder")}
-              value={answerInput}
-              onChange={(e) => setAnswerInput(e.target.value)}
-              className={inputClass}
-              style={font}
-            />
-            {error && (
-              <span className="text-[12px] text-accent-primary" style={font}>
-                {error}
-              </span>
-            )}
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              className="w-full"
-              disabled={!answerInput.trim()}
-              onClick={() => void submitHostAnswer()}
-            >
-              {t("party.connect")}
-            </Button>
-          </div>
-        )}
+        {phase === "invite-ready" && code &&
+          (relay ? (
+            <div className="flex flex-col gap-[8px]">
+              <StepLabel>{t("party.step_share_code")}</StepLabel>
+              <div
+                className="flex items-center justify-center rounded-md border border-border-primary bg-bg-primary py-[14px]"
+                style={font}
+              >
+                <span className="select-all font-mono text-[30px] font-[600] tracking-[0.32em] text-text-primary">
+                  {code}
+                </span>
+              </div>
+              <ShareCopyRow text={code} />
+              <SpinnerRow label={t("party.waiting_guest")} />
+              {error && (
+                <span className="text-[12px] text-accent-primary" style={font}>
+                  {error}
+                </span>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-[8px]">
+              <StepLabel>{t("party.step_share_invite")}</StepLabel>
+              <CodeBox value={code} />
+              <ShareCopyRow text={code} />
+              <StepLabel className="mt-[6px]">
+                {t("party.step_paste_reply")}
+              </StepLabel>
+              <textarea
+                rows={4}
+                placeholder={t("party.reply_placeholder")}
+                value={answerInput}
+                onChange={(e) => setAnswerInput(e.target.value)}
+                className={inputClass}
+                style={font}
+              />
+              {error && (
+                <span className="text-[12px] text-accent-primary" style={font}>
+                  {error}
+                </span>
+              )}
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                className="w-full"
+                disabled={!answerInput.trim()}
+                onClick={() => void submitHostAnswer()}
+              >
+                {t("party.connect")}
+              </Button>
+            </div>
+          ))}
 
         {phase === "connecting" && (
           <SpinnerRow label={t("party.connecting")} />

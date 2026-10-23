@@ -39,6 +39,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_API_URL: https://api.tryliner.fun
           VITE_COVERS_PROXY_URL: https://covers.tryliner.fun
+          VITE_PARTY_RELAY_URL: ${{ vars.VITE_PARTY_RELAY_URL }}
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
@@ -78,6 +79,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_API_URL: https://api.tryliner.fun
           VITE_COVERS_PROXY_URL: https://covers.tryliner.fun
+          VITE_PARTY_RELAY_URL: ${{ vars.VITE_PARTY_RELAY_URL }}
 
       - name: Verify native snap preview add-on is packaged
         shell: pwsh
@@ -125,6 +127,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
           VITE_API_URL: https://api.tryliner.fun
           VITE_COVERS_PROXY_URL: https://covers.tryliner.fun
+          VITE_PARTY_RELAY_URL: ${{ vars.VITE_PARTY_RELAY_URL }}
 
       - name: Upload macOS Artifacts
         uses: actions/upload-artifact@v4
@@ -166,6 +169,7 @@ jobs:
         env:
           VITE_API_URL: https://api.tryliner.fun
           VITE_COVERS_PROXY_URL: https://covers.tryliner.fun
+          VITE_PARTY_RELAY_URL: ${{ vars.VITE_PARTY_RELAY_URL }}
 
       - name: Setup JDK 17
         uses: actions/setup-java@v4
@@ -247,6 +251,7 @@ jobs:
         env:
           VITE_API_URL: https://api.tryliner.fun
           VITE_COVERS_PROXY_URL: https://covers.tryliner.fun
+          VITE_PARTY_RELAY_URL: ${{ vars.VITE_PARTY_RELAY_URL }}
 
       - name: Sync renderer into the iOS bundle
         run: bash ios/sync-web.sh
