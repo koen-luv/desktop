@@ -19,10 +19,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "electron:build": "tsc -b && vite build && electron-builder",
-    "electron:build:linux": "tsc -b && vite build && electron-builder --linux",
-    "electron:build:win": "pnpm native:build && tsc -b && vite build && electron-builder --win",
-    "electron:build:mac": "tsc -b && vite build && electron-builder --mac",
-    "native:build": "pnpm dlx node-gyp@11 rebuild --directory native/snap-preview && node scripts/verify-native-addon.cjs"
+    "electron:build:linux": "tsc -b && vite build && electron-builder --linux --publish never",
+    "electron:build:win": "pnpm native:build && tsc -b && vite build && electron-builder --win --publish never",
+    "electron:build:mac": "tsc -b && vite build && electron-builder --mac --publish never",
+    "native:build": "pnpm dlx node-gyp@latest rebuild --directory native/snap-preview && node scripts/verify-native-addon.cjs"
   },
   "build": {
     "appId": "com.hkamori.liner",
