@@ -20,6 +20,10 @@ when it expires.
 
 ## Deploy
 
+Currently deployed at **https://liner-party.lucabatarcian.workers.dev** and wired
+in as the `VITE_PARTY_RELAY_URL` repository variable, so release builds pick it
+up automatically.
+
 ```bash
 cd party-worker
 npx wrangler login          # once
