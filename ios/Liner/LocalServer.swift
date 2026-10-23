@@ -1,13 +1,6 @@
 import Foundation
 import Network
 
-/// Serves the packaged renderer (`Web/` in the app bundle) over loopback HTTP.
-///
-/// Android can hand `https://appassets.androidplatform.net/` to its WebView
-/// through `WebViewAssetLoader`; WebKit has no equivalent, and `file://` URLs
-/// would cost us localStorage and IndexedDB (the app keeps its session there).
-/// A loopback origin is a real, potentially-trustworthy origin, so storage,
-/// service workers and `crypto.subtle` behave exactly like they do in Safari.
 final class LocalServer {
     static let shared = LocalServer()
 
@@ -20,7 +13,6 @@ final class LocalServer {
         return base.appendingPathComponent("Web", isDirectory: true)
     }
 
-    /// Starts the listener (idempotent) and returns the loopback port.
     func start() throws -> UInt16 {
         if port != 0 { return port }
 
@@ -59,7 +51,6 @@ final class LocalServer {
         return resolved
     }
 
-    // MARK: - Connections
 
     private func accept(_ connection: NWConnection) {
         connection.stateUpdateHandler = { state in
@@ -96,7 +87,6 @@ final class LocalServer {
         }
     }
 
-    // MARK: - Request handling
 
     private func respond(_ connection: NWConnection, head: String) {
         let lines = head.components(separatedBy: "\r\n")
@@ -140,8 +130,6 @@ final class LocalServer {
             return
         }
 
-        // index.html must never be cached: a stale shell would keep pointing at
-        // the previous JS bundle after an app update (Android uses LOAD_NO_CACHE).
         let cacheControl = relative == "index.html" ? "no-store" : "no-cache"
         var headers: [String: String] = [
             "Content-Type": Self.mimeType(forExtension: fileURL.pathExtension),
@@ -190,7 +178,6 @@ final class LocalServer {
         })
     }
 
-    // MARK: - Helpers
 
     private static func parseRange(_ header: String, total: Int) -> Range<Int>? {
         guard total > 0 else { return nil }
@@ -201,7 +188,6 @@ final class LocalServer {
         let lower: Int
         let upper: Int
         if bounds[0].isEmpty {
-            // "bytes=-500" — suffix range.
             guard let suffix = Int(bounds[1]), suffix > 0 else { return nil }
             lower = max(0, total - suffix)
             upper = total

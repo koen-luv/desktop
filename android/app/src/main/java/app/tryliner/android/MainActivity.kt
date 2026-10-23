@@ -142,9 +142,6 @@ class MainActivity : ComponentActivity() {
         settings.allowFileAccessFromFileURLs = false
         settings.allowUniversalAccessFromFileURLs = false
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-        // The WebView serves the app shell from the APK assets, so there is
-        // nothing worth caching: without this, Chromium keeps serving a stale
-        // index.html (and its old JS bundle) after the app is updated.
         settings.cacheMode = WebSettings.LOAD_NO_CACHE
         settings.loadsImagesAutomatically = true
         settings.blockNetworkImage = false
@@ -264,8 +261,6 @@ class MainActivity : ComponentActivity() {
                 isUserGesture: Boolean,
                 resultMsg: android.os.Message,
             ): Boolean {
-                // External links are opened in the system browser, never in an
-                // uncontrolled popup WebView.
                 return false
             }
         }
@@ -391,8 +386,6 @@ class MainActivity : ComponentActivity() {
 
     private fun finishAfterBack() {
         if (isFinishing) return
-        // Keep the WebView and its queue alive while audio is active, exactly
-        // like a music app going to the background. Without playback, exit.
         if (PlaybackHolder.isPlaying()) {
             moveTaskToBack(true)
         } else {
@@ -438,9 +431,6 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onPause() {
-        // Intentionally do not call webView.onPause(): the renderer owns the
-        // queue and must keep advancing tracks while ExoPlayer plays in the
-        // background.
         super.onPause()
     }
 

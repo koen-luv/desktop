@@ -1,14 +1,5 @@
 package app.tryliner.android
 
-/**
- * Bridges native playback events (ended, errors, notification next/previous)
- * into the WebView without coupling the media service to the Activity.
- *
- * Events emitted while no WebView is attached (cold start from Android Auto,
- * activity destroyed) are queued and flushed as soon as an emitter registers,
- * so an early play request still reaches the renderer. The queue is bounded;
- * the oldest events are dropped first.
- */
 object NativeEvents {
     private const val MAX_PENDING = 32
 
@@ -32,8 +23,6 @@ object NativeEvents {
             if (pending.size >= MAX_PENDING) pending.removeFirst()
             pending.addLast(type to payloadJson)
         }
-        // The emitter may have attached between the check above and the queue
-        // write; flush again so the event is not stranded until the next attach.
         emitter?.let(::flush)
     }
 
@@ -47,7 +36,6 @@ object NativeEvents {
             try {
                 target.invoke(type, payload)
             } catch (_: Exception) {
-                // A flush into a dying WebView is best effort.
             }
         }
     }

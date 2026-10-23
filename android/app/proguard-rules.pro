@@ -1,4 +1,3 @@
-# JavaScript bridge surface
 -keepclassmembers class fun.tryliner.android.LinerBridge {
     public *;
 }

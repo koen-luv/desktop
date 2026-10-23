@@ -7,17 +7,6 @@ import java.io.FilterInputStream
 import java.io.InputStream
 import java.util.Locale
 
-/**
- * The production API and several artwork CDNs emit more than one
- * Access-Control-Allow-Origin header, which Chromium rejects outright. This
- * proxy re-serves GET/HEAD (and answers preflight OPTIONS) with exactly one
- * correct CORS header so the unmodified renderer keeps working. Request bodies
- * are not available to shouldInterceptRequest, so write methods are executed by
- * the async native bridge instead.
- *
- * SSE lyric streaming keeps working: the response body is streamed straight
- * through from OkHttp.
- */
 object CorsProxy {
     private val apiHosts = setOf("api.tryliner.fun", "covers.tryliner.fun", "link.tryliner.fun")
     private val imageExtensions = setOf("jpg", "jpeg", "png", "webp", "gif", "avif")
@@ -65,10 +54,6 @@ object CorsProxy {
     private fun originOf(request: WebResourceRequest): String =
         request.requestHeaders["Origin"]?.takeIf { it.isNotBlank() } ?: "*"
 
-    /**
-     * Synthesizes the preflight response. The real server already accepts these
-     * headers, but its duplicated ACAO header makes Chromium drop it.
-     */
     private fun preflight(request: WebResourceRequest): WebResourceResponse {
         val origin = originOf(request)
         val requestedHeaders = request.requestHeaders["Access-Control-Request-Headers"]
@@ -109,8 +94,6 @@ object CorsProxy {
             if (!hasUserAgent) builder.header("User-Agent", Http.userAgent)
             if (request.method == "HEAD") builder.head()
 
-            // The response must stay open until the WebView finishes reading the
-            // stream, so it is closed by ClosingStream rather than a use{} block.
             val response = Http.client.newCall(builder.build()).execute()
             try {
                 val body = response.body

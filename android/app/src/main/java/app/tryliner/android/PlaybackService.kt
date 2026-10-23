@@ -35,18 +35,6 @@ import com.google.common.util.concurrent.MoreExecutors
 import org.json.JSONObject
 import java.util.concurrent.Executors
 
-/**
- * Foreground media service. ExoPlayer handles audio focus, headphone unplug,
- * buffering, stream errors and metadata; MediaSession exposes the lock screen,
- * Bluetooth and Android Auto controllers while this service renders the media
- * notification itself so track info and controls are always present.
- *
- * It is a [MediaLibraryService] so MediaBrowser clients (Android Auto, Android
- * TV, Bluetooth sources) can browse Recents/Playlists/Queue and search. The
- * browse tree is served from the WebView renderer through [AutoBrowse]; play
- * requests funnel into [MediaSession.Callback.onSetMediaItems], where URI-less
- * items are play intents that the renderer resolves with the real stream.
- */
 class PlaybackService : MediaLibraryService() {
     private var player: ExoPlayer? = null
     private var session: MediaLibrarySession? = null
@@ -82,11 +70,6 @@ class PlaybackService : MediaLibraryService() {
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
 
-        // Streaming CDNs hand out cross-protocol redirects and expect a normal
-        // player user agent, so the data source is configured explicitly.
-        // googlevideo answers HTTP 403 to a request without a Range header, and
-        // ExoPlayer omits Range on its first (position 0) request, so a default
-        // is provided here; real range requests still override it while seeking.
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent(Http.userAgent)
             .setConnectTimeoutMs(20_000)
@@ -99,13 +82,11 @@ class PlaybackService : MediaLibraryService() {
                 ),
             )
 
-        // Cached downloads are played back as file:// URIs, so the resolving data
-        // source is required instead of the HTTP-only one.
         val dataSourceFactory = DefaultDataSource.Factory(this, httpDataSourceFactory)
 
         val exoPlayer = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
-            .setAudioAttributes(audioAttributes, /* handleAudioFocus = */ true)
+            .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .setSeekBackIncrementMs(5_000)
@@ -133,9 +114,6 @@ class PlaybackService : MediaLibraryService() {
             mediaSession.setSessionActivity(pendingIntent)
         }
 
-        // Media3 keeps its provider for the cases where it posts the notification
-        // itself (for example after a MediaController reconnect); it uses the same
-        // id and channel as the notification built here.
         val notificationProvider = DefaultMediaNotificationProvider.Builder(this)
             .setChannelId(NOTIFICATION_CHANNEL_ID)
             .setChannelName(R.string.playback_channel_name)
@@ -149,11 +127,6 @@ class PlaybackService : MediaLibraryService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session
 
-    /**
-     * Serves the browse tree to MediaBrowser clients. Roots and folders are
-     * static; leaf content is queried from the renderer through [AutoBrowse]
-     * and cached per served media id so [onGetItem] can answer synchronously.
-     */
     private val libraryCallback = object : MediaLibrarySession.Callback {
         override fun onMediaButtonEvent(
             session: MediaSession,
@@ -254,15 +227,6 @@ class PlaybackService : MediaLibraryService() {
             return rendererSearch(query)
         }
 
-        /**
-         * media3 converts Android Auto's playFromMediaId and playFromSearch
-         * into a setMediaItems call: URI-less items carry the mediaId (or the
-         * search query in requestMetadata) and are play intents for the
-         * renderer, which owns stream resolution and the queue. Returning an
-         * empty timeline acknowledges the intent without touching the real
-         * player; the renderer loads the stream through the normal pipeline.
-         * Controllers that pass real stream URIs keep the standard path.
-         */
         override fun onSetMediaItems(
             session: MediaSession,
             controllerInfo: MediaSession.ControllerInfo,
@@ -396,12 +360,6 @@ class PlaybackService : MediaLibraryService() {
 
     private fun servedItem(mediaId: String): MediaItem? = synchronized(servedLock) { served[mediaId] }
 
-    /**
-     * A track load starts this service before the stream is ready, so the service
-     * must satisfy the five second foreground contract itself. The notification
-     * built here is the real media notification (track, artist, controls) and is
-     * refreshed whenever playback state or metadata changes.
-     */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_PREVIOUS -> emitMediaCommand("previous")
@@ -426,11 +384,9 @@ class PlaybackService : MediaLibraryService() {
         try {
             startForeground(NOTIFICATION_ID, buildNotification())
         } catch (_: Exception) {
-            // startForeground can only fail if the process is already dying.
         }
     }
 
-    /** Re-renders the notification from the current player state. */
     fun refreshNotification() {
         val current = player ?: return
         if (current.mediaItemCount == 0) return
@@ -438,7 +394,6 @@ class PlaybackService : MediaLibraryService() {
             val manager = getSystemService(NotificationManager::class.java)
             manager.notify(NOTIFICATION_ID, buildNotification())
         } catch (_: Exception) {
-            // Notification updates are best effort.
         }
         loadArtwork(current.mediaMetadata.artworkUri?.toString())
     }
@@ -510,10 +465,6 @@ class PlaybackService : MediaLibraryService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-    /**
-     * Artwork is decoded off the main thread and cached per URL; a refresh is
-     * posted once so the notification picks the cover up when it is ready.
-     */
     private fun loadArtwork(url: String?) {
         if (url == null || url == currentArtworkUrl) return
         currentArtworkUrl = url
@@ -553,7 +504,6 @@ class PlaybackService : MediaLibraryService() {
         NativeEvents.emit("mediaCommand", "{\"command\":\"$command\"}")
     }
 
-    /** Releases the service again when a load never turned into real playback. */
     private fun scheduleIdleStop() {
         idleCheck?.let { handler.removeCallbacks(it) }
         val check = Runnable {
@@ -567,7 +517,6 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // Keep playing when the task is swiped away only while audio is active.
         if (player?.playWhenReady != true) {
             stopSelf()
         }

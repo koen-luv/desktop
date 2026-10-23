@@ -16,57 +16,18 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
-/**
- * Discord Rich Presence for the Android app — the Kotlin counterpart of
- * electron/discord.ts (same contract: raw state payloads in, activity built
- * natively, settings patches, status query).
- *
- * Discord's client serves a local RPC endpoint on localhost ports 6463..6472
- * (probed sequentially, as Discord's own docs prescribe). On desktop the
- * classic transport is a named pipe; the portable transport — and the only one
- * served over TCP — is WebSocket, which is also what the signed-in Discord
- * Android app accepts since Social SDK 1.10 shipped "Rich Presence via an
- * unauthenticated RPC transport". Both speak the same JSON protocol:
- * connect → READY dispatch → SET_ACTIVITY. SET_ACTIVITY needs no OAuth.
- *
- * Emulators have no Discord app, so the host loopback alias (10.0.2.2) is
- * probed as well; that reaches the Discord desktop client running on the
- * development machine and lets the debug build show real presence end to end.
- *
- * Every mutable field is confined to one daemon worker thread: entry points
- * post to it and OkHttp callbacks hop onto it, mirroring the single-threaded
- * event loop of the desktop manager (only the status snapshot is @Volatile
- * because getDiscordStatus() answers the WebView thread directly). Everything
- * fails soft — no Discord app or a dropped link just logs and retries with
- * the desktop's 2s → 60s backoff. Presence is a nicety; it must never affect
- * playback.
- */
 object DiscordRpc {
     private const val TAG = "LinerDiscordRpc"
 
-    /**
-     * The Android app ships its own Discord application id (the desktop build
-     * uses 1561339119617974362). RPC Origins must include `https://localhost`
-     * in the Developer Portal for this id.
-     */
     private const val APPLICATION_ID = "1462731846218416179"
 
-    /**
-     * Origin sent with the WebSocket upgrade. Discord verifies it against the
-     * RPC Origins registered for the application id and disconnects on a
-     * mismatch; the RPC docs recommend `https://localhost` for local clients.
-     */
     private const val ORIGIN = "https://localhost"
 
     private const val BASE_BACKOFF_MS = 2_000L
     private const val MAX_BACKOFF_MS = 60_000L
-    /** READY normally arrives unsolicited; past this delay we send the v1 handshake message once. */
     private const val HANDSHAKE_FALLBACK_MS = 1_500L
-    /** An open socket that never becomes READY within this window is treated as dead. */
     private const val READY_TIMEOUT_MS = 6_000L
 
-    // Sync pacing — identical numbers to electron/discord.ts so Discord sees
-    // the same rate of SET_ACTIVITY requests on both platforms.
     private const val SYNC_DEBOUNCE_MS = 1_000L
     private const val MIN_SYNC_INTERVAL_MS = 4_000L
 
@@ -80,12 +41,10 @@ object DiscordRpc {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(2, TimeUnit.SECONDS)
-        // Long-lived socket: no read timeout; protocol-level pings keep it healthy.
         .readTimeout(0, TimeUnit.MILLISECONDS)
         .pingInterval(30, TimeUnit.SECONDS)
         .build()
 
-    /** True on the Android emulator: no local Discord there, probe the host too. */
     private val isEmulator by lazy {
         Build.FINGERPRINT.startsWith("generic") ||
             Build.FINGERPRINT.contains("emulator") ||
@@ -97,10 +56,8 @@ object DiscordRpc {
             Build.PRODUCT.contains("sdk_gphone")
     }
 
-    // ── Worker-thread state ────────────────────────────────────────────────
     private var generation = 0
 
-    // Settings mirror DEFAULT_SETTINGS in electron/discord.ts.
     private var enabled = true
     private var statusDisplayType = "artist"
     private var showArtwork = true
@@ -125,30 +82,24 @@ object DiscordRpc {
     private var lastSyncAt = 0L
     private var syncFuture: ScheduledFuture<*>? = null
 
-    /** Status snapshot: the only state the WebView thread reads directly. */
     @Volatile private var statusConnected = false
     @Volatile private var statusUsername: String? = null
 
-    // ── API (called from the WebView thread) ───────────────────────────────
 
-    /** Player state payload (a serialized DiscordRpcStatePayload). */
     fun updateState(payloadJson: String) {
         worker.execute { doUpdateState(payloadJson) }
     }
 
-    /** Settings patch (a serialized Partial<DiscordRpcSettings>). */
     fun updateSettings(settingsJson: String) {
         worker.execute { doUpdateSettings(settingsJson) }
     }
 
-    /** `{ "connected": Boolean, "username": String? }` — answered off-thread. */
     fun getStatus(): String =
         JSONObject()
             .put("connected", statusConnected)
             .putOpt("username", statusUsername)
             .toString()
 
-    // ── State machine (worker thread only) ─────────────────────────────────
 
     private fun doUpdateState(rawPayload: String) {
         val payload = try {
@@ -161,8 +112,6 @@ object DiscordRpc {
 
         if (!enabled) return
         if (!connecting && socket == null) {
-            // First state push opens the connection (desktop connects eagerly
-            // in its constructor; Android waits for the renderer to be alive).
             connect()
             return
         }
@@ -193,9 +142,7 @@ object DiscordRpc {
         val requestedType = patch.optString("statusDisplayType", "")
         if (requestedType in validStatusTypes) statusDisplayType = requestedType
 
-        // Master switch toggled: connect or tear down like the desktop manager.
         if (!patch.has("enabled")) {
-            // Display flags changed: refresh the current activity.
             if (enabled && ready) scheduleSync()
             return
         }
@@ -214,7 +161,7 @@ object DiscordRpc {
             lastSentJson = null
             backoffMs = BASE_BACKOFF_MS
             if (old != null) {
-                if (wasReady) sendActivity(old, null, force = true) // best-effort clear
+                if (wasReady) sendActivity(old, null, force = true)
                 old.close(1000, "disabled")
             }
             Log.i(TAG, "disabled by settings")
@@ -238,7 +185,6 @@ object DiscordRpc {
         if (!enabled || connecting || socket != null) return
         val url = candidates.getOrNull(candidateIndex)
         if (url == null) {
-            // Every candidate refused: start the walk over after a backoff pause.
             candidateIndex = 0
             scheduleReconnect()
             return
@@ -261,7 +207,6 @@ object DiscordRpc {
 
         override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
             worker.execute { Log.i(TAG, "server closing: $code ${reason.ifBlank { "(no reason)" }}") }
-            // Acknowledge the close so the handshake completes cleanly.
             val safeCode = if (code in 1000..4999 && code != 1005 && code != 1006 && code != 1015) code else 1000
             try {
                 webSocket.close(safeCode, null)
@@ -294,19 +239,15 @@ object DiscordRpc {
         }
         socket = ws
         ready = false
-        candidateIndex = 0 // found a live listener; later drops retry through backoff
+        candidateIndex = 0
         lastSentJson = null
         Log.i(TAG, "socket open, waiting for READY")
 
-        // READY usually arrives unsolicited — the URL already carries v and
-        // client_id. If the server waits for the handshake message instead,
-        // send it after a short beat.
         worker.schedule({
             if (attempt == generation && socket === ws && !ready) {
                 ws.send(JSONObject().put("v", 1).put("client_id", APPLICATION_ID).toString())
             }
         }, HANDSHAKE_FALLBACK_MS, TimeUnit.MILLISECONDS)
-        // Safety net: an open socket that never becomes READY is dead weight.
         worker.schedule({
             if (attempt == generation && socket === ws && !ready) {
                 Log.i(TAG, "no READY within ${READY_TIMEOUT_MS}ms; dropping socket")
@@ -346,14 +287,10 @@ object DiscordRpc {
         if (socket !== ws) return
         ready = true
         backoffMs = BASE_BACKOFF_MS
-        // Discord's READY dispatch carries the signed-in user (the desktop
-        // library exposes it as client.user for discord:get-status).
         val user = message.optJSONObject("data")?.optJSONObject("user")
         statusUsername = user?.optString("username", "")?.takeIf { it.isNotEmpty() }
         statusConnected = true
         Log.i(TAG, "READY — Discord session established${statusUsername?.let { " as $it" } ?: ""}")
-        // Push whatever the renderer last reported (building it fresh, so
-        // display settings applied before the link came up are honoured).
         if (latestPayload != null) scheduleSync()
     }
 
@@ -371,13 +308,12 @@ object DiscordRpc {
             statusConnected = false
             statusUsername = null
         }
-        if (!wasConnecting && !wasSocket) return // already accounted for
+        if (!wasConnecting && !wasSocket) return
         if (!enabled) {
             Log.i(TAG, "connection down ($why); disabled")
             return
         }
         if (wasConnecting) {
-            // Never opened: walk the candidate ports (refusals are instant locally).
             Log.d(TAG, "candidate refused: $why")
             candidateIndex += 1
             if (candidateIndex >= candidates.size) {
@@ -392,9 +328,7 @@ object DiscordRpc {
         }
     }
 
-    // ── Activity sync ──────────────────────────────────────────────────────
 
-    /** Debounced (1s) and rate-limited (4s) exactly like the desktop manager. */
     private fun scheduleSync() {
         syncFuture?.cancel(false)
         val now = System.currentTimeMillis()
@@ -437,12 +371,6 @@ object DiscordRpc {
         sendActivity(ws, buildActivity(payload, track, isPlaying, isPaused)?.toString())
     }
 
-    /**
-     * Mirrors syncActivity() in electron/discord.ts: statusDisplayType switch,
-     * sanitised details/state, live progress timestamps, artwork assets and
-     * the two action buttons — all serialized the way @xhayper/discord-rpc
-     * formats SET_ACTIVITY for the wire.
-     */
     private fun buildActivity(
         payload: JSONObject,
         track: JSONObject,
@@ -460,29 +388,29 @@ object DiscordRpc {
         var activityName = "Liner"
         var detailsText = title
         var stateText = if (isPaused) "$artist (Paused)" else artist
-        var statusDisplay = 1 // 1 = "Listening to [Artist]"
+        var statusDisplay = 1
         when (statusDisplayType) {
             "title" -> {
                 activityName = title
-                statusDisplay = 2 // 2 = "Listening to [Title]"
+                statusDisplay = 2
                 detailsText = if (isPaused) "$title (Paused)" else title
                 stateText = artist
             }
             "app" -> {
                 activityName = "Liner"
-                statusDisplay = 0 // 0 = "Listening to Liner"
+                statusDisplay = 0
                 detailsText = title
                 stateText = if (isPaused) "$artist (Paused)" else artist
             }
             "artist_title" -> {
                 activityName = "$artist - $title"
-                statusDisplay = 1 // 1 = "Listening to [Artist - Title]"
+                statusDisplay = 1
                 detailsText = title
                 stateText = if (isPaused) "$artist - $title (Paused)" else "$artist - $title"
             }
             "title_artist" -> {
                 activityName = "$title - $artist"
-                statusDisplay = 2 // 2 = "Listening to [Title - Artist]"
+                statusDisplay = 2
                 detailsText = if (isPaused) "$title - $artist (Paused)" else "$title - $artist"
                 stateText = artist
             }
@@ -497,7 +425,7 @@ object DiscordRpc {
         val activity = try {
             JSONObject()
                 .put("name", sanitize(activityName) ?: "Liner")
-                .put("type", 2) // 2 = Listening -> renders "Listening to" + live progress bar
+                .put("type", 2)
                 .put("created_at", System.currentTimeMillis())
                 .put("instance", false)
                 .put("status_display_type", statusDisplay)
@@ -507,7 +435,6 @@ object DiscordRpc {
         sanitize(detailsText)?.let { activity.put("details", it) }
         sanitize(stateText)?.let { activity.put("state", it) }
 
-        // Timestamps (media timeline / live progress bar like Spotify).
         if (isPlaying && showTime && durationMs > 0) {
             val now = System.currentTimeMillis()
             val elapsedSincePayload = maxOf(0L, now - latestPayloadReceivedAt)
@@ -520,7 +447,6 @@ object DiscordRpc {
             )
         }
 
-        // Assets: large artwork (cover) + small badge (artist photo).
         val assets = JSONObject()
         val coverImage = toDiscordImageUrl(track.optString("coverUrl"))
         if (showArtwork && coverImage != null) {
@@ -534,7 +460,6 @@ object DiscordRpc {
         }
         if (assets.length() > 0) activity.put("assets", assets)
 
-        // Action buttons linking to the song or tryliner.fun (max 2).
         val buttons = JSONArray()
         val trackId = track.optString("id", "")
         if (showButton && trackId.isNotEmpty()) {
@@ -556,7 +481,6 @@ object DiscordRpc {
         if (text.isNullOrBlank()) return null
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return null
-        // Discord drops single-char details/state lines; pad like the desktop does.
         if (trimmed.length == 1) return "$trimmed "
         return if (trimmed.length > MAX_TEXT_LENGTH) trimmed.substring(0, MAX_TEXT_LENGTH) else trimmed
     }
@@ -572,7 +496,7 @@ object DiscordRpc {
 
     private fun sendActivity(ws: WebSocket, activityJson: String?, force: Boolean = false) {
         val normalized = activityJson ?: "null"
-        if (!force && normalized == lastSentJson) return // avoid hammering Discord's limit
+        if (!force && normalized == lastSentJson) return
         val payload = try {
             JSONObject()
                 .put("cmd", "SET_ACTIVITY")
@@ -606,7 +530,7 @@ object DiscordRpc {
         backoffMs = (backoffMs * 2).coerceAtMost(MAX_BACKOFF_MS)
         val scheduledFor = generation
         worker.schedule({
-            if (scheduledFor != generation) return@schedule // reconfigured meanwhile
+            if (scheduledFor != generation) return@schedule
             reconnectScheduled = false
             if (!enabled) return@schedule
             connect()

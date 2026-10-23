@@ -75,8 +75,6 @@ android {
     }
 }
 
-// The renderer is a plain Vite build. Mirror ../dist into the packaged assets so
-// a release APK always ships the current web bundle instead of a stale copy.
 val webDistDir = rootProject.projectDir.resolve("../dist")
 val syncWebAssets by tasks.registering(Sync::class) {
     from(webDistDir)

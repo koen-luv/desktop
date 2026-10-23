@@ -49,8 +49,6 @@
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
-                <!-- MediaBrowser clients (Android Auto, Android TV, Bluetooth)
-                     discover and bind the library service through this action. -->
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>

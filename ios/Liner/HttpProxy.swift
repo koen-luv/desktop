@@ -1,12 +1,5 @@
 import Foundation
 
-/// Native HTTP for the renderer — the counterpart of `LinerBridge.httpRequest`
-/// in the Android shell (`LinerBridge.kt` + `CorsProxy.kt`).
-///
-/// `src/platform/http.ts` routes hosts that are not CORS-enabled (Innertube,
-/// `youtubei.googleapis.com`) and every non-GET call to the production API
-/// through this path, so the page never needs a CORS preflight. Only the
-/// allowlisted production hosts are reachable, exactly like Android.
 enum HttpProxy {
     static let userAgent =
         "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) "
@@ -32,8 +25,6 @@ enum HttpProxy {
         ".sndcdn.com",
     ]
 
-    /// Headers the page must not control: they are either transport-level or
-    /// tied to the WebView origin, and forwarding them breaks the request.
     private static let blockedHeaders: Set<String> = [
         "host", "connection", "content-length", "accept-encoding",
         "origin", "referer", "cookie", "sec-fetch-mode", "sec-fetch-site",
@@ -75,9 +66,6 @@ enum HttpProxy {
         return allowedSuffixes.contains { normalized.hasSuffix($0) }
     }
 
-    /// Executes an allowlisted request off the WebView thread and reports the
-    /// result through the `httpResponse` event, mirroring the Kotlin payload
-    /// (`id`, `status`, `ok`, `headers`, `body` — or `status: 0` with `error`).
     static func request(
         id: String,
         method: String,
@@ -123,9 +111,6 @@ enum HttpProxy {
         }
         request.setValue("en-US,en;q=0.9", forHTTPHeaderField: "Accept-Language")
 
-        // Innertube rejects requests whose Origin does not match the host it was
-        // sent to ("Origin doesn't match Host"), so mirror the target's own
-        // origin instead of a fixed one.
         if host.lowercased().hasSuffix("youtube.com") {
             request.setValue("https://\(host)", forHTTPHeaderField: "Origin")
             request.setValue("https://\(host)/", forHTTPHeaderField: "Referer")
@@ -180,8 +165,6 @@ enum HttpProxy {
         }.resume()
     }
 
-    /// Streams an audio track into the app's Documents/Downloads folder, the iOS
-    /// counterpart of the Android Download action (`downloadAudio`).
     static func downloadAudio(id: String, url: String, filename: String, mimeType: String) {
         guard
             let parsed = URL(string: url),
@@ -272,7 +255,6 @@ enum HttpProxy {
         return total
     }
 
-    // MARK: - Helpers
 
     private static func emit(id: String, json: String) {
         LinerHost.shared.emit("httpResponse", json)

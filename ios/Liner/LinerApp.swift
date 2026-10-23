@@ -21,8 +21,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        // Background playback + lock-screen controls. Mirrors the Media3 service
-        // foreground mode on Android.
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playback, mode: .default, options: [])
         try? session.setActive(true, options: [])
@@ -66,7 +64,6 @@ final class LinerWebViewController: UIViewController, WKNavigationDelegate, WKUI
         LinerHost.shared.updateInsets(for: view)
     }
 
-    // MARK: - Boot
 
     private func start() {
         do {
@@ -136,7 +133,6 @@ final class LinerWebViewController: UIViewController, WKNavigationDelegate, WKUI
         ])
     }
 
-    // MARK: - Bridge messages
 
     func userContentController(
         _ userContentController: WKUserContentController,
@@ -146,7 +142,6 @@ final class LinerWebViewController: UIViewController, WKNavigationDelegate, WKUI
         LinerBridge.handle(body: body)
     }
 
-    // MARK: - Navigation
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         hasLoaded = true

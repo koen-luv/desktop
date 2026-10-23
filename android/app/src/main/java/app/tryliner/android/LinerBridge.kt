@@ -25,10 +25,6 @@ import java.io.File
 import java.util.Locale
 import java.util.concurrent.Executors
 
-/**
- * Native surface consumed by src/platform/index.ts. Every method performs a real
- * platform operation; none are stubs.
- */
 class LinerBridge(private val activity: MainActivity) {
     @Volatile private var reportedLocalStorageBytes = 0L
     @Volatile private var reportedIndexedDbBytes = 0L
@@ -58,7 +54,6 @@ class LinerBridge(private val activity: MainActivity) {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             activity.startActivity(intent)
         } catch (_: Exception) {
-            // No browser installed.
         }
     }
 
@@ -83,15 +78,6 @@ class LinerBridge(private val activity: MainActivity) {
         }
     }
 
-    /**
-     * Renderer-originated HTTP for endpoints whose browser requests fail CORS
-     * (the production API also duplicates Access-Control-Allow-Origin) and for
-     * hosts that are not CORS-enabled at all (YouTube visitorData + Innertube).
-     *
-     * Runs off the WebView thread and answers asynchronously through the
-     * `httpResponse` event so page JavaScript never blocks. Only allowlisted
-     * production hosts are reachable.
-     */
     @JavascriptInterface
     fun httpRequest(requestId: String, method: String, url: String, headersJson: String, body: String?) {
         httpExecutor.execute {
@@ -100,11 +86,6 @@ class LinerBridge(private val activity: MainActivity) {
         }
     }
 
-    /**
-     * Answers a pending Android Auto browse query (see AutoBrowse.query). The
-     * WebView replies on its JavaScript thread; the future completion is
-     * thread-safe.
-     */
     @JavascriptInterface
     fun autoBrowseResponse(requestId: String, payloadJson: String) {
         AutoBrowse.deliver(requestId, payloadJson)
@@ -145,10 +126,6 @@ class LinerBridge(private val activity: MainActivity) {
             }
             if (!hasUserAgent) builder.header("User-Agent", Http.userAgent)
             builder.header("Accept-Language", "en-US,en;q=0.9")
-            // Innertube rejects a request whose Origin does not match the host it
-            // was sent to ("Origin doesn't match Host"), so mirror the target's
-            // own origin instead of a fixed one: music.youtube.com and
-            // www.youtube.com are both valid player endpoints.
             if (host.endsWith("youtube.com")) {
                 builder.header("Origin", "https://$host")
                 builder.header("Referer", "https://$host/")
@@ -215,7 +192,6 @@ class LinerBridge(private val activity: MainActivity) {
             .put("error", message)
             .toString()
 
-    // ── Playback ────────────────────────────────────────────────────────────
 
     @JavascriptInterface
     fun audioLoad(payload: String) {
@@ -296,7 +272,6 @@ class LinerBridge(private val activity: MainActivity) {
         }
     }
 
-    // ── Storage / files ─────────────────────────────────────────────────────
 
     @JavascriptInterface
     fun saveDump(filename: String, content: String): String {
@@ -304,12 +279,6 @@ class LinerBridge(private val activity: MainActivity) {
         return saveBytesToDownloads(safeName, "application/json", content.toByteArray(Charsets.UTF_8))
     }
 
-    /**
-     * Downloads an audio stream into the device's public Downloads/Liner folder.
-     * Playback never writes song files by itself (streaming only), so this is
-     * the one path that persists audio — triggered by the user's explicit
-     * Download action for the current song.
-     */
     @JavascriptInterface
     fun downloadAudio(requestId: String, url: String, filename: String, mimeType: String) {
         httpExecutor.execute {
@@ -482,8 +451,6 @@ class LinerBridge(private val activity: MainActivity) {
         val sw = dirSize(serviceWorker)
         val indexed = reportedIndexedDbBytes
         val local = reportedLocalStorageBytes
-        // navigator.storage.estimate().usage already covers IndexedDB/Cache
-        // Storage/Service Worker, so do not add the native SW directory again.
         val total = audio + http + code + indexed + local
         return JSONObject()
             .put("cacheSize", total)
@@ -507,25 +474,17 @@ class LinerBridge(private val activity: MainActivity) {
         }
     }
 
-    // ── Discord Rich Presence ──────────────────────────────────────────────
 
-    /**
-     * Player state payload (a serialized DiscordRpcStatePayload) mirrored to
-     * Discord by the Kotlin RPC client. Same contract as the Electron
-     * preload's `discordUpdateState`.
-     */
     @JavascriptInterface
     fun discordUpdateState(payloadJson: String) {
         DiscordRpc.updateState(payloadJson)
     }
 
-    /** Settings patch (a serialized Partial<DiscordRpcSettings>). */
     @JavascriptInterface
     fun discordUpdateSettings(settingsJson: String) {
         DiscordRpc.updateSettings(settingsJson)
     }
 
-    /** Current RPC connection status as JSON: `{ connected, username? }`. */
     @JavascriptInterface
     fun discordGetStatus(): String {
         return DiscordRpc.getStatus()

@@ -3,9 +3,6 @@ import UIKit
 import UserNotifications
 import WebKit
 
-/// Central native coordinator. Owns the WebView reference, the values the
-/// renderer reads synchronously (`getInsets`, `audioState`, `getCacheStats`),
-/// and the app-level bridge calls that need UIKit.
 final class LinerHost {
     static let shared = LinerHost()
 
@@ -22,7 +19,6 @@ final class LinerHost {
 
     private init() {}
 
-    // MARK: - Wiring
 
     func attach(webView: WKWebView, controller: UIViewController) {
         self.webView = webView
@@ -31,8 +27,6 @@ final class LinerHost {
         refreshStats()
         if let url = pendingURL {
             pendingURL = nil
-            // The page installs `__linerAndroidEmit` during module evaluation;
-            // mirror Android's "pending deeplink on page finished" timing.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
                 self?.handleIncoming(url: url)
             }
@@ -46,10 +40,7 @@ final class LinerHost {
         }
     }
 
-    // MARK: - JS plumbing
 
-    /// Native → JS event channel. Matches the Kotlin `emitToJs` contract:
-    /// `window.__linerAndroidEmit(type, payloadJson)`.
     func emit(_ type: String, _ payload: String) {
         DispatchQueue.main.async { [weak self] in
             guard let webView = self?.webView else { return }
@@ -58,7 +49,6 @@ final class LinerHost {
         }
     }
 
-    /// Updates a value the renderer reads synchronously from the bridge.
     func push(_ key: String, _ json: String) {
         DispatchQueue.main.async { [weak self] in
             guard let webView = self?.webView else { return }
@@ -78,12 +68,9 @@ final class LinerHost {
         return "\"\(escaped)\""
     }
 
-    // MARK: - Insets
 
     func updateInsets(for view: UIView) {
         guard ready else { return }
-        // The hosting view fills the window (`.ignoresSafeArea()`), so the window
-        // carries the real notch/home-indicator insets.
         let windowInsets = view.window?.safeAreaInsets ?? .zero
         let insets = windowInsets == .zero ? view.safeAreaInsets : windowInsets
         let top = Int(insets.top.rounded())
@@ -102,7 +89,6 @@ final class LinerHost {
         controller?.setNeedsStatusBarAppearanceUpdate()
     }
 
-    // MARK: - Cache stats
 
     func reportStorage(localStorage: Double, indexedDb: Double) {
         localStorageBytes = max(0, localStorage)
@@ -145,7 +131,6 @@ final class LinerHost {
         return statsJSON
     }
 
-    // MARK: - UIKit bridge calls
 
     func openExternal(_ raw: String) {
         guard let url = URL(string: raw), let scheme = url.scheme?.lowercased(),
@@ -175,8 +160,6 @@ final class LinerHost {
         }
     }
 
-    /// There is no public "open the app's Documents folder" URL. `shareddocuments`
-    /// is the Files-app bridge used by on-device installs; fall back to Settings.
     func openDownloads() {
         DispatchQueue.main.async {
             guard let url = URL(string: "shareddocuments://") else {
@@ -212,7 +195,6 @@ final class LinerHost {
         }
     }
 
-    // MARK: - Deeplinks
 
     func handleIncoming(url: URL) {
         guard url.scheme?.lowercased() == "liner" else { return }
@@ -244,7 +226,6 @@ final class LinerHost {
         emit("deeplink", json)
     }
 
-    // MARK: - Helpers
 
     private func topViewController() -> UIViewController? {
         var current = controller

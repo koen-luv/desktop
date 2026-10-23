@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
   workflow_dispatch:
 
 permissions:
@@ -32,7 +34,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build Linux packages (AppImage & deb)
-        run: pnpm run electron:build:linux
+        run: pnpm run electron:build:linux -- --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_API_URL: https://api.tryliner.fun
@@ -45,6 +47,8 @@ jobs:
           path: |
             release/*.AppImage
             release/*.deb
+            release/latest-linux.yml
+            release/*.blockmap
           if-no-files-found: error
 
   build-windows:
@@ -69,21 +73,18 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build Windows installer (NSIS)
-        run: pnpm run electron:build:win
+        run: pnpm run electron:build:win -- --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_API_URL: https://api.tryliner.fun
           VITE_COVERS_PROXY_URL: https://covers.tryliner.fun
 
-      # the drag-to-top snap preview (windows 11) is a native add-on built by
-      # electron:build:win (native:build); never ship an installer without it
       - name: Verify native snap preview add-on is packaged
         shell: pwsh
         run: |
           $addon = "release/win-unpacked/resources/app.asar.unpacked/native/snap-preview/build/Release/snap_preview.node"
           if (-not (Test-Path $addon)) { throw "snap_preview.node missing from the package: $addon" }
           Write-Host "ok: $addon ($((Get-Item $addon).Length) bytes)"
-          # it must also load and export everything the app calls (not just exist)
           node scripts/verify-native-addon.cjs $addon
 
       - name: Upload Windows Artifacts
@@ -92,6 +93,8 @@ jobs:
           name: windows-installer
           path: |
             release/*.exe
+            release/latest.yml
+            release/*.blockmap
           if-no-files-found: error
 
   build-macos:
@@ -116,7 +119,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build macOS packages (DMG & ZIP)
-        run: pnpm run electron:build:mac
+        run: pnpm run electron:build:mac -- --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
@@ -130,6 +133,8 @@ jobs:
           path: |
             release/*.dmg
             release/*.zip
+            release/latest-mac.yml
+            release/*.blockmap
           if-no-files-found: error
 
   build-android:
@@ -156,8 +161,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The Gradle `syncWebAssets` task mirrors ../dist into the packaged
-      # assets, so the release APK ships the current renderer bundle.
       - name: Build web bundle
         run: pnpm build
         env:
@@ -173,10 +176,6 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # The action's default `packages` value is the legacy `tools` package,
-      # which no longer exists on the runner's cmdline-tools 16.0 (sdkmanager
-      # fails with "Failed to find package 'tools'"). Override it with a real
-      # package; this step mainly sets up ANDROID_HOME, PATH and licenses.
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -185,9 +184,6 @@ jobs:
       - name: Install Android SDK packages
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-      # Release signing is optional. When the keystore secrets are present the
-      # APK is signed; otherwise the build produces an unsigned release APK,
-      # which matches the repo's intentional "no key committed" policy.
       - name: Configure release signing (optional)
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -205,10 +201,6 @@ jobs:
             echo "No ANDROID_KEYSTORE_BASE64 secret — building an unsigned release APK."
           fi
 
-      # Build both variants. The release APK is signed only when the keystore
-      # secrets are present (otherwise it is unsigned and not installable).
-      # The debug APK is auto-signed by the SDK with the debug key, so it is
-      # always installable for sideload testing even without release signing.
       - name: Build Android APKs (release + debug)
         working-directory: android
         run: ./gradlew :app:assembleRelease :app:assembleDebug --no-daemon
@@ -220,7 +212,6 @@ jobs:
           mkdir -p android-out
           find android/app/build/outputs/apk -name '*.apk' -exec cp {} android-out/ \;
           ls -la android-out
-          echo "Install app-debug.apk for sideloading (signed with the debug key)."
 
       - name: Upload Android Artifacts
         uses: actions/upload-artifact@v4
@@ -229,11 +220,86 @@ jobs:
           path: android-out/*.apk
           if-no-files-found: error
 
+  build-ios:
+    name: Build iOS
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web renderer
+        run: pnpm build
+        env:
+          VITE_API_URL: https://api.tryliner.fun
+          VITE_COVERS_PROXY_URL: https://covers.tryliner.fun
+
+      - name: Sync renderer into the iOS bundle
+        run: bash ios/sync-web.sh
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Read app version
+        id: version
+        run: echo "value=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
+
+      - name: Archive app (unsigned)
+        run: |
+          xcodebuild \
+            -project ios/Liner.xcodeproj \
+            -scheme Liner \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath ios/build/DerivedData \
+            -archivePath ios/build/Liner.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            archive
+
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          APP="ios/build/Liner.xcarchive/Products/Applications/Liner.app"
+          test -d "$APP"
+          rm -rf ios/build/Payload Liner-unsigned.ipa
+          mkdir -p ios/build/Payload
+          cp -R "$APP" ios/build/Payload/
+          (cd ios/build && ditto -c -k --sequesterRsrc --keepParent Payload ../../Liner-unsigned.ipa)
+          ls -lh Liner-unsigned.ipa
+
+      - name: Upload iOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: Liner-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
+
   publish-release:
     name: Publish Release
-    needs: [build-linux, build-windows, build-macos, build-android]
+    needs: [build-linux, build-windows, build-macos, build-android, build-ios]
     runs-on: ubuntu-latest
-    if: false
+    if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -246,11 +312,14 @@ jobs:
           files: |
             artifacts/linux-packages/*.AppImage
             artifacts/linux-packages/*.deb
+            artifacts/linux-packages/latest-linux.yml
             artifacts/windows-installer/*.exe
+            artifacts/windows-installer/latest.yml
             artifacts/macos-packages/*.dmg
             artifacts/macos-packages/*.zip
+            artifacts/macos-packages/latest-mac.yml
             artifacts/android-apk/*.apk
-          fail_on_unmatched_files: false
+            artifacts/ios-ipa/*.ipa
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

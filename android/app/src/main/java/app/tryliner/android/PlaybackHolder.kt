@@ -18,12 +18,6 @@ import android.net.Uri
 import org.json.JSONObject
 import java.io.File
 
-/**
- * Owns the single ExoPlayer instance and exposes a small JSON command surface to
- * the renderer. ExoPlayer is the source of truth for position/duration: the
- * WebView only mirrors it. All methods are safe to call before the service has
- * finished starting (commands are queued).
- */
 object PlaybackHolder {
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var player: ExoPlayer? = null
@@ -57,10 +51,6 @@ object PlaybackHolder {
         if (service != null) return
         val app = context.applicationContext
         val intent = Intent(app, PlaybackService::class.java)
-        // Playback must not be killed while a stream is resolving, so the
-        // service always starts as a foreground service and claims the slot
-        // itself; Media3 then replaces that notification with the full media
-        // notification once the player is playing.
         try {
             app.startForegroundService(
                 intent.putExtra(PlaybackService.EXTRA_PROMOTE_TO_FOREGROUND, true),
@@ -69,8 +59,6 @@ object PlaybackHolder {
             try {
                 app.startService(intent)
             } catch (_: Exception) {
-                // Service cannot be started right now; the bridge reports the
-                // failure through the state poll as idle.
             }
         }
     }
@@ -209,7 +197,6 @@ object PlaybackHolder {
             reverb?.setPreset(preset)
             reverb?.enabled = true
         } catch (_: Exception) {
-            // Effect not available on this device.
         }
     }
 
@@ -229,12 +216,6 @@ object PlaybackHolder {
         updateState()
     }
 
-    /**
-     * Pauses playback at an absolute epoch-ms deadline (<= 0 cancels). Runs on
-     * the service's main handler so it fires even with the WebView suspended /
-     * screen off — a renderer-only timer cannot guarantee that while Media3
-     * keeps playing in the background.
-     */
     fun setSleepAt(deadlineEpochMs: Long) {
         cancelSleep()
         if (deadlineEpochMs <= 0L) return
@@ -302,11 +283,6 @@ object PlaybackHolder {
         }
     }
 
-    /**
-     * PlaybackException only carries a generic message, so the underlying
-     * data-source cause is folded in: the HTTP status and CDN host are what make
-     * a stream failure actionable (expired URL vs. unsupported codec).
-     */
     private fun describePlaybackError(error: PlaybackException): String {
         val cause = error.cause
         val builder = StringBuilder(error.errorCodeName)
@@ -316,8 +292,6 @@ object PlaybackHolder {
             if (cause is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
                 builder.append(" (HTTP ").append(cause.responseCode).append(", ")
                 builder.append(cause.dataSpec?.uri?.host ?: "unknown host").append(")")
-                // The CDN's rejection body (XML error) is the only place that
-                // states why a URL was refused (expired signature vs. bot policy).
                 val body = cause.responseBody
                 if (body.isNotEmpty()) {
                     val text = String(body, 0, minOf(body.size, 220), Charsets.UTF_8)
@@ -373,8 +347,6 @@ object PlaybackHolder {
             .put("canSeek", duration > 0)
         lastState = state.toString()
 
-        // Rebuild the media notification only when what it shows actually
-        // changed; the ticker still publishes position updates to the renderer.
         if (status != notifiedStatus || currentTrackId != notifiedTrackId) {
             notifiedStatus = status
             notifiedTrackId = currentTrackId

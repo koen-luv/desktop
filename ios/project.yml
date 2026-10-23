@@ -20,10 +20,7 @@ targets:
     platform: iOS
     deploymentTarget: "15.0"
     sources:
-      # Swift shell (the native port of android/app/src/main/java/app/tryliner/android).
       - path: Liner
-      # Renderer bundle. `pnpm build` output is copied here by CI / `ios/sync-web.sh`
-      # as a folder reference so the whole tree lands in the .app bundle verbatim.
       - path: Web
         type: folder
         buildPhase: resources
@@ -80,8 +77,6 @@ targets:
         CODE_SIGN_STYLE: Automatic
         SUPPORTS_MACCATALYST: NO
         SWIFT_EMIT_LOC_STRINGS: NO
-        # Unsigned CI archives pass CODE_SIGNING_ALLOWED=NO; a developer with a
-        # team can archive from Xcode instead and sign normally.
         DEVELOPMENT_TEAM: ""
 
 schemes:

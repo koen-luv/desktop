@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-/**
- * Copies the production renderer bundle (dist/) into the Android app assets so
- * the release APK ships the real application instead of depending on a dev
- * server. Run `pnpm build` first (or use `pnpm android:apk`).
- */
 import { cp, mkdir, readdir, rm, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -19,8 +14,6 @@ if (!existsSync(path.join(distDir, "index.html"))) {
   process.exit(1);
 }
 
-// The WebViewAssetLoader maps "/" to the assets root, and the bundle registers
-// "/cover-sw.js" at the domain root, so every file is copied to the root.
 for (const entry of ["index.html", "cover-sw.js", "icon.png", "assets"]) {
   await rm(path.join(targetDir, entry), { recursive: true, force: true });
 }

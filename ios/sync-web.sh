@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Copies the Vite renderer into the iOS bundle as a folder reference.
-# Run `pnpm build` first; CI does both.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"

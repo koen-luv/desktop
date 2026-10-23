@@ -9,7 +9,8 @@ The project is described by [`project.yml`](./project.yml) and generated with
 
 ## Build an IPA
 
-CI (`.github/workflows/ios.yml`, macOS runner) is the supported path:
+CI (`.github/workflows/release.yml`, `build-ios` job, macOS runner) is the
+supported path:
 
 ```bash
 pnpm build
@@ -31,6 +32,28 @@ your Apple ID:
 2. Open it with [Sideloadly](https://sideloadly.io) (Windows/macOS) or AltStore.
 3. Sign in with a free Apple ID. The app then runs for 7 days, or one year with a
    paid Apple Developer account (bundle id `app.tryliner.ios`).
+
+### Re-signing the IPA by hand
+
+The bundle id is `app.tryliner.ios`. With a paid Apple Developer account and the
+app registered in the portal, a signing certificate (`Apple Development` or
+`Apple Distribution`) exported as `.p12` and its `.mobileprovision` re-sign the
+unsigned IPA on any Mac:
+
+```bash
+unzip -q Liner-unsigned.ipa -d out                 # out/Payload/Liner.app
+codesign -f -s "Apple Distribution: Your Name (TEAMID)" \
+  --entitlements Liner.entitlements out/Payload/Liner.app/Frameworks/*.framework
+codesign -f -s "Apple Distribution: Your Name (TEAMID)" \
+  --entitlements Liner.entitlements out/Payload/Liner.app
+cp Liner.mobileprovision out/Payload/Liner.app/embedded.mobileprovision
+cd out && zip -qry ../Liner-signed.ipa Payload
+```
+
+The entitlements file must at least carry
+`application-identifier` = `TEAMID.app.tryliner.ios` and the
+`com.apple.developer.team-identifier` matching the profile, or install fails on
+device. Ad-hoc signing (`codesign -s -`) only works for the simulator.
 
 Signing in CI instead: add `IOS_CERT_P12_BASE64`, `IOS_CERT_PASSWORD`,
 `IOS_PROVISION_PROFILE_BASE64` and `IOS_TEAM_ID` secrets, import the identity and

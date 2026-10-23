@@ -5,11 +5,6 @@ import okhttp3.Request
 import java.io.File
 import java.util.concurrent.Executors
 
-/**
- * Native audio cache. Mirrors the desktop IndexedDB audio cache: tracks are
- * stored after they start playing, replayed from disk on later plays, pruned to
- * the user's configured limit, and removable from Settings.
- */
 object AudioCache {
     private val io = Executors.newSingleThreadExecutor { r ->
         Thread(r, "liner-audio-cache").apply { isDaemon = true }

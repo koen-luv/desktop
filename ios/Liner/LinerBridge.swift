@@ -1,13 +1,6 @@
 import Foundation
 import UIKit
 
-/// The native surface consumed by `src/platform/index.ts`.
-///
-/// Android exposes this synchronously through `@JavascriptInterface`; WebKit
-/// message handlers are one-way, so the JS object injected at document start
-/// keeps a local mirror of every value the renderer reads synchronously
-/// (`getVersion`, `getInsets`, `audioState`, `getCacheStats`) and native pushes
-/// updates into it through `window.__linerNativeSet`.
 enum LinerBridge {
     static var version: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
@@ -212,7 +205,6 @@ enum LinerBridge {
         }
     }
 
-    // MARK: - Argument coercion
 
     static func text(_ args: [Any], _ index: Int) -> String {
         guard index < args.count else { return "" }

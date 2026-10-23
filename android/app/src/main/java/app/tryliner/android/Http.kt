@@ -6,11 +6,6 @@ import okhttp3.OkHttpClient
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-/**
- * One HTTP stack for native cover loading, the CORS-compatible fetch bridge and
- * audio cache downloads. It uses a real disk cache so repeated artwork and
- * YouTube visitor/bootstrap requests do not hit the network again.
- */
 object Http {
     @Volatile
     lateinit var client: OkHttpClient

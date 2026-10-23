@@ -3,13 +3,6 @@ import Foundation
 import MediaPlayer
 import UIKit
 
-/// Native playback engine for iOS — the counterpart of the Media3 service in
-/// `android/app/src/main/java/app/tryliner/android/PlaybackService.kt`.
-///
-/// The renderer keeps owning queue, repeat/shuffle, lyrics and persistence; it
-/// polls `audioState()` every 150 ms and mirrors the returned JSON into the same
-/// player store the desktop runtime feeds (`androidPlayerRuntime.ts`). Audio
-/// decoding, background playback and lock-screen controls live here.
 final class PlaybackEngine {
     static let shared = PlaybackEngine()
 
@@ -40,7 +33,6 @@ final class PlaybackEngine {
         startTicking()
     }
 
-    // MARK: - Bridge surface
 
     func load(_ payloadJSON: String) {
         guard
@@ -74,8 +66,6 @@ final class PlaybackEngine {
             options: ["AVURLAssetHTTPHeaderFieldsKey": ["User-Agent": HttpProxy.userAgent]]
         )
         let item = AVPlayerItem(asset: asset)
-        // Spectral keeps the key when the user changes speed, matching Media3's
-        // pitch-preserving default.
         item.audioTimePitchAlgorithm = .spectral
         currentItem = item
 
@@ -171,22 +161,14 @@ final class PlaybackEngine {
         updateNowPlaying()
     }
 
-    /// Standalone pitch shifting (without a tempo change) needs an
-    /// `AVAudioEngine` + `AVAudioUnitTimePitch` graph over a downloaded file;
-    /// the streaming `AVPlayer` cannot do it. Linked pitch is covered by
-    /// `setSpeed`, which preserves the key via `audioTimePitchAlgorithm`.
     func setPitch(_ semitones: Double) {
         _ = semitones
     }
 
-    /// No reverb stage on AVPlayer (same limitation as `setPitch`).
     func setReverb(_ level: Double) {
         _ = level
     }
 
-    /// Schedules a pause at an absolute epoch-ms deadline (0 cancels). Enforced
-    /// here, not in JS, so it still fires with the screen off and the app in the
-    /// background — then reported as a `sleepTimerFired` event.
     func sleepAt(_ deadlineMs: Double) {
         sleepTimer?.invalidate()
         sleepTimer = nil
@@ -227,7 +209,6 @@ final class PlaybackEngine {
         return PlaybackEngine.json(state) ?? "{}"
     }
 
-    // MARK: - Ticking
 
     private func startTicking() {
         let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
@@ -302,7 +283,6 @@ final class PlaybackEngine {
         LinerHost.shared.push("audio", stateJSON())
     }
 
-    // MARK: - Clock
 
     private func currentPositionMs() -> Double {
         let seconds = player.currentTime().seconds
@@ -326,7 +306,6 @@ final class PlaybackEngine {
         return max(0, end * 1000)
     }
 
-    // MARK: - Now Playing
 
     private func updateNowPlaying() {
         guard trackId != nil else {
@@ -377,7 +356,6 @@ final class PlaybackEngine {
         }
     }
 
-    // MARK: - Remote commands / interruptions
 
     private func registerRemoteCommands() {
         let center = MPRemoteCommandCenter.shared()
@@ -464,7 +442,6 @@ final class PlaybackEngine {
         }
     }
 
-    // MARK: - Small helpers
 
     private static func number(_ value: Any?) -> Double {
         if let number = value as? NSNumber { return number.doubleValue }
