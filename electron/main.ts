@@ -1607,11 +1607,15 @@ if (!gotTheLock) {
 
     // automatic update check after window initialization (packaged app only)
     if (app.isPackaged) {
-      setTimeout(() => {
+      const checkForUpdatesInBackground = () => {
         autoUpdater.checkForUpdates().catch((err) => {
           console.error("\x1b[31m updater \x1b[0m background check error:", err?.message || err);
         });
-      }, 4000);
+      };
+
+      setTimeout(checkForUpdatesInBackground, 4000);
+      // keep long-running windows up to date without restarting the app
+      setInterval(checkForUpdatesInBackground, 6 * 60 * 60 * 1000);
 
       // check for OTA bundles every 15 minutes silently in background
       setInterval(() => {

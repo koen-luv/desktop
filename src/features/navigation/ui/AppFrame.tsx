@@ -1,4 +1,6 @@
 import {
+  Suspense,
+  lazy,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -34,12 +36,7 @@ import {
   useSearchPlaylists,
 } from "@/features/search/hooks";
 import { mediaUrl, toClientTrack, toMaxQualityAvatarUrl } from "@/shared/api";
-import {
-  FullscreenPlayer,
-  playerEngine,
-  MiniPlayer,
-  usePlayerStore,
-} from "@/features/player";
+import { playerEngine, MiniPlayer, usePlayerStore } from "@/features/player";
 import SearchResultsList from "@/features/search/ui/SearchResultsList";
 import { SearchHistoryList, useSearchHistoryStore } from "@/features/search";
 import { useTranslation } from "@/languages";
@@ -54,10 +51,21 @@ import {
   CreatePlaylistModal,
   useModalStore,
 } from "@/features/library";
-import { SettingsModal, useCustomizationStore, getBlockStyle } from "@/features/settings";
+import { useCustomizationStore, getBlockStyle } from "@/features/settings/store/customizationStore";
 import { UpdateModal, UpdateToastBridge } from "@/features/updater";
 import { setBackHandler } from "@/platform";
 
+
+// Settings is the heaviest surface in the app (its Storage tab pulls in
+// lottie-web and most tabs pull their own charts/lists), so it is only fetched
+// once the user actually opens it.
+const SettingsModal = lazy(() => import("@/features/settings/ui/SettingsModal"));
+
+// The fullscreen player owns the WebGL (kawarp) background and the lyrics
+// engine, so it only ships when it is first opened.
+const FullscreenPlayer = lazy(() =>
+  import("@/features/player/ui/FullscreenPlayer").then((m) => ({ default: m.FullscreenPlayer })),
+);
 
 interface AppFrameProps {
   children: React.ReactNode;
@@ -88,6 +96,13 @@ export default function AppFrame({ children }: AppFrameProps) {
   const openSettings = useModalStore((state) => state.openSettings);
   const settingsOpen = useModalStore((state) => state.settingsOpen);
   const closeSettings = useModalStore((state) => state.closeSettings);
+
+  // Keep the modal mounted after the first open so its close animation and
+  // two-level menu state behave exactly as before the split.
+  const [settingsReady, setSettingsReady] = useState(settingsOpen);
+  useEffect(() => {
+    if (settingsOpen) setSettingsReady(true);
+  }, [settingsOpen]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [queuePopupOpen, setQueuePopupOpen] = useState(false);
@@ -884,10 +899,12 @@ export default function AppFrame({ children }: AppFrameProps) {
             onAnimationComplete={() => setFullscreenEffectsReady(fullscreenPlayerOpen)}
             className="dark absolute inset-0 z-[70] overflow-hidden bg-black will-change-transform"
           >
-            <FullscreenPlayer
-              onClose={closeFullscreenPlayer}
-              effectsReady={fullscreenEffectsReady}
-            />
+            <Suspense fallback={null}>
+              <FullscreenPlayer
+                onClose={closeFullscreenPlayer}
+                effectsReady={fullscreenEffectsReady}
+              />
+            </Suspense>
           </motion.div>
         ) : isFullscreenRoute ? (
           <div data-theme="dark" className="dark absolute inset-0 z-[70] overflow-hidden bg-black">
@@ -1136,7 +1153,11 @@ export default function AppFrame({ children }: AppFrameProps) {
       <ImportLikesModal />
       <CreatePlaylistModal />
       <ImportReviewModal />
-      <SettingsModal />
+      {settingsReady && (
+        <Suspense fallback={null}>
+          <SettingsModal />
+        </Suspense>
+      )}
       <UpdateModal />
       <UpdateToastBridge />
       <WindowControls

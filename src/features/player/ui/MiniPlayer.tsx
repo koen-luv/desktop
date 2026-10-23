@@ -40,9 +40,9 @@ import { SpeedPitchPicker } from "./SpeedPitchPicker";
 import { TimelineSlider } from "./TimelineSlider";
 import { useTheme } from "next-themes";
 import { useCoverReady, CoverImage } from "@/features/covers";
-import { useCustomizationStore, getBlockStyle } from "@/features/settings";
+import { useCustomizationStore, getBlockStyle } from "@/features/settings/store/customizationStore";
 import ExplicitBadge from "@/shared/ui/ExplicitBadge";
-import { ArtistLink } from "@/features/artist";
+import ArtistLink from "@/features/artist/ui/ArtistLink";
 
 
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {

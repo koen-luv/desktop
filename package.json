@@ -32,8 +32,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "tryliner",
-        "repo": "desktop"
+        "owner": "koen-luv",
+        "repo": "liner-app-apk-by-koen"
       }
     ],
     "directories": {

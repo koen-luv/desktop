@@ -26,13 +26,7 @@ export {
 } from "./hooks/useSongMenuItems";
 
 export { default as MiniPlayer, type MiniPlayerProps } from "./ui/MiniPlayer";
-export {
-  FullscreenPlayer,
-  default as PlayerPage,
-  type FullscreenPlayerProps,
-} from "./ui/FullscreenPlayer";
 export { PlayerUiElements } from "./ui/PlayerUiElements";
-export { KawarpWrapper } from "./ui/KawarpWrapper";
 export { default as SongCard, type SongCardProps } from "./ui/SongCard";
 export {
   default as SongCardWithMenu,

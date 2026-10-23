@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { HashRouter } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { ToastProvider, AppleEmojiProvider, RootErrorBoundary, GlobalTooltip, WindowAnimationContainer } from "@/shared/ui";
@@ -7,14 +8,14 @@ import { I18nProvider } from "@/languages";
 import { AuthLock } from "@/features/auth";
 import { CoverSwRegistrar } from "@/features/covers";
 import { usePresenceSync } from "@/shared/presence";
-import { useThemeCustomizationSync } from "@/features/settings";
+import { useThemeCustomizationSync } from "@/features/settings/hooks/useThemeCustomizationSync";
 import { useTouchBarSync } from "@/features/touchbar";
 import { useOverlaySync } from "@/features/overlay";
 import { useDiscordSync } from "@/features/discord";
 import { useLastfmScrobbler } from "@/features/lastfm";
 import { useAutoSync } from "@/features/auto";
 import { PartySheet, usePartySync } from "@/features/party";
-import { AppRoutes } from "./routes";
+import { AppRoutes, prefetchRoutes } from "./routes";
 import DeeplinkHandler from "./DeeplinkHandler";
 import EnvironmentWarning from "./EnvironmentWarning";
 import { ConnectivityWall } from "@/features/connectivity";
@@ -67,6 +68,10 @@ function PartySync() {
 
 export default function App() {
   useWindowDrag();
+
+  useEffect(() => {
+    prefetchRoutes();
+  }, []);
 
   return (
     <HashRouter>

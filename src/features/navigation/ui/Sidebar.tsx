@@ -19,7 +19,7 @@ import { useTranslation } from "@/languages";
 import { useTheme } from "next-themes";
 import { usePlayerStore, type AccentVariant } from "@/features/player";
 import { useModalStore } from "@/features/library";
-import { useCustomizationStore, getBlockStyle } from "@/features/settings";
+import { useCustomizationStore, getBlockStyle } from "@/features/settings/store/customizationStore";
 import { Tooltip } from "@/shared/ui";
 
 

@@ -21,7 +21,7 @@ import { playerEngine } from "../engine/playerEngine";
 import { isRadioContext, nextRepeatMode } from "../engine/radioMode";
 import { useIsTrackLiked, useLikeTrack, useUnlikeTrack } from "@/features/library/hooks";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArtistLink } from "@/features/artist";
+import ArtistLink from "@/features/artist/ui/ArtistLink";
 import { useCoverReady, CoverImage } from "@/features/covers";
 import { usePartyStore } from "@/features/party/store/partyStore";
 import ExplicitBadge from "@/shared/ui/ExplicitBadge";
