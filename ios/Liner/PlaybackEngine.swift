@@ -6,8 +6,20 @@ import UIKit
 final class PlaybackEngine {
     static let shared = PlaybackEngine()
 
-    private let player = AVPlayer()
+    private var player = AVPlayer()
     private var currentItem: AVPlayerItem?
+
+    // Overlapping crossfade: a second, silent player holds the incoming song
+    // while the two volumes blend on the main run loop (see crossfadeLoad).
+    private var userVolume: Double = 1
+    private var transitionPlayer: AVPlayer?
+    private var transitionItem: AVPlayerItem?
+    private var crossfadeTrackId: String?
+    private var crossfadePayload: [String: Any]?
+    private var crossfadeStartedAt: Date?
+    private var crossfadeDurationMs: Double = 0
+    private var crossfadeTimer: Timer?
+    private var crossfadeEpoch = 0
     private var trackId: String?
     private var title = ""
     private var artist = ""
@@ -48,6 +60,7 @@ final class PlaybackEngine {
             return
         }
 
+        cancelCrossfade()
         teardownObservers()
         trackId = loadedTrackId
         title = payload["title"] as? String ?? ""
@@ -69,21 +82,7 @@ final class PlaybackEngine {
         item.audioTimePitchAlgorithm = .spectral
         currentItem = item
 
-        endObserver = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: item,
-            queue: .main
-        ) { [weak self] _ in
-            self?.handleEnded()
-        }
-        failObserver = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemFailedToPlayToEndTime,
-            object: item,
-            queue: .main
-        ) { [weak self] notification in
-            let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
-            self?.fail(error?.localizedDescription ?? "Audio playback error")
-        }
+        observe(item: item)
 
         player.replaceCurrentItem(with: item)
         player.seek(
@@ -100,6 +99,7 @@ final class PlaybackEngine {
     }
 
     func pause() {
+        cancelCrossfade()
         wantsPlay = false
         player.pause()
         status = "paused"
@@ -119,6 +119,7 @@ final class PlaybackEngine {
 
     func seek(_ positionMs: Double) {
         guard currentItem != nil else { return }
+        cancelCrossfade()
         let target = max(0, positionMs)
         player.seek(
             to: CMTime(seconds: target / 1000, preferredTimescale: 600),
@@ -131,6 +132,7 @@ final class PlaybackEngine {
     }
 
     func stop() {
+        cancelCrossfade()
         wantsPlay = false
         ended = false
         player.pause()
@@ -150,7 +152,8 @@ final class PlaybackEngine {
     }
 
     func setVolume(_ volume: Double) {
-        player.volume = Float(max(0, min(1, volume)))
+        userVolume = max(0, min(1, volume))
+        player.volume = Float(userVolume)
     }
 
     func setSpeed(_ rate: Double) {
@@ -184,6 +187,168 @@ final class PlaybackEngine {
         }
         RunLoop.main.add(timer, forMode: .common)
         sleepTimer = timer
+    }
+
+    // MARK: - Overlapping crossfade
+
+    /// Prepares the incoming song on a silent second player. Mirrors the
+    /// Android transition player: the blend runs from here on the main run
+    /// loop, so it keeps working while the app is backgrounded.
+    func crossfadeLoad(_ payloadJSON: String) {
+        guard
+            let data = payloadJSON.data(using: .utf8),
+            let raw = try? JSONSerialization.jsonObject(with: data),
+            let payload = raw as? [String: Any],
+            let urlString = payload["url"] as? String,
+            let url = URL(string: urlString),
+            let loadedTrackId = payload["trackId"] as? String,
+            !loadedTrackId.isEmpty,
+            !urlString.isEmpty
+        else {
+            return
+        }
+
+        cancelCrossfade()
+
+        let asset = AVURLAsset(
+            url: url,
+            options: ["AVURLAssetHTTPHeaderFieldsKey": ["User-Agent": HttpProxy.userAgent]]
+        )
+        let item = AVPlayerItem(asset: asset)
+        item.audioTimePitchAlgorithm = .spectral
+        let incoming = AVPlayer(playerItem: item)
+        incoming.actionAtItemEnd = .pause
+        incoming.volume = 0
+        incoming.playImmediately(atRate: Float(desiredRate))
+
+        transitionItem = item
+        transitionPlayer = incoming
+        crossfadePayload = payload
+        crossfadeTrackId = loadedTrackId
+    }
+
+    /// Starts (or restarts) the blend once the incoming player is ready.
+    func crossfadeStart(_ durationMs: Double) {
+        guard transitionPlayer != nil, transitionItem != nil, durationMs > 0 else {
+            cancelCrossfade()
+            return
+        }
+        crossfadeDurationMs = min(max(durationMs, 500), 30_000)
+        crossfadeEpoch += 1
+        waitForTransition(epoch: crossfadeEpoch, waitedMs: 0)
+    }
+
+    func crossfadeCancel() {
+        cancelCrossfade()
+    }
+
+    private func waitForTransition(epoch: Int, waitedMs: Int) {
+        guard epoch == crossfadeEpoch else { return }
+        guard let incoming = transitionPlayer, let item = transitionItem else { return }
+        let ready = incoming.timeControlStatus == .playing || item.status == .readyToPlay
+        if ready {
+            crossfadeStartedAt = Date()
+            scheduleRampTick(epoch: epoch)
+            return
+        }
+        if waitedMs >= 5_000 {
+            // Fall back to the sequential path; the outgoing song keeps playing.
+            cancelCrossfade()
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            self?.waitForTransition(epoch: epoch, waitedMs: waitedMs + 50)
+        }
+    }
+
+    private func scheduleRampTick(epoch: Int) {
+        crossfadeTimer?.invalidate()
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+            self?.runRampTick(epoch: epoch)
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        crossfadeTimer = timer
+    }
+
+    private func runRampTick(epoch: Int) {
+        guard epoch == crossfadeEpoch else { return }
+        guard let incoming = transitionPlayer, let startedAt = crossfadeStartedAt else { return }
+        let elapsedMs = Date().timeIntervalSince(startedAt) * 1000
+        let t = min(1, max(0, elapsedMs / crossfadeDurationMs))
+
+        // Equal-power blend scaled by the user volume.
+        let angle = t * Double.pi / 2
+        player.volume = Float(userVolume * cos(angle))
+        incoming.volume = Float(userVolume * sin(angle))
+
+        if t >= 1 {
+            promoteCrossfade(epoch: epoch)
+        }
+    }
+
+    /// Hands playback over to the incoming player at full volume.
+    private func promoteCrossfade(epoch: Int) {
+        guard
+            epoch == crossfadeEpoch,
+            let incoming = transitionPlayer,
+            let item = transitionItem
+        else { return }
+
+        crossfadeEpoch += 1
+        crossfadeTimer?.invalidate()
+        crossfadeTimer = nil
+
+        let promotedId = crossfadeTrackId
+        let payload = crossfadePayload
+
+        trackId = promotedId
+        title = payload?["title"] as? String ?? ""
+        artist = payload?["artist"] as? String ?? ""
+        album = payload?["album"] as? String ?? "Liner"
+        coverUrl = payload?["coverUrl"] as? String
+        payloadDurationMs = PlaybackEngine.number(payload?["durationMs"])
+        errorMessage = nil
+        ended = false
+        wantsPlay = true
+        status = "playing"
+
+        teardownObservers()
+        observe(item: item)
+
+        let outgoing = player
+        player = incoming
+        currentItem = item
+        player.volume = Float(userVolume)
+
+        transitionPlayer = nil
+        transitionItem = nil
+        crossfadeTrackId = nil
+        crossfadePayload = nil
+        crossfadeStartedAt = nil
+
+        outgoing.pause()
+        outgoing.replaceCurrentItem(with: nil)
+
+        loadArtwork()
+        updateNowPlaying()
+        pushState()
+        if let promotedId {
+            LinerHost.shared.emit("crossfadeCompleted", LinerHost.jsQuote(promotedId))
+        }
+    }
+
+    private func cancelCrossfade() {
+        crossfadeEpoch += 1
+        crossfadeTimer?.invalidate()
+        crossfadeTimer = nil
+        crossfadeStartedAt = nil
+        crossfadeTrackId = nil
+        crossfadePayload = nil
+        transitionPlayer?.pause()
+        transitionPlayer?.replaceCurrentItem(with: nil)
+        transitionPlayer = nil
+        transitionItem = nil
+        player.volume = Float(userVolume)
     }
 
     func stateJSON() -> String {
@@ -428,6 +593,24 @@ final class PlaybackEngine {
             @unknown default:
                 break
             }
+        }
+    }
+
+    private func observe(item: AVPlayerItem) {
+        endObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleEnded()
+        }
+        failObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemFailedToPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] notification in
+            let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
+            self?.fail(error?.localizedDescription ?? "Audio playback error")
         }
     }
 

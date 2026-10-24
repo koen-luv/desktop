@@ -82,6 +82,9 @@ enum LinerBridge {
             clearAudioCache: function () { send("clearAudioCache", []); return true; },
             clearHttpCache: function () { send("clearHttpCache", []); return true; },
             audioLoad: function (payload) { send("audioLoad", [String(payload)]); },
+            audioCrossfadeLoad: function (payload) { send("audioCrossfadeLoad", [String(payload)]); },
+            audioCrossfadeStart: function (durationMs) { send("audioCrossfadeStart", [Number(durationMs) || 0]); },
+            audioCrossfadeCancel: function () { send("audioCrossfadeCancel", []); },
             audioPause: function () { send("audioPause", []); },
             audioResume: function () { send("audioResume", []); },
             audioSeek: function (positionMs) { send("audioSeek", [Number(positionMs) || 0]); },
@@ -166,6 +169,15 @@ enum LinerBridge {
 
         case "audioLoad":
             PlaybackEngine.shared.load(text(args, 0))
+
+        case "audioCrossfadeLoad":
+            PlaybackEngine.shared.crossfadeLoad(text(args, 0))
+
+        case "audioCrossfadeStart":
+            PlaybackEngine.shared.crossfadeStart(number(args, 0))
+
+        case "audioCrossfadeCancel":
+            PlaybackEngine.shared.crossfadeCancel()
 
         case "audioPause":
             PlaybackEngine.shared.pause()
