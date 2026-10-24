@@ -212,7 +212,9 @@ final class LinerWebViewController: UIViewController, WKNavigationDelegate, WKUI
     }
 
     /// WKWebView asks the host to present a picker for `<input type="file">`
-    /// (custom playlist covers, wallpaper, playlist imports).
+    /// (custom playlist covers, wallpaper, playlist imports). This delegate is
+    /// iOS 18.4+; older releases keep WebKit's built-in upload panel.
+    @available(iOS 18.4, *)
     func webView(
         _ webView: WKWebView,
         runOpenPanelWith parameters: WKOpenPanelParameters,
