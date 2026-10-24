@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit
  */
 object AppUpdater {
     private const val RELEASES_URL =
-        "https://api.github.com/repos/koen-luv/liner-app-apk-by-koen/releases/latest"
+        "https://api.github.com/repos/koen-luv/desktop/releases/latest"
     private const val APK_FILE = "liner-update.apk"
     private const val CHECK_INTERVAL_MS = 30 * 60 * 1000L
 

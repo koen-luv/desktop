@@ -1,6 +1,6 @@
 {
   "name": "@liner/client",
-  "version": "0.1.42",
+  "version": "0.1.43",
   "type": "module",
   "private": true,
   "description": "Liner Music Player",
@@ -33,7 +33,7 @@
       {
         "provider": "github",
         "owner": "koen-luv",
-        "repo": "liner-app-apk-by-koen"
+        "repo": "desktop"
       }
     ],
     "directories": {
