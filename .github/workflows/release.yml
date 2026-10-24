@@ -305,16 +305,35 @@ jobs:
     name: Publish Release
     needs: [build-linux, build-windows, build-macos, build-android, build-ios]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Tag pushes publish their own version; pushes to the mobile branch publish
+    # the package.json version so sideloaded/installed builds can auto-update
+    # without waiting for a manual tag.
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/mobile'
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
+      - name: Resolve release tag
+        id: release
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            VERSION=$(node -p "require('./package.json').version")
+            echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: Liner ${{ steps.release.outputs.tag }}
+          generate_release_notes: true
           files: |
             artifacts/linux-packages/*.AppImage
             artifacts/linux-packages/*.deb

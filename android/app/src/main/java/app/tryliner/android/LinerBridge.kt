@@ -38,6 +38,14 @@ class LinerBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun getPlatform(): String = "android"
 
+    /** Cached update check; refreshes from the GitHub release in the background. */
+    @JavascriptInterface
+    fun updaterCheck(): String = AppUpdater.check(activity)
+
+    /** Downloads the APK found by [updaterCheck] and opens the system installer. */
+    @JavascriptInterface
+    fun updaterInstall() = AppUpdater.install(activity)
+
     @JavascriptInterface
     fun getInsets(): String = activity.insetsJson()
 

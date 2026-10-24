@@ -14,6 +14,14 @@ import {
 export interface LinerAndroidBridge {
   getVersion(): string;
   getPlatform(): string;
+  /**
+   * Cached APK update check (JSON: { available, version?, url?, releaseNotes? });
+   * a stale cache refreshes from the published GitHub release in the
+   * background and emits `updateAvailable` when a newer build exists.
+   */
+  updaterCheck(): string;
+  /** Downloads the APK found by `updaterCheck` and opens the system installer. */
+  updaterInstall(): void;
   openExternal(url: string): void;
   shareText(text: string): void;
   copyText(text: string): void;
@@ -302,6 +310,58 @@ export function installAndroidPlatform(): void {
     syncServerTime: async (dateHeaderOrMs) => wasmSyncServerTime(dateHeaderOrMs),
     getServerTimeOffset: async () => getServerTimeOffset(),
     getAppVersion: async () => bridge.getVersion(),
+    // Updater: the Android shell checks the published release itself, download
+    // and install are handled natively (DownloadManager + package installer).
+    checkForUpdates: async () => {
+      if (typeof bridge.updaterCheck !== "function") return { available: false };
+      try {
+        const parsed = JSON.parse(bridge.updaterCheck()) as {
+          available?: boolean;
+          version?: string;
+          releaseNotes?: string;
+          error?: string;
+        };
+        return {
+          available: Boolean(parsed.available && parsed.version),
+          version: parsed.version,
+          releaseNotes: parsed.releaseNotes,
+          error: parsed.error,
+        };
+      } catch {
+        return { available: false };
+      }
+    },
+    downloadUpdate: async () => {
+      if (typeof bridge.updaterInstall !== "function") {
+        return { success: false, error: "Updates are unavailable on this platform" };
+      }
+      try {
+        bridge.updaterInstall();
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: String(err instanceof Error ? err.message : err) };
+      }
+    },
+    quitAndInstall: async () => true,
+    onUpdateAvailable: (cb) =>
+      onNativeEvent("updateAvailable", (payload) => {
+        if (payload && typeof payload === "object" && "version" in payload) {
+          cb(payload as { version: string; releaseNotes?: string });
+        }
+      }),
+    onUpdateDownloadProgress: () => () => {},
+    onUpdateDownloaded: (cb) =>
+      onNativeEvent("updateDownloaded", (payload) => {
+        if (payload && typeof payload === "object" && "version" in payload) {
+          cb(payload as { version: string });
+        }
+      }),
+    onUpdateError: (cb) =>
+      onNativeEvent("updateError", (payload) => {
+        if (payload && typeof payload === "object" && "message" in payload) {
+          cb(payload as { message: string });
+        }
+      }),
     getCacheStats: async () => {
       try {
         let siteDataBytes = 0;
