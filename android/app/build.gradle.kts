@@ -20,8 +20,8 @@ android {
         applicationId = "app.tryliner.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.1.43"
+        versionCode = 6
+        versionName = "0.1.44"
         resourceConfigurations += listOf("en", "es", "ru", "uk")
     }
 
