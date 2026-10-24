@@ -52,13 +52,12 @@ export async function discoverLocalDevices(): Promise<LocalDeviceInfo[]> {
       hosts = await window.linerElectron.discoverLanHosts();
     } else {
       const bridge = getAndroidBridge();
-      const lanDiscover = bridge?.lanDiscover;
-      if (!bridge || !lanDiscover) {
+      if (!bridge) {
         store.setNearbyError(tr("devices.error_local_unsupported"));
         return [];
       }
       const id = newRequestId("lan");
-      hosts = await new Promise<LocalDeviceInfo[]>((resolve, reject) => {
+      hosts = await new Promise<LocalDeviceInfo[]>((resolve) => {
         let settled = false;
         const finish = (value: LocalDeviceInfo[]) => {
           if (settled) return;
@@ -68,26 +67,15 @@ export async function discoverLocalDevices(): Promise<LocalDeviceInfo[]> {
           resolve(value);
         };
         const off = onNativeEvent("lanDiscovery", (payload) => {
-          const data = payload as { id?: string; hosts?: LocalDeviceInfo[]; error?: string };
+          const data = payload as { id?: string; hosts?: LocalDeviceInfo[] };
           if (data?.id !== id) return;
-          if (data.error) {
-            finishError(new Error(data.error));
-            return;
-          }
           finish(Array.isArray(data.hosts) ? data.hosts : []);
         });
-        const finishError = (error: Error) => {
-          if (settled) return;
-          settled = true;
-          off();
-          window.clearTimeout(timer);
-          reject(error);
-        };
         const timer = window.setTimeout(() => finish([]), DISCOVERY_TIMEOUT_MS);
         try {
-          lanDiscover.call(bridge, id);
+          bridge.lanDiscover(id);
         } catch {
-          finishError(new Error(tr("devices.error_connect_failed")));
+          finish([]);
         }
       });
     }
@@ -103,10 +91,8 @@ export async function discoverLocalDevices(): Promise<LocalDeviceInfo[]> {
       useDeviceControlStore.getState().setNearbyError(tr("devices.no_nearby"));
     }
     return list;
-  } catch (error) {
-    useDeviceControlStore.getState().setNearbyError(
-      error instanceof Error ? error.message : tr("devices.no_nearby"),
-    );
+  } catch {
+    useDeviceControlStore.getState().setNearbyError(tr("devices.no_nearby"));
     return [];
   } finally {
     useDeviceControlStore.getState().setDiscovering(false);
@@ -130,8 +116,7 @@ async function lanHttp(url: string, method: "GET" | "POST", body?: string): Prom
   }
 
   const bridge = getAndroidBridge();
-  const lanRequest = bridge?.lanRequest;
-  if (!bridge || !lanRequest) throw new Error("LAN control is unavailable on this platform");
+  if (!bridge) throw new Error("LAN control is unavailable on this platform");
 
   const id = newRequestId("lanreq");
   return new Promise<LanHttpResult>((resolve, reject) => {
@@ -160,7 +145,7 @@ async function lanHttp(url: string, method: "GET" | "POST", body?: string): Prom
       8_000,
     );
     try {
-      lanRequest.call(bridge, id, method, url, body ?? null);
+      bridge.lanRequest(id, method, url, body ?? null);
     } catch (error) {
       finish("reject", error instanceof Error ? error : new Error(String(error)));
     }
