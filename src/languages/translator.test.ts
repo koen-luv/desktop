@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { flatten, t, formatTemplate, createTranslatorSync, type TranslationDict } from "./translator";
+import { SUPPORTED_LOCALES } from "./locale";
 
 const mockDict: TranslationDict = {
   "common.loading": "Loading...",
@@ -95,5 +96,13 @@ describe("createTranslatorSync with plurals", () => {
   it("falls back to English when key is missing in target locale", () => {
     const tRu = createTranslatorSync("ru");
     expect(tRu("common.app.name")).toBe("Liner");
+  });
+
+  it("translates the connected-accounts label in every supported locale", () => {
+    for (const locale of SUPPORTED_LOCALES) {
+      expect(createTranslatorSync(locale)("party.connected_accounts")).not.toBe(
+        "party.connected_accounts",
+      );
+    }
   });
 });

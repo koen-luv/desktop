@@ -8,15 +8,16 @@
  */
 
 export const PARTY_JOIN_CODE_LENGTH = 6;
+const DEFAULT_PARTY_RELAY_URL = "https://liner-party.lucabatarcian.workers.dev";
 
 const POLL_INTERVAL_MS = 1_000;
 const REQUEST_TIMEOUT_MS = 15_000;
 const ANSWER_WAIT_MS = 10 * 60 * 1000;
 
 function relayBase(): string {
-  return ((import.meta.env.VITE_PARTY_RELAY_URL as string | undefined) ?? "")
-    .trim()
-    .replace(/\/+$/, "");
+  const configured =
+    (import.meta.env.VITE_PARTY_RELAY_URL as string | undefined)?.trim() ?? "";
+  return (configured || DEFAULT_PARTY_RELAY_URL).replace(/\/+$/, "");
 }
 
 export function isPartyRelayEnabled(): boolean {

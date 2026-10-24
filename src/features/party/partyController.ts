@@ -61,9 +61,20 @@ function clearHostRelay(): void {
   }
 }
 
-function ownName(): string {
+function ownProfile(): { name: string; avatarUrl: string | null } {
   const user = useAuthStore.getState().user;
-  return user?.displayName || user?.username || tr("party.guest_default_name");
+  return {
+    name: user?.displayName || user?.username || tr("party.guest_default_name"),
+    avatarUrl: user?.avatarUrl ?? null,
+  };
+}
+
+function broadcastPartyParticipants(): void {
+  const store = usePartyStore.getState();
+  const people = [{ id: "host", ...ownProfile() }, ...store.guests];
+  for (const conn of store.hostConnections.values()) {
+    if (conn.isOpen) conn.send({ t: "participants", people });
+  }
 }
 
 /** Guest failure: end the attempt outright so the control lock can't stick. */
@@ -170,7 +181,9 @@ function onHostOpen(id: string, conn: PartyConnection): void {
     error: null,
     guests: [...store.guests, { id, name: tr("party.guest_default_name") }],
   });
-  conn.send({ t: "hello", name: ownName() });
+  broadcastPartyParticipants();
+  const profile = ownProfile();
+  conn.send({ t: "hello", ...profile });
   // Tell the guest right away whether it may edit the queue.
   conn.send({
     t: "control",
@@ -189,9 +202,12 @@ function onHostMessage(id: string, message: PartyMessage): void {
     const store = usePartyStore.getState();
     usePartyStore.setState({
       guests: store.guests.map((g) =>
-        g.id === id ? { ...g, name: message.name } : g,
+        g.id === id
+          ? { ...g, name: message.name, avatarUrl: message.avatarUrl ?? null }
+          : g,
       ),
     });
+    broadcastPartyParticipants();
     return;
   }
   // "bye" just precedes the channel closing; state belongs to guests (no
@@ -227,6 +243,7 @@ function onHostClose(id: string): void {
     code: keep ? store.code : null,
     error: keep ? store.error : null,
   });
+  broadcastPartyParticipants();
 }
 
 /** Host: apply the guest's answer; the channel opens once ICE connects. */
@@ -296,12 +313,30 @@ export async function joinParty(inviteCode: string): Promise<void> {
       {
         onOpen: () => {
           clearGuestTimer();
-          conn.send({ t: "hello", name: ownName() });
+          conn.send({ t: "hello", ...ownProfile() });
           usePartyStore.setState({ phase: "connected", error: null });
         },
         onMessage: (message) => {
           if (message.t === "control") {
             usePartyStore.setState({ allowGuestQueueControl: message.queue });
+            return;
+          }
+          if (message.t === "participants") {
+            const people = Array.isArray(message.people)
+              ? message.people.filter(
+                  (person) =>
+                    person &&
+                    typeof person.id === "string" &&
+                    typeof person.name === "string",
+                )
+              .map((person) => ({
+                id: person.id,
+                name: person.name,
+                avatarUrl:
+                  typeof person.avatarUrl === "string" ? person.avatarUrl : null,
+              }))
+              : [];
+            usePartyStore.setState({ connectedAccounts: people });
             return;
           }
           usePartyStore.getState().emitMessage(message);

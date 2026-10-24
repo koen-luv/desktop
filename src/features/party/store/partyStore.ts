@@ -18,6 +18,7 @@ export type PartyPhase =
 export interface PartyGuestInfo {
   id: string;
   name: string;
+  avatarUrl?: string | null;
 }
 
 interface PartyState {
@@ -33,6 +34,8 @@ interface PartyState {
   answerInput: string;
   /** Only guests with an open data channel — this count drives the host UI. */
   guests: PartyGuestInfo[];
+  /** Guest: host and guest accounts currently connected to the party. */
+  connectedAccounts: PartyGuestInfo[];
   error: string | null;
   /** Host: whether guests may edit the queue. Guest: last value received. */
   allowGuestQueueControl: boolean;
@@ -60,6 +63,7 @@ const initialState = {
   pendingInvite: null,
   answerInput: "",
   guests: [] as PartyGuestInfo[],
+  connectedAccounts: [] as PartyGuestInfo[],
   error: null,
   allowGuestQueueControl: false,
 };

@@ -792,7 +792,7 @@ export default function AppFrame({ children }: AppFrameProps) {
           {backgroundDim > 0 && (
             <div
               className="absolute inset-0 bg-black"
-              style={{ opacity: backgroundDim / 100 }}
+              style={{ opacity: (backgroundDim / 100) * (backgroundOpacity / 100) }}
             />
           )}
         </div>

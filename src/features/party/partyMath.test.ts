@@ -3,6 +3,7 @@ import {
   DRIFT_TOLERANCE_MS,
   expectedPositionMs,
   planResync,
+  stampPlaybackStateAtReceipt,
   type RemotePlaybackState,
 } from "./partyMath";
 
@@ -28,6 +29,18 @@ describe("expectedPositionMs", () => {
     expect(
       expectedPositionMs({ ...remote, playing: false }, 1_000 + 9_999),
     ).toBe(60_000);
+  });
+});
+
+describe("stampPlaybackStateAtReceipt", () => {
+  it("uses the local receipt clock instead of the host clock", () => {
+    expect(stampPlaybackStateAtReceipt(remote, 5_000)).toEqual({
+      ...remote,
+      sentAt: 5_000,
+    });
+    expect(
+      expectedPositionMs(stampPlaybackStateAtReceipt(remote, 5_000), 7_000),
+    ).toBe(62_000);
   });
 });
 

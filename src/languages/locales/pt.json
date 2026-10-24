@@ -404,6 +404,9 @@
     "reverb_hint": "Espaço atmosférico e profundidade ambiente",
     "reverb_amount": "Reverb"
   },
+  "party": {
+    "connected_accounts": "Contas conectadas"
+  },
   "playlist": {
     "playlist": "Playlist",
     "liked_songs": "Curtidas",

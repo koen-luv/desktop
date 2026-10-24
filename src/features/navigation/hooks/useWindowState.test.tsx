@@ -288,13 +288,24 @@ describe("useWindowState", () => {
     expect(latestState?.isFullScreen).toBe(false);
   });
 
-  it("prevents default on F11 keydown to disable uncoordinated fullscreen", async () => {
+  it("toggles native fullscreen on F11 and prevents browser fullscreen handling", async () => {
     await mount();
 
     const event = new KeyboardEvent("keydown", { key: "F11", cancelable: true });
     window.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true);
+    expect(window.linerElectron?.toggleFullScreen).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retrigger native fullscreen while F11 is held", async () => {
+    await mount();
+
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "F11", repeat: true, cancelable: true }),
+    );
+
+    expect(window.linerElectron?.toggleFullScreen).not.toHaveBeenCalled();
   });
 
   it("updates document.body classes and data-edge-to-edge attribute", async () => {

@@ -53,6 +53,7 @@
       "search": "Search",
       "library": "Library",
       "settings": "Settings",
+      "player": "Player",
       "now_playing": "Now playing"
     },
     "minimize": "Minimize",
@@ -478,6 +479,7 @@
     "queue_control_desc": "Friends can add, reorder and remove songs from their device.",
     "queue_control_hint": "You can edit the host's queue.",
     "listening_count": "{count} listening",
+    "connected_accounts": "Connected accounts",
     "share": "Share",
     "copy": "Copy",
     "copied": "Copied to clipboard",
@@ -516,7 +518,8 @@
       "title": "Title",
       "artist": "Artist",
       "album": "Album",
-      "recent": "Recently added"
+      "recent": "Recently added",
+      "oldest": "Oldest added"
     },
     "cover_change": "Change cover",
     "cover_remove": "Remove cover",
@@ -762,11 +765,11 @@
       "section_title": "Device control",
       "section_desc": "Pair your phone and computer to control playback and the queue from either one.",
       "controller_title": "Control another device",
-      "controller_desc": "Find this computer automatically on the same Wi-Fi, or use a pairing code from anywhere.",
+      "controller_desc": "Find a Liner desktop on the same Wi-Fi network and control it without a code.",
       "host_title": "Control from your phone",
-      "host_desc": "Let a phone on the same Wi-Fi control this player, or show a pairing code for remote control.",
-      "show_code": "Show pairing code",
-      "new_code": "New code",
+      "host_desc": "Let devices on the same Wi-Fi network control this player without pairing codes.",
+      "show_code": "Enable local control",
+      "new_code": "Restart local control",
       "open_remote": "Open remote"
     },
     "discord": {

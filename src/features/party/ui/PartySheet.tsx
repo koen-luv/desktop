@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Button from "@/shared/ui/Button";
 import Dialog from "@/shared/ui/Dialog";
-import { showToast } from "@/shared/ui";
+import { showToast, UserAvatar } from "@/shared/ui";
 import { useTranslation, type TFunction } from "@/languages";
 import { nativeCopy, nativeShare } from "@/platform";
 import {
@@ -123,15 +123,20 @@ function ShareCopyRow({ text }: { text: string }) {
   );
 }
 
-function GuestList({ guests }: { guests: PartyGuestInfo[] }) {
-  const { t } = useTranslation();
+function GuestList({
+  guests,
+  title,
+}: {
+  guests: PartyGuestInfo[];
+  title: string;
+}) {
   return (
     <div className="flex flex-col gap-[6px] rounded-lg border border-border-primary bg-bg-primary px-[12px] py-[9px]">
       <span
         className="text-[12px] font-[500] text-text-secondary"
         style={font}
       >
-        {t("party.listening_count", { count: guests.length })}
+        {title}
       </span>
       {guests.map((guest) => (
         <div
@@ -139,7 +144,14 @@ function GuestList({ guests }: { guests: PartyGuestInfo[] }) {
           className="flex items-center gap-[8px] text-[13px] text-text-primary"
           style={font}
         >
-          <span className="h-[6px] w-[6px] shrink-0 rounded-full bg-accent-primary" />
+          <UserAvatar
+            user={{
+              displayName: guest.name,
+              avatarUrl: guest.avatarUrl,
+            }}
+            size={28}
+            className="!rounded-full"
+          />
           <span className="truncate">{guest.name}</span>
         </div>
       ))}
@@ -160,6 +172,7 @@ export function PartySheet() {
   const code = usePartyStore((s) => s.code);
   const error = usePartyStore((s) => s.error);
   const guests = usePartyStore((s) => s.guests);
+  const connectedAccounts = usePartyStore((s) => s.connectedAccounts);
   const answerInput = usePartyStore((s) => s.answerInput);
   const setAnswerInput = usePartyStore((s) => s.setAnswerInput);
   const allowGuestQueueControl = usePartyStore((s) => s.allowGuestQueueControl);
@@ -374,7 +387,12 @@ export function PartySheet() {
           </div>
         )}
 
-        {guests.length > 0 && <GuestList guests={guests} />}
+        {guests.length > 0 && (
+          <GuestList
+            guests={guests}
+            title={t("party.listening_count", { count: guests.length })}
+          />
+        )}
 
         {(phase === "invite-ready" || phase === "connected") && (
           <div
@@ -440,13 +458,22 @@ export function PartySheet() {
 
         {phase === "connecting" && (
           <SpinnerRow label={t("party.connecting")} />
-        )}        {phase === "connected" && (
-          <div className="flex items-center gap-[8px] rounded-lg border border-border-primary bg-bg-primary px-[12px] py-[10px] text-[13px] text-text-primary"
+        )}
+        {phase === "connected" && (
+          <div
+            className="flex items-center gap-[8px] rounded-lg border border-border-primary bg-bg-primary px-[12px] py-[10px] text-[13px] text-text-primary"
             style={font}
           >
             <CheckLine size={16} className="shrink-0 text-accent-primary" />
             {t("party.synced_hint")}
           </div>
+        )}
+
+        {phase === "connected" && connectedAccounts.length > 0 && (
+          <GuestList
+            guests={connectedAccounts}
+            title={t("party.connected_accounts")}
+          />
         )}
 
         {phase === "connected" && allowGuestQueueControl && (

@@ -162,7 +162,7 @@ class MainActivity : ComponentActivity() {
         settings.builtInZoomControls = false
         settings.displayZoomControls = false
         settings.allowFileAccess = false
-        settings.allowContentAccess = false
+        settings.allowContentAccess = true
         settings.allowFileAccessFromFileURLs = false
         settings.allowUniversalAccessFromFileURLs = false
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
@@ -296,16 +296,36 @@ class MainActivity : ComponentActivity() {
                 pendingFileCallback?.onReceiveValue(null)
                 pendingFileCallback = filePathCallback
                 return try {
-                    fileChooserLauncher.launch(fileChooserParams.createIntent())
+                    fileChooserLauncher.launch(createFilePickerIntent(fileChooserParams))
                     true
                 } catch (_: Exception) {
                     pendingFileCallback = null
+                    filePathCallback.onReceiveValue(null)
                     false
                 }
             }
         }
 
         return view
+    }
+
+    private fun createFilePickerIntent(params: WebChromeClient.FileChooserParams): Intent {
+        val mimeTypes = params.acceptTypes
+            .flatMap { it.split(",") }
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .distinct()
+        return Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = mimeTypes.singleOrNull() ?: "*/*"
+            if (mimeTypes.size > 1) {
+                putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes.toTypedArray())
+            }
+            putExtra(
+                Intent.EXTRA_ALLOW_MULTIPLE,
+                params.mode == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE,
+            )
+        }
     }
 
     private fun showLoadError(view: WebView, title: String, message: String) {

@@ -60,6 +60,15 @@ describe("sortPlaylistTracks", () => {
     ]);
   });
 
+  it("shows the oldest added items first, unknown dates last", () => {
+    expect(titles(sortPlaylistTracks(tracks, "oldest"))).toEqual([
+      "Mango",
+      "Zebra",
+      "Banana",
+      "apple",
+    ]);
+  });
+
   it("does not mutate the input", () => {
     const before = titles(tracks);
     sortPlaylistTracks(tracks, "title");

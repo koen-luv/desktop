@@ -400,6 +400,9 @@
     "reverb_hint": "Атмосферний простір та об'ємна глибина",
     "reverb_amount": "Реверберація"
   },
+  "party": {
+    "connected_accounts": "Підключені облікові записи"
+  },
   "playlist": {
     "playlist": "Плейліст",
     "liked_songs": "Вподобані",

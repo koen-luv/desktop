@@ -4,12 +4,28 @@ import { playerEngine } from "@/features/player/engine/playerEngine";
 import type { Track } from "@/shared/types";
 import { type PartyMessage } from "../partySession";
 import { usePartyStore } from "../store/partyStore";
-import { planResync, type RemotePlaybackState } from "../partyMath";
+import {
+  expectedPositionMs,
+  planResync,
+  stampPlaybackStateAtReceipt,
+  type RemotePlaybackState,
+} from "../partyMath";
 import {
   resetPlaybackLock,
   setPlaybackLock,
   withPlaybackLockBypass,
 } from "../playbackLock";
+
+function applyResync(action: ReturnType<typeof planResync>): void {
+  if (action.seekToMs === null && action.play === null) return;
+  withPlaybackLockBypass(() => {
+    if (action.seekToMs !== null) {
+      playerEngine.seek(action.seekToMs, action.play === true);
+    }
+    if (action.play === true && action.seekToMs === null) playerEngine.resume();
+    else if (action.play === false) playerEngine.pause();
+  });
+}
 
 /** Keep guests' extrapolation clocks fresh while playing. */
 const HEARTBEAT_MS = 5000;
@@ -119,7 +135,8 @@ export function usePartySync(): void {
         playing: message.playing,
         sentAt: message.sentAt,
       };
-      lastRemote = remote;
+      const receivedState = stampPlaybackStateAtReceipt(remote, Date.now());
+      lastRemote = receivedState;
 
       const local = usePlayerStore.getState();
       const localId = local.currentTrack?.id ?? null;
@@ -145,8 +162,11 @@ export function usePartySync(): void {
         );
         void load.then(() => {
           if (disposed) return;
-          withPlaybackLockBypass(() =>
-            playerEngine.seek(message.positionMs, message.playing),
+          const latest = lastRemote;
+          if (!latest || latest.trackId !== message.trackId) return;
+          playerEngine.seek(
+            expectedPositionMs(latest, Date.now()),
+            latest.playing,
           );
         });
         return;
@@ -158,17 +178,10 @@ export function usePartySync(): void {
           positionMs: local.positionMs,
           playing: local.status === "playing",
         },
-        remote,
+        receivedState,
         Date.now(),
       );
-      if (action.seekToMs === null && action.play === null) return;
-      withPlaybackLockBypass(() => {
-        if (action.seekToMs !== null) {
-          playerEngine.seek(action.seekToMs, action.play ?? false);
-        }
-        if (action.play === true) playerEngine.resume();
-        else if (action.play === false) playerEngine.pause();
-      });
+      applyResync(action);
     };
 
     const unsubscribeMessages =
@@ -188,14 +201,7 @@ export function usePartySync(): void {
         lastRemote,
         Date.now(),
       );
-      if (action.seekToMs === null && action.play === null) return;
-      withPlaybackLockBypass(() => {
-        if (action.seekToMs !== null) {
-          playerEngine.seek(action.seekToMs, action.play ?? false);
-        }
-        if (action.play === true) playerEngine.resume();
-        else if (action.play === false) playerEngine.pause();
-      });
+      applyResync(action);
     }, GUEST_DRIFT_TICK_MS);
 
     return () => {

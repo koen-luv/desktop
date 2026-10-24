@@ -38,10 +38,19 @@ describe("party relay codes", () => {
     expect(normalizeJoinCode("linerparty1.abc")).toBeNull();
   });
 
-  it("is disabled until a relay URL is configured", () => {
+  it("uses the deployed relay when no URL is configured", () => {
     expect(isPartyRelayEnabled()).toBe(true);
     vi.stubEnv("VITE_PARTY_RELAY_URL", "");
-    expect(isPartyRelayEnabled()).toBe(false);
+    expect(isPartyRelayEnabled()).toBe(true);
+  });
+
+  it("allows a configured relay URL to override the default", async () => {
+    vi.stubEnv("VITE_PARTY_RELAY_URL", RELAY);
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ code: "654321" }, 201));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createRelayRoom("offer");
+    expect(fetchMock.mock.calls[0][0]).toBe(`${RELAY}/rooms`);
   });
 
   it("posts the offer and returns the room code", async () => {

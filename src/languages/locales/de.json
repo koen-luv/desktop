@@ -398,6 +398,9 @@
     "reverb_hint": "Atmosphärischer Raum & Tiefe",
     "reverb_amount": "Hall"
   },
+  "party": {
+    "connected_accounts": "Verbundene Konten"
+  },
   "playlist": {
     "playlist": "Playlist",
     "liked_songs": "Lieblingstitel",

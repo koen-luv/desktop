@@ -17,6 +17,14 @@ export interface RemotePlaybackState {
   sentAt: number;
 }
 
+/** Replace a remote wall-clock timestamp with this device's receipt time. */
+export function stampPlaybackStateAtReceipt(
+  remote: RemotePlaybackState,
+  receivedAtMs: number,
+): RemotePlaybackState {
+  return { ...remote, sentAt: receivedAtMs };
+}
+
 export interface LocalPlaybackState {
   trackId: string | null;
   positionMs: number;

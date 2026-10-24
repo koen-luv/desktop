@@ -152,12 +152,13 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
                   className="h-full w-full object-cover"
                   style={{
                     filter: backgroundBlur > 0 ? `blur(${backgroundBlur}px)` : undefined,
+                    opacity: backgroundOpacity / 100,
                   }}
                 />
                 {backgroundDim > 0 && (
                   <div
                     className="absolute inset-0 bg-black pointer-events-none"
-                    style={{ opacity: backgroundDim / 100 }}
+                    style={{ opacity: (backgroundDim / 100) * (backgroundOpacity / 100) }}
                   />
                 )}
                 <div className="absolute right-[8px] top-[8px] flex items-center gap-[6px]">

@@ -18,6 +18,7 @@ import vhsLogo from "@/assets/branding/logo-vhs.svg";
 import { useTranslation } from "@/languages";
 import { useTheme } from "next-themes";
 import { usePlayerStore, type AccentVariant } from "@/features/player";
+import { MusicNote } from "@solar-icons/react";
 import { useModalStore } from "@/features/library";
 import { useCustomizationStore, getBlockStyle } from "@/features/settings/store/customizationStore";
 import { Tooltip } from "@/shared/ui";
@@ -48,6 +49,9 @@ function Sidebar({ searchOpen, onSearchToggle, isEdgeToEdge = false }: SidebarPr
   const { pathname } = useLocation();
   const { t } = useTranslation();
   const accentVariant = usePlayerStore((state) => state.accentVariant);
+  const playerFullscreen = usePlayerStore((state) => state.fullscreen);
+  const hasCurrentTrack = usePlayerStore((state) => Boolean(state.currentTrack));
+  const setPlayerFullscreen = usePlayerStore((state) => state.setFullscreen);
   const settingsOpen = useModalStore((state) => state.settingsOpen);
   const toggleSettings = useModalStore((state) => state.toggleSettings);
 
@@ -201,6 +205,29 @@ function Sidebar({ searchOpen, onSearchToggle, isEdgeToEdge = false }: SidebarPr
 
         <nav className="relative flex-1 flex flex-col items-center gap-[24px] pt-[12px]">
           {renderNavItems()}
+          <Tooltip
+            content={t("common.sidebar.player") || "Player"}
+            side="right"
+            sideOffset={12}
+          >
+            <button
+              type="button"
+              aria-label={t("common.sidebar.player") || "Player"}
+              aria-pressed={playerFullscreen}
+              disabled={!hasCurrentTrack}
+              onClick={() => setPlayerFullscreen(true)}
+              className="group relative inline-flex items-center justify-center border-0 bg-transparent p-0 cursor-pointer active:scale-[0.96] transition-transform duration-100 disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              <MusicNote
+                size={26}
+                className={`relative z-10 text-text-primary transition-opacity duration-150 ease-out ${
+                  playerFullscreen
+                    ? "opacity-100"
+                    : "opacity-55 group-hover:opacity-90"
+                }`}
+              />
+            </button>
+          </Tooltip>
         </nav>
 
         <div className="pt-[16px] pb-[16px] shrink-0 flex justify-center items-center">

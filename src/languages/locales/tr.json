@@ -393,6 +393,9 @@
     "reverb_hint": "Atmosferik alan ve ortam derinliği",
     "reverb_amount": "Yankı"
   },
+  "party": {
+    "connected_accounts": "Bağlı hesaplar"
+  },
   "playlist": {
     "playlist": "Çalma listesi",
     "liked_songs": "Beğenilen şarkılar",

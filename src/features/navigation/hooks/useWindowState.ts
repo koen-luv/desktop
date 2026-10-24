@@ -10,9 +10,26 @@ export interface WindowStateHookResult {
 let activeF11Count = 0;
 let activeWindowStateInstances = 0;
 
-const handlePreventF11 = (e: KeyboardEvent) => {
-  if (e.key === "F11") {
-    e.preventDefault();
+const handleF11 = (event: KeyboardEvent) => {
+  if (event.key !== "F11") return;
+  event.preventDefault();
+  if (event.repeat) return;
+
+  if (window.linerElectron) {
+    void window.linerElectron.toggleFullScreen().catch((error: unknown) => {
+      console.error("Failed to toggle fullscreen:", error);
+    });
+    return;
+  }
+
+  if (document.fullscreenElement) {
+    void document.exitFullscreen().catch((error: unknown) => {
+      console.error("Failed to exit fullscreen:", error);
+    });
+  } else if (document.documentElement.requestFullscreen) {
+    void document.documentElement.requestFullscreen().catch((error: unknown) => {
+      console.error("Failed to enter fullscreen:", error);
+    });
   }
 };
 
@@ -60,7 +77,7 @@ export function useWindowState(): WindowStateHookResult {
     let pushSeq = 0;
 
     if (activeF11Count === 0 && typeof window !== "undefined") {
-      window.addEventListener("keydown", handlePreventF11);
+      window.addEventListener("keydown", handleF11);
     }
     activeF11Count++;
 
@@ -82,7 +99,7 @@ export function useWindowState(): WindowStateHookResult {
         mounted = false;
         activeF11Count--;
         if (activeF11Count === 0 && typeof window !== "undefined") {
-          window.removeEventListener("keydown", handlePreventF11);
+          window.removeEventListener("keydown", handleF11);
         }
         document.removeEventListener("fullscreenchange", handleFullscreenChange);
         window.removeEventListener("resize", handleFullscreenChange);
@@ -165,7 +182,7 @@ export function useWindowState(): WindowStateHookResult {
       mounted = false;
       activeF11Count--;
       if (activeF11Count === 0 && typeof window !== "undefined") {
-        window.removeEventListener("keydown", handlePreventF11);
+        window.removeEventListener("keydown", handleF11);
       }
       unsubscribe?.();
       window.removeEventListener("resize", handleResize);

@@ -397,6 +397,9 @@
     "reverb_hint": "Przestrzeń i głębia brzmienia",
     "reverb_amount": "Pogłos"
   },
+  "party": {
+    "connected_accounts": "Połączone konta"
+  },
   "playlist": {
     "playlist": "Playlista",
     "liked_songs": "Polubione utwory",

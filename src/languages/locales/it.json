@@ -393,6 +393,9 @@
     "reverb_hint": "Spazio atmosferico e profondità ambientale",
     "reverb_amount": "Riverbero"
   },
+  "party": {
+    "connected_accounts": "Account connessi"
+  },
   "playlist": {
     "playlist": "Playlist",
     "liked_songs": "Brani che ti piacciono",

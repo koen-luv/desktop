@@ -395,6 +395,9 @@
     "reverb_hint": "Espace atmosphérique et profondeur d'ambiance",
     "reverb_amount": "Réverbération"
   },
+  "party": {
+    "connected_accounts": "Comptes connectés"
+  },
   "playlist": {
     "playlist": "Playlist",
     "liked_songs": "Titres aimés",

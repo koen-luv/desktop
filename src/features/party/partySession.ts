@@ -36,7 +36,12 @@ export type PartyMessage =
       contextCover?: string | null;
     }
   /** Sent by each side once the channel opens, purely for display names. */
-  | { t: "hello"; name: string }
+  | { t: "hello"; name: string; avatarUrl?: string | null }
+  /** Host → guests: display names for everyone connected to the party. */
+  | {
+      t: "participants";
+      people: Array<{ id: string; name: string; avatarUrl?: string | null }>;
+    }
   /** Guest → host: a queue edit. Applied by the host only when it allows control. */
   | { t: "queue-op"; op: "reorder"; from: number; to: number }
   | { t: "queue-op"; op: "remove"; index: number }

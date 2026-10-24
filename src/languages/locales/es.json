@@ -400,6 +400,9 @@
     "reverb_hint": "Espacio atmosférico y profundidad ambiental",
     "reverb_amount": "Reverberación"
   },
+  "party": {
+    "connected_accounts": "Cuentas conectadas"
+  },
   "playlist": {
     "playlist": "Lista de reproducción",
     "liked_songs": "Canciones que te gustan",

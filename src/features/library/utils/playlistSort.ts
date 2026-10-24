@@ -5,7 +5,7 @@ import type { Track } from "@/shared/types";
  * also the only mode where drag-to-reorder is allowed; every other mode is a
  * view-only sort and never touches the playlist's revision.
  */
-export type PlaylistSortKey = "custom" | "title" | "artist" | "album" | "recent";
+export type PlaylistSortKey = "custom" | "title" | "artist" | "album" | "recent" | "oldest";
 
 export const PLAYLIST_SORT_KEYS: PlaylistSortKey[] = [
   "custom",
@@ -13,6 +13,7 @@ export const PLAYLIST_SORT_KEYS: PlaylistSortKey[] = [
   "artist",
   "album",
   "recent",
+  "oldest",
 ];
 
 export const PLAYLIST_SORT_LABEL_KEYS: Record<PlaylistSortKey, string> = {
@@ -21,11 +22,12 @@ export const PLAYLIST_SORT_LABEL_KEYS: Record<PlaylistSortKey, string> = {
   artist: "playlist.sort.artist",
   album: "playlist.sort.album",
   recent: "playlist.sort.recent",
+  oldest: "playlist.sort.oldest",
 };
 
 const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
 
-function valueOf(track: Track, key: Exclude<PlaylistSortKey, "custom" | "recent">): string {
+function valueOf(track: Track, key: Exclude<PlaylistSortKey, "custom" | "recent" | "oldest">): string {
   if (key === "title") return track.title ?? "";
   if (key === "artist") return track.artists ?? "";
   return track.album?.title ?? "";
@@ -47,12 +49,12 @@ export function sortPlaylistTracks(tracks: Track[], key: PlaylistSortKey): Track
 
   const rows = tracks.map((track, index) => ({ track, index }));
   rows.sort((a, b) => {
-    if (key === "recent") {
+    if (key === "recent" || key === "oldest") {
       const at = addedAt(a.track);
       const bt = addedAt(b.track);
       const aValid = Number.isFinite(at);
       const bValid = Number.isFinite(bt);
-      if (aValid && bValid && at !== bt) return bt - at;
+      if (aValid && bValid && at !== bt) return key === "recent" ? bt - at : at - bt;
       if (aValid !== bValid) return aValid ? -1 : 1;
       return a.index - b.index;
     }
