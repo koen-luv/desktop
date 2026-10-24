@@ -27,7 +27,7 @@ import "@braccato/core/styles/lyrics.css";
 import "@braccato/core/styles/instrumental.css";
 import KawarpWrapper from "./KawarpWrapper";
 import { useTranslation } from "@/languages";
-import { isAndroidApp } from "@/platform";
+import { isAndroidApp, isWindowsDesktop } from "@/platform";
 
 const BRACCATO_TAG = "braccato-lyrics";
 const KAWARP_FADE_IN_MS = 600;
@@ -377,6 +377,8 @@ export function FullscreenPlayer({
   const partyActive = usePartyStore(
     (s) => s.role !== null && s.phase !== "idle" && s.phase !== "error",
   );
+  const windowsDesktop = isWindowsDesktop();
+  const deviceConnected = useDeviceControlStore((s) => s.controllerPhase === "connected");
 
   useEffect(() => {
     if (!player.currentTrack) {
@@ -451,12 +453,12 @@ export function FullscreenPlayer({
 
       <div className="absolute inset-0 z-[1] bg-black/40" />
 
-      <div className="absolute inset-0 z-10 flex flex-col md:flex-row pt-[var(--inset-top,0px)] pb-[var(--inset-bottom,0px)]">
-        <div className="w-full shrink-0 md:flex-1 flex flex-col items-center justify-center gap-3 md:gap-5 px-4 pt-12 pb-2 md:p-0">
+      <div className="absolute inset-0 z-10 flex flex-col landscape:flex-row md:flex-row pt-[var(--inset-top,0px)] pb-[var(--inset-bottom,0px)]">
+        <div className="w-full landscape:w-[42%] landscape:flex-none shrink-0 md:flex-1 flex flex-col items-center justify-center gap-3 landscape:gap-2 md:gap-5 px-4 landscape:px-2 pt-12 landscape:pt-0 pb-2 md:p-0">
           <PlayerUiElements onClose={onClose} />
         </div>
 
-        <div className="flex-1 w-full min-h-0 pl-0 pr-0 md:pl-2 md:pr-6 flex flex-col relative">
+        <div className="flex-1 w-full landscape:w-[58%] min-h-0 pl-0 pr-0 md:pl-2 md:pr-6 flex flex-col relative">
           {showProviderIsland && (
             <div className="absolute top-[12px] left-1/2 -translate-x-1/2 z-30 pointer-events-none flex justify-center">
               <LyricsProviderIsland />
@@ -573,7 +575,9 @@ export function FullscreenPlayer({
         onClick={() => useDeviceControlStore.getState().setOpen(true)}
         data-no-window-drag
         className={`absolute top-[calc(var(--inset-top,0px)+52px)] right-[12px] z-30 inline-flex h-[32px] w-[32px] items-center justify-center rounded-lg border-none backdrop-blur-xl active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto ${
-          useDeviceControlStore.getState().controllerPhase === "connected"
+          windowsDesktop ? "hidden" : ""
+        } ${
+          deviceConnected
             ? "bg-accent-primary/30 text-white ring-1 ring-accent-primary/60 hover:bg-accent-primary/40"
             : "bg-black/50 text-white/80 hover:text-white hover:bg-white/10"
         }`}
@@ -586,6 +590,8 @@ export function FullscreenPlayer({
         onClick={() => usePartyStore.getState().setOpen(true)}
         data-no-window-drag
         className={`absolute top-[calc(var(--inset-top,0px)+12px)] right-[12px] z-30 inline-flex h-[32px] w-[32px] items-center justify-center rounded-lg border-none backdrop-blur-xl active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto ${
+          windowsDesktop ? "hidden" : ""
+        } ${
           partyActive
             ? "bg-accent-primary/30 text-white ring-1 ring-accent-primary/60 hover:bg-accent-primary/40"
             : "bg-black/50 text-white/80 hover:text-white hover:bg-white/10"

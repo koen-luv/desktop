@@ -69,6 +69,11 @@ export interface LinerAndroidBridge {
   audioSetSpeed(rate: number): void;
   audioSetPitch(semitones: number): void;
   audioSetReverb(level: number): void;
+  audioSetEqualizer?(enabled: boolean, gainsJson: string): void;
+  /** Broadcasts LAN discovery and emits `lanDiscovery` with { id, hosts }. */
+  lanDiscover?(requestId: string): void;
+  /** Makes an HTTP request to a discovered LAN host and emits `lanResponse`. */
+  lanRequest?(requestId: string, method: string, url: string, body: string | null): void;
   /**
    * Schedules native playback to pause at an absolute epoch-ms deadline
    * (0 cancels). Enforced by the Media3 service so it fires even with the
@@ -87,6 +92,9 @@ export interface LinerAndroidBridge {
   audioCrossfadeLoad(payload: string): void;
   audioCrossfadeStart(durationMs: number): void;
   audioCrossfadeCancel(): void;
+  /** Supplies a resolved queue item so native playback can advance without the WebView. */
+  audioSetNextTrack?(payload: string | null, autoAdvance?: boolean): void;
+  audioSetPreviousTrack?(payload: string | null): void;
   audioState(): string;
   audioCache(url: string, trackId: string, mimeType: string, limitBytes: number): void;
   audioSetCacheLimit(limitBytes: number): void;
@@ -120,6 +128,14 @@ let backHandler: (() => boolean) | null = null;
 
 export function isAndroidApp(): boolean {
   return typeof window !== "undefined" && Boolean(window.LinerAndroid);
+}
+
+export function isWindowsDesktop(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    Boolean(window.linerElectron) &&
+    /Windows/i.test(navigator.userAgent)
+  );
 }
 
 export function getAndroidBridge(): LinerAndroidBridge | null {

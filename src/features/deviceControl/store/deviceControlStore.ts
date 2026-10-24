@@ -16,6 +16,13 @@ export interface DeviceControllerInfo {
   name: string;
 }
 
+export interface LocalDeviceInfo {
+  name: string;
+  address: string;
+  port: number;
+  token: string;
+}
+
 interface DeviceControlState {
   /** Whether the remote-control sheet is open. */
   open: boolean;
@@ -32,6 +39,9 @@ interface DeviceControlState {
   hostCode: string | null;
   hostError: string | null;
   controllers: DeviceControllerInfo[];
+  nearbyHosts: LocalDeviceInfo[];
+  isDiscovering: boolean;
+  nearbyError: string | null;
 
   setOpen: (open: boolean) => void;
   setCodeInput: (value: string) => void;
@@ -40,6 +50,9 @@ interface DeviceControlState {
   setRemotePosition: (positionMs: number, sentAt?: number) => void;
   setRemotePlaying: (playing: boolean) => void;
   setRemoteVolume: (volume: number) => void;
+  setNearbyHosts: (hosts: LocalDeviceInfo[]) => void;
+  setDiscovering: (discovering: boolean) => void;
+  setNearbyError: (error: string | null) => void;
 
   // Session objects live outside React state (RTCPeerConnection is mutable).
   hostConnections: Map<string, PartyConnection<DeviceMessage>>;
@@ -57,6 +70,9 @@ const initial = {
   hostCode: null,
   hostError: null,
   controllers: [] as DeviceControllerInfo[],
+  nearbyHosts: [] as LocalDeviceInfo[],
+  isDiscovering: false,
+  nearbyError: null,
 };
 
 export const useDeviceControlStore = create<DeviceControlState>((set, get) => ({
@@ -65,6 +81,9 @@ export const useDeviceControlStore = create<DeviceControlState>((set, get) => ({
   controllerConnection: null,
 
   setOpen: (open) => set({ open }),
+  setNearbyHosts: (nearbyHosts) => set({ nearbyHosts }),
+  setDiscovering: (isDiscovering) => set({ isDiscovering }),
+  setNearbyError: (nearbyError) => set({ nearbyError }),
 
   setCodeInput: (value) => set({ codeInput: value }),
 

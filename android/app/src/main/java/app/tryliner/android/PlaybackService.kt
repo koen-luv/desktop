@@ -157,11 +157,11 @@ class PlaybackService : MediaLibraryService() {
                 val event = intent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT)
                 when (event?.keyCode) {
                     KeyEvent.KEYCODE_MEDIA_NEXT -> {
-                        emitMediaCommand("next")
+                        PlaybackHolder.skipToNext()
                         return true
                     }
                     KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
-                        emitMediaCommand("previous")
+                        PlaybackHolder.skipToPrevious()
                         return true
                     }
                 }
@@ -394,8 +394,8 @@ class PlaybackService : MediaLibraryService() {
     }
 
     private fun togglePlayback() {
-        val current = player ?: return
-        if (current.isPlaying) current.pause() else current.play()
+        if (player == null) return
+        PlaybackHolder.togglePlayback()
         refreshNotification()
     }
 
@@ -520,7 +520,8 @@ class PlaybackService : MediaLibraryService() {
     }
 
     private fun emitMediaCommand(command: String) {
-        NativeEvents.emit("mediaCommand", "{\"command\":\"$command\"}")
+        if (command == "next") PlaybackHolder.skipToNext()
+        else if (command == "previous") PlaybackHolder.skipToPrevious()
     }
 
     private fun scheduleIdleStop() {

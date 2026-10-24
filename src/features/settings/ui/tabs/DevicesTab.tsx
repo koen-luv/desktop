@@ -4,6 +4,7 @@ import { nativeCopy } from "@/platform";
 import { showToast } from "@/shared/ui";
 import { CheckLine, Copy2Line } from "@mingcute/react";
 import { useDeviceControlStore } from "@/features/deviceControl";
+import { discoverLocalDevices, connectToLocalHost } from "@/features/deviceControl";
 import { connectToHost, disconnectController, sendControl } from "@/features/deviceControl";
 import { startHosting, stopHosting } from "@/features/deviceControl";
 import type { ControlAction } from "@/features/deviceControl";
@@ -37,6 +38,9 @@ export function DevicesTab({ searchQuery }: { searchQuery?: string }) {
   const hostCode = useDeviceControlStore((s) => s.hostCode);
   const hostError = useDeviceControlStore((s) => s.hostError);
   const controllers = useDeviceControlStore((s) => s.controllers);
+  const nearbyHosts = useDeviceControlStore((s) => s.nearbyHosts);
+  const isDiscovering = useDeviceControlStore((s) => s.isDiscovering);
+  const nearbyError = useDeviceControlStore((s) => s.nearbyError);
 
   const query = (searchQuery ?? "").trim().toLowerCase();
   const matches = (...texts: string[]) =>
@@ -114,6 +118,38 @@ export function DevicesTab({ searchQuery }: { searchQuery?: string }) {
             </div>
           ) : (
             <div className="flex flex-col gap-[8px]">
+              <div className="flex flex-col gap-[7px] rounded-lg border border-border-primary bg-bg-primary p-[10px]">
+                <div className="flex items-center justify-between gap-[8px]">
+                  <span className="text-[12.5px] font-[500] text-text-secondary">
+                    {t("devices.local_network") || "Same Wi-Fi network"}
+                  </span>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={isDiscovering}
+                    onClick={() => void discoverLocalDevices()}
+                  >
+                    {isDiscovering
+                      ? t("devices.searching") || "Searching…"
+                      : t("devices.discover") || "Find devices"}
+                  </Button>
+                </div>
+                {nearbyHosts.map((host) => (
+                  <Button
+                    key={`${host.address}:${host.port}`}
+                    variant="outline"
+                    size="sm"
+                    disabled={controllerPhase === "connecting"}
+                    onClick={() => void connectToLocalHost(host)}
+                    className="w-full justify-start"
+                  >
+                    {host.name} · {host.address}
+                  </Button>
+                ))}
+                {nearbyError ? (
+                  <span className="text-[11.5px] text-text-tertiary">{nearbyError}</span>
+                ) : null}
+              </div>
               {controllerPhase === "connecting" ? (
                 <div className="flex items-center gap-[9px] rounded-lg border border-border-primary bg-bg-primary px-[12px] py-[11px]">
                   <Spinner />
@@ -170,7 +206,9 @@ export function DevicesTab({ searchQuery }: { searchQuery?: string }) {
               {hostPhase === "waiting" ? (
                 <>
                   <span className="text-[12px] font-[500] text-text-secondary">
-                    {t("devices.waiting")}
+                    {hostCode?.startsWith("http://")
+                      ? t("devices.waiting_local") || "Waiting for a device on your Wi-Fi network"
+                      : t("devices.waiting")}
                   </span>
                   <textarea
                     readOnly

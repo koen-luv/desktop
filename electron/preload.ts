@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { AuthRefreshResult, StoredAuthSession } from "./auth-session-store";
 import { startPoTokenWorker } from "./potoken-preload";
 import type { MainNetResult } from "./netdiag";
+import type { LanDiscoveredHost, LanHostInfo } from "./lan";
 
 export interface DeeplinkTarget {
   type: "artist" | "album" | "playlist" | "track";
@@ -134,6 +135,10 @@ export interface LinerElectronApi {
   discordUpdateState: (state: any) => void;
   discordUpdateSettings: (settings: any) => void;
   getDiscordStatus: () => Promise<{ connected: boolean; username?: string }>;
+  discoverLanHosts?: () => Promise<LanDiscoveredHost[]>;
+  startLanHost?: (name: string, offer: string) => Promise<LanHostInfo>;
+  stopLanHost?: () => Promise<void>;
+  onLanAnswer?: (cb: (answer: string) => void) => () => void;
   mintPoToken: (identifier: string) => Promise<string>;
 }
 
@@ -363,6 +368,14 @@ const api: LinerElectronApi = {
     ipcRenderer.send("discord:update-settings", settings);
   },
   getDiscordStatus: () => ipcRenderer.invoke("discord:get-status"),
+  discoverLanHosts: () => ipcRenderer.invoke("lan:discover-hosts"),
+  startLanHost: (name, offer) => ipcRenderer.invoke("lan:start-host", name, offer),
+  stopLanHost: () => ipcRenderer.invoke("lan:stop-host"),
+  onLanAnswer: (cb) => {
+    const listener = (_event: unknown, answer: string) => cb(answer);
+    ipcRenderer.on("lan:answer", listener);
+    return () => ipcRenderer.removeListener("lan:answer", listener);
+  },
   mintPoToken: (identifier) => ipcRenderer.invoke("potoken:mint", identifier),
 };
 

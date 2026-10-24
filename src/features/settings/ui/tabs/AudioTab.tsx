@@ -4,8 +4,18 @@ import { useToast } from "@/shared/ui";
 import Button from "@/shared/ui/Button";
 import { useTranslation } from "@/languages";
 import { usePlayerStore, type AudioQuality } from "@/features/player";
-import { Select } from "@/shared/ui";
+import { Select, Slider, ToggleSwitch } from "@/shared/ui";
 import { useConnectivityStore } from "@/features/connectivity";
+import {
+  EQUALIZER_BANDS,
+  EQUALIZER_MAX_DB,
+  EQUALIZER_MIN_DB,
+  EQUALIZER_PRESETS,
+  equalizerPresetFor,
+  presetGains,
+} from "@/features/player/engine/equalizer";
+import type { EqualizerPresetId } from "@/features/player/engine/equalizer";
+import { useEqualizerSettingsStore } from "@/features/player/store/equalizerSettingsStore";
 import { SettingRow, SettingSection } from "../controls";
 
 export function AudioTab({ searchQuery }: { searchQuery?: string }) {
@@ -19,6 +29,12 @@ export function AudioTab({ searchQuery }: { searchQuery?: string }) {
   const connChecks = useConnectivityStore((s) => s.checks);
   const connLastRunAt = useConnectivityStore((s) => s.lastRunAt);
   const runAndSaveDump = useConnectivityStore((s) => s.runAndSaveDump);
+  const equalizerEnabled = useEqualizerSettingsStore((s) => s.enabled);
+  const equalizerGains = useEqualizerSettingsStore((s) => s.gains);
+  const setEqualizerEnabled = useEqualizerSettingsStore((s) => s.setEnabled);
+  const setEqualizerGain = useEqualizerSettingsStore((s) => s.setGain);
+  const setEqualizerGains = useEqualizerSettingsStore((s) => s.setGains);
+  const equalizerPreset = equalizerPresetFor(equalizerGains);
 
   useEffect(() => {
     setMounted(true);
@@ -61,6 +77,49 @@ export function AudioTab({ searchQuery }: { searchQuery?: string }) {
             )
           }
         />
+      </SettingSection>
+
+      <SettingSection label={t("settings.equalizer.title") || "Equalizer"}>
+        <SettingRow
+          title={t("settings.equalizer.enable") || "Enable equalizer"}
+          description={t("settings.equalizer.description") || "Adjust five frequency bands for your preferred sound."}
+          control={<ToggleSwitch checked={equalizerEnabled} onChange={setEqualizerEnabled} />}
+        />
+        <div className="flex flex-col gap-[12px] py-[12px]">
+          <Select
+            aria-label={t("settings.equalizer.preset") || "Equalizer preset"}
+            value={equalizerPreset}
+            onChange={(value) => {
+              if (value !== "custom") setEqualizerGains(presetGains(value as EqualizerPresetId));
+            }}
+            options={[
+              ...EQUALIZER_PRESETS.map((preset) => ({
+                value: preset.id,
+                label: t(`settings.equalizer.presets.${preset.id}`) || preset.id,
+              })),
+              { value: "custom", label: t("settings.equalizer.presets.custom") || "Custom" },
+            ]}
+          />
+          <div className="grid grid-cols-5 gap-[12px]">
+            {EQUALIZER_BANDS.map((band, index) => (
+              <Slider
+                key={band.frequency}
+                value={equalizerGains[index] ?? 0}
+                onChange={(value) => setEqualizerGain(index, value)}
+                min={EQUALIZER_MIN_DB}
+                max={EQUALIZER_MAX_DB}
+                step={0.5}
+                unit=" dB"
+                ariaLabel={`${band.frequency} Hz`}
+                disabled={!equalizerEnabled}
+                className="min-w-0"
+              />
+            ))}
+          </div>
+          <div className="grid grid-cols-5 gap-[12px] text-center text-[11px] text-text-tertiary">
+            {EQUALIZER_BANDS.map((band) => <span key={band.frequency}>{band.label} Hz</span>)}
+          </div>
+        </div>
       </SettingSection>
 
       <SettingSection label={t("settings.connection.title")}>

@@ -1,8 +1,10 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { debouncedStorage } from "@/shared/utils/storage";export interface BlockCustomization {
+import { debouncedStorage } from "@/shared/utils/storage";
+
+export interface BlockCustomization {
   opacity: number;
-  backgroundOpacity: number;
+  backgroundOpacity?: number;
   blur: number;
   dim: number;
 }
@@ -46,6 +48,7 @@ export interface CustomizationState {
   backgroundImage: string | null;
   backgroundBlur: number;
   backgroundDim: number;
+  backgroundOpacity: number;
   sidebar: BlockCustomization;
   contentView: BlockCustomization;
   miniplayer: BlockCustomization;
@@ -54,6 +57,7 @@ export interface CustomizationState {
   setBackgroundImage: (image: string | null) => void;
   setBackgroundBlur: (blur: number) => void;
   setBackgroundDim: (dim: number) => void;
+  setBackgroundOpacity: (opacity: number) => void;
   setBlockConfig: (
     block: "sidebar" | "contentView" | "miniplayer",
     patch: Partial<BlockCustomization>,
@@ -239,6 +243,11 @@ export const useCustomizationStore = create<CustomizationState>()(
         set({ backgroundDim: clamped });
       },
 
+      setBackgroundOpacity: (opacity) => {
+        const clamped = Math.max(MIN_OPACITY, Math.min(MAX_OPACITY, Math.round(opacity)));
+        set({ backgroundOpacity: clamped });
+      },
+
       setBlockConfig: (block, patch) => {
         set((state) => ({
           [block]: {
@@ -292,6 +301,7 @@ export const useCustomizationStore = create<CustomizationState>()(
           backgroundImage: null,
           backgroundBlur: 0,
           backgroundDim: 0,
+          backgroundOpacity: 100,
           sidebar: { ...DEFAULT_BLOCK_CONFIG },
           contentView: { ...DEFAULT_BLOCK_CONFIG },
           miniplayer: { ...DEFAULT_BLOCK_CONFIG },
@@ -316,6 +326,10 @@ export const useCustomizationStore = create<CustomizationState>()(
         state.sidebar = clampBlockConfig(state.sidebar || {});
         state.contentView = clampBlockConfig(state.contentView || {});
         state.miniplayer = clampBlockConfig(state.miniplayer || {});
+        state.backgroundOpacity =
+          typeof state.backgroundOpacity === "number"
+            ? Math.max(MIN_OPACITY, Math.min(MAX_OPACITY, Math.round(state.backgroundOpacity)))
+            : 100;
         state.playerElementOrder = normalizePlayerElementOrder(state.playerElementOrder);
         void loadPersistedWallpaper().then((img) => {
           if (img) {
@@ -357,7 +371,7 @@ export function getBlockStyle(
     };
   }
 
-  const alpha = config.backgroundOpacity / 100;
+  const alpha = (config.backgroundOpacity ?? config.opacity) / 100;
   const dimAlpha = config.dim / 100;
 
   let bg: string;
@@ -399,7 +413,10 @@ export function isGlassThemeActive(state: {
 }): boolean {
   if (!state.backgroundImage) return false;
   return [state.sidebar, state.contentView, state.miniplayer].some(
-    (b) => b.opacity < 100 && b.blur > 0 && b.backgroundOpacity < 100,
+    (b) =>
+      b.opacity < 100 &&
+      b.blur > 0 &&
+      (b.backgroundOpacity ?? b.opacity) < 100,
   );
 }
 

@@ -4,6 +4,7 @@ import {
   clampBlockConfig,
   getBlockStyle,
   isGlassThemeActive,
+  normalizePlayerElementOrder,
   MIN_OPACITY,
   MAX_OPACITY,
   MIN_BLUR,
@@ -18,10 +19,10 @@ describe("customizationStore", () => {
   });
 
   it("clamps block values within safe limits", () => {
-    const clampedUnder = clampBlockConfig({ opacity: 5, blur: -10, dim: -5 });
-    expect(clampedUnder.opacity).toBe(25);
-    expect(clampedUnder.blur).toBe(10);
-    expect(clampedUnder.dim).toBe(8);
+    const clampedUnder = clampBlockConfig({ opacity: -5, blur: -10, dim: -5 });
+    expect(clampedUnder.opacity).toBe(MIN_OPACITY);
+    expect(clampedUnder.blur).toBe(MIN_BLUR);
+    expect(clampedUnder.dim).toBe(MIN_DIM);
 
     const clampedOver = clampBlockConfig({ opacity: 150, blur: 100, dim: 200 });
     expect(clampedOver.opacity).toBe(100);
@@ -53,9 +54,9 @@ describe("customizationStore", () => {
     store.applyToAllBlocks("sidebar");
 
     const state = useCustomizationStore.getState();
-    expect(state.sidebar).toEqual({ opacity: 45, blur: 28, dim: 35 });
-    expect(state.contentView).toEqual({ opacity: 45, blur: 28, dim: 35 });
-    expect(state.miniplayer).toEqual({ opacity: 45, blur: 28, dim: 35 });
+    expect(state.sidebar).toEqual({ opacity: 45, backgroundOpacity: 100, blur: 28, dim: 35 });
+    expect(state.contentView).toEqual({ opacity: 45, backgroundOpacity: 100, blur: 28, dim: 35 });
+    expect(state.miniplayer).toEqual({ opacity: 45, backgroundOpacity: 100, blur: 28, dim: 35 });
   });
 
   it("calculates composite glassmorphism block style accurately", () => {
@@ -85,6 +86,38 @@ describe("customizationStore", () => {
       (styleLowOpacity as Record<string, string>)["--glass-pill-bg"]
     );
     expect((styleLowOpacity as Record<string, string>)["--glass-pill-border"]).toBe("none");
+  });
+
+  it("allows wallpaper opacity to be set to zero", () => {
+    useCustomizationStore.getState().setBackgroundOpacity(0);
+    expect(useCustomizationStore.getState().backgroundOpacity).toBe(0);
+  });
+
+  it("moves player elements while preserving a complete unique order", () => {
+    const store = useCustomizationStore.getState();
+    store.movePlayerElement("controls", -1);
+    expect(useCustomizationStore.getState().playerElementOrder).toEqual([
+      "artwork",
+      "trackInfo",
+      "controls",
+      "timeline",
+      "volume",
+    ]);
+    store.setPlayerElementOrder(["volume", "volume"]);
+    expect(useCustomizationStore.getState().playerElementOrder).toEqual([
+      "volume",
+      "artwork",
+      "trackInfo",
+      "timeline",
+      "controls",
+    ]);
+    expect(normalizePlayerElementOrder(["controls", "invalid", "controls"])).toEqual([
+      "controls",
+      "artwork",
+      "trackInfo",
+      "timeline",
+      "volume",
+    ]);
   });
 
   it("determines when glass theme is active with custom wallpaper and transparent blur", () => {

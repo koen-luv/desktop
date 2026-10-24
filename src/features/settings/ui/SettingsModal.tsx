@@ -131,8 +131,6 @@ const SETTING_ITEMS: { sectionId: SectionId; titleKey: string; descKey?: string;
 
   // Last.fm
   { sectionId: "LastFm", titleKey: "settings.lastfm.enable.title", descKey: "settings.lastfm.enable.description" },
-  { sectionId: "LastFm", titleKey: "settings.lastfm.api_key.title", descKey: "settings.lastfm.api_key.description" },
-  { sectionId: "LastFm", titleKey: "settings.lastfm.api_secret.title", descKey: "settings.lastfm.api_secret.description" },
   { sectionId: "LastFm", titleKey: "settings.lastfm.account.title", descKey: "settings.lastfm.account.description" },
 
   // Device control

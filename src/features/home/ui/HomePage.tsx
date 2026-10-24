@@ -10,6 +10,7 @@ import {
 } from "../hooks/usePopularTracks";
 import { useRecentlyPlayed } from "../hooks/useRecentlyPlayed";
 import { useDailyMixes } from "../hooks/useDailyMixes";
+import { useForgottenMemories, useNewReleases } from "../hooks/useHomeExtras";
 import { useLikedTracks } from "@/features/library/hooks/useLikedTracks";
 import { playerEngine } from "@/features/player";
 import SongCard from "@/features/player/ui/SongCard";
@@ -40,6 +41,8 @@ export default function HomePage() {
   const { data: recentlyPlayed, isLoading: recentLoading } =
     useRecentlyPlayed(20);
   const { data: dailyMixes } = useDailyMixes();
+  const { data: forgottenMemories } = useForgottenMemories(20);
+  const { data: newReleases } = useNewReleases(12);
 
   const isDataLoading =
     tracksLoading ||
@@ -244,6 +247,24 @@ export default function HomePage() {
               title={t("home.popularPlaylists")}
               icon={<PlaylistFill className="w-5 h-5 text-rose-400" />}
               items={popularPlaylists}
+              headingMarginTop="mt-[22px]"
+            />
+          )}
+
+          {newReleases.length > 0 && (
+            <PopularTracksSection
+              title={t("home.newReleases") || "New releases"}
+              icon={<AlbumFill className="w-5 h-5 text-violet-400" />}
+              items={newReleases}
+              headingMarginTop="mt-[22px]"
+            />
+          )}
+
+          {forgottenMemories.length > 0 && (
+            <PopularTracksSection
+              title={t("home.forgottenMemories") || "Forgotten memories"}
+              icon={<TimeFill className="w-5 h-5 text-sky-400" />}
+              items={forgottenMemories}
               headingMarginTop="mt-[22px]"
             />
           )}

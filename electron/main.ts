@@ -44,6 +44,7 @@ import { computeDragBounds, isInTopSnapZone, restoreUnderCursor } from "./window
 import { isWindows11, loadSnapPreviewAddon, NativeSnapPreview } from "./snap-native.js";
 import { DiscordRpcManager } from "./discord.js";
 import { PoTokenService } from "./potoken.js";
+import { discoverLanHosts, startLanHost, stopLanHost } from "./lan.js";
 
 // root error handling for main process
 process.on("uncaughtException", (error) => {
@@ -147,6 +148,7 @@ const shutdown = createShutdown({
       poTokenService?.destroy();
       poTokenService = null;
     },
+    () => stopLanHost(),
     () => globalShortcut.unregisterAll(),
     () => {
       for (const child of spawnedChildren) {
@@ -405,6 +407,16 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
+    ipcMain.handle("lan:discover-hosts", () => discoverLanHosts());
+    ipcMain.handle("lan:start-host", async (event, name: unknown, offer: unknown) => {
+      if (typeof name !== "string" || typeof offer !== "string" || !offer.trim()) {
+        throw new Error("Invalid local device host request.");
+      }
+      return startLanHost(name, offer, (answer) => {
+        if (!event.sender.isDestroyed()) event.sender.send("lan:answer", answer);
+      });
+    });
+    ipcMain.handle("lan:stop-host", () => stopLanHost());
     // register liner:// so browsers / xdg-open route share links to us
     // (on linux the packaged .desktop carries the mime handler too)
     if (process.defaultApp && process.argv.length >= 2) {

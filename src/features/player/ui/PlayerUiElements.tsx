@@ -8,7 +8,15 @@ import {
   RepeatOne,
   Shuffle,
 } from "@solar-icons/react";
-import { AddLine, CheckFill, HeartFill, HeartLine, MoonLine } from "@mingcute/react";
+import {
+  AddLine,
+  CheckFill,
+  Group2Line,
+  HeartFill,
+  HeartLine,
+  MoonLine,
+  RemoteControlLine,
+} from "@mingcute/react";
 import {
   PlayerMorphIcon,
   ICON_PLAY,
@@ -24,10 +32,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import ArtistLink from "@/features/artist/ui/ArtistLink";
 import { useCoverReady, CoverImage } from "@/features/covers";
 import { usePartyStore } from "@/features/party/store/partyStore";
+import { useDeviceControlStore } from "@/features/deviceControl";
 import ExplicitBadge from "@/shared/ui/ExplicitBadge";
 import { VolumePicker } from "./VolumePicker";
 import { TimelineSlider } from "./TimelineSlider";
 import { SleepTimerControl } from "./SleepTimerControl";
+import { useCustomizationStore, PLAYER_ELEMENT_IDS } from "@/features/settings/store/customizationStore";
+import { isWindowsDesktop } from "@/platform";
 
 import { useTranslation } from "@/languages";
 
@@ -76,6 +87,13 @@ export function PlayerUiElements({
   const partyGuest = usePartyStore((s) => s.role === "guest");
   const [sleepOpen, setSleepOpen] = useState(false);
   const sleepRemaining = useSleepTimerRemainingMs();
+  const playerElementOrder = useCustomizationStore((s) => s.playerElementOrder);
+  const elementOrder = playerElementOrder.length ? playerElementOrder : PLAYER_ELEMENT_IDS;
+  const showWindowsDeviceButtons = isWindowsDesktop();
+  const deviceConnected = useDeviceControlStore((s) => s.controllerPhase === "connected");
+  const partyActive = usePartyStore(
+    (s) => s.role !== null && s.phase !== "idle" && s.phase !== "error",
+  );
 
   const track = player.currentTrack;
   const coverUrl = track?.coverUrl || "";
@@ -111,6 +129,7 @@ export function PlayerUiElements({
         className={`relative shrink-0 overflow-hidden rounded-xl w-[min(280px,44vh,72vw)] h-[min(280px,44vh,72vw)] bg-black/20 ${
           coverUrl && !isCoverLoaded ? "animate-pulse" : ""
         }`}
+        style={{ order: elementOrder.indexOf("artwork") }}
       >
         <AnimatePresence>
           <motion.div
@@ -174,7 +193,10 @@ export function PlayerUiElements({
       </div>
 
       {/* Track info */}
-      <div className="w-full md:w-[280px] flex items-start justify-center min-w-0 px-4">
+      <div
+        className="w-full md:w-[280px] flex items-start justify-center min-w-0 px-4"
+        style={{ order: elementOrder.indexOf("trackInfo") }}
+      >
         <div className="flex flex-col gap-[2px] min-w-0 text-center">
           <p
             className="m-0 text-[15px] font-[600] text-white flex items-center justify-center gap-[6px] max-w-[min(280px,82vw)]"
@@ -202,17 +224,25 @@ export function PlayerUiElements({
       </div>
 
       {/* Timeline (Compact, with smooth spring pill, no thumb) */}
-      <TimelineSlider
-        positionMs={player.positionMs}
-        durationMs={player.durationMs}
-        onSeek={(pos) => playerEngine.seek(pos)}
-        showTime
-        size="md"
-        className="w-[min(320px,84vw)] md:w-[320px]"
-      />
+      <div
+        className="flex w-full justify-center"
+        style={{ order: elementOrder.indexOf("timeline") }}
+      >
+        <TimelineSlider
+          positionMs={player.positionMs}
+          durationMs={player.durationMs}
+          onSeek={(pos) => playerEngine.seek(pos)}
+          showTime
+          size="md"
+          className="w-[min(320px,84vw)] md:w-[320px]"
+        />
+      </div>
 
       {/* Primary Playback Controls */}
-      <div className="flex items-center gap-[14px]">
+      <div
+        className="flex items-center gap-[14px]"
+        style={{ order: elementOrder.indexOf("controls") }}
+      >
         <button
           type="button"
           aria-label={player.shuffle ? t("player.shuffle_on") : t("player.shuffle_off")}
@@ -313,10 +343,39 @@ export function PlayerUiElements({
             )}
           </AnimatePresence>
         </div>
+
+        {showWindowsDeviceButtons && (
+          <>
+            <button
+              type="button"
+              aria-label={t("devices.remote_title")}
+              title={t("devices.remote_title")}
+              onClick={() => useDeviceControlStore.getState().setOpen(true)}
+              className={`${iconButtonClass} ${
+                deviceConnected ? "!text-white !opacity-100" : "!text-white/40"
+              }`}
+            >
+              <RemoteControlLine size={18} />
+            </button>
+            <button
+              type="button"
+              aria-label={t("party.title")}
+              title={t("party.title")}
+              onClick={() => usePartyStore.getState().setOpen(true)}
+              className={`${iconButtonClass} ${
+                partyActive ? "!text-white !opacity-100" : "!text-white/40"
+              }`}
+            >
+              <Group2Line size={18} />
+            </button>
+          </>
+        )}
       </div>
 
       {/* Volume (Compact smooth slider, size sm) */}
-      <VolumePicker className="w-[180px]" size="sm" />
+      <div style={{ order: elementOrder.indexOf("volume") }}>
+        <VolumePicker className="w-[180px]" size="sm" />
+      </div>
     </>
   );
 }

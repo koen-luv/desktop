@@ -5,8 +5,14 @@ import { audioCache } from "@/shared/storage/audioCache";
 import { getAndroidBridge, onNativeEvent, registerMediaCommandHandler } from "@/platform";
 import type { Track } from "@/shared/types";
 import { resolvePlaybackStream, type ResolvedPlaybackStream } from "./playbackSource";
-import { autoCrossfadeWindowMs, transitionSpec, CROSSFADE_MAX_MS } from "./transitions";
-import { peekAutoNextTrack } from "./queueNext";
+import {
+  autoCrossfadeWindowMs,
+  transitionSpec,
+  CROSSFADE_MAX_MS,
+  CROSSFADE_MIN_MS,
+} from "./transitions";
+import { computeNextIndex, peekAutoNextTrack } from "./queueNext";
+import { useEqualizerSettingsStore } from "../store/equalizerSettingsStore";
 import {
   startBackgroundAudioKeepAlive,
   stopBackgroundAudioKeepAlive,
@@ -84,6 +90,8 @@ export class AndroidPlayerRuntime {
   /** Track the native side already plays after a crossfade promotion; the
    *  queue advance must adopt it instead of reloading it. */
   private adoptTrackId: string | null = null;
+  private nextTrackEpoch = 0;
+  private previousTrackEpoch = 0;
   public onEnded?: () => void;
   public onError?: (info: { trackId: string; message: string }) => void;
 
@@ -107,6 +115,11 @@ export class AndroidPlayerRuntime {
 
     this.setNativeVolume(usePlayerStore.getState().volume);
     this.bridge.audioSetCacheLimit(audioCache.getLimitBytes());
+    const equalizer = useEqualizerSettingsStore.getState();
+    this.bridge.audioSetEqualizer?.(equalizer.enabled, JSON.stringify(equalizer.gains));
+    useEqualizerSettingsStore.subscribe((state) => {
+      this.bridge.audioSetEqualizer?.(state.enabled, JSON.stringify(state.gains));
+    });
     this.applyPlaybackRateAndPitch();
 
     this.unsubscribe = usePlayerStore.subscribe((state, prev) => {
@@ -134,6 +147,19 @@ export class AndroidPlayerRuntime {
     // already flipped status to paused, this just clears the countdown).
     this.sleepUnsubscribe = onNativeEvent("sleepTimerFired", () => {
       usePlayerStore.getState().setSleepTimer(null);
+    });
+
+    onNativeEvent("playbackAutoAdvanced", (payload) => {
+      const trackId = this.readNativeTrackId(payload);
+      if (trackId) this.handleNativeAutoAdvance(trackId);
+    });
+    onNativeEvent("playbackNextAdvanced", (payload) => {
+      const trackId = this.readNativeTrackId(payload);
+      if (trackId) this.handleNativeNextAdvance(trackId);
+    });
+    onNativeEvent("playbackPreviousAdvanced", (payload) => {
+      const trackId = this.readNativeTrackId(payload);
+      if (trackId) this.handleNativePreviousAdvance(trackId);
     });
 
     onNativeEvent("crossfadeCompleted", (payload) => {
@@ -199,6 +225,111 @@ export class AndroidPlayerRuntime {
       clearTimeout(this.rampTimer);
       this.rampTimer = null;
     }
+  }
+
+  public async preloadPreviousTrack(track: Track): Promise<void> {
+    const preloadEpoch = ++this.previousTrackEpoch;
+    this.bridge.audioSetPreviousTrack?.(null);
+    try {
+      const cached = this.preloaded.get(track.id);
+      let stream = cached?.stream;
+      if (!stream || (stream.expiresAtMs !== null && Date.now() >= stream.expiresAtMs - 15_000)) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 12_000);
+        try {
+          stream = await resolvePlaybackStream(
+            track,
+            controller.signal,
+            "playback",
+            usePlayerStore.getState().audioQuality,
+          );
+        } finally {
+          clearTimeout(timeout);
+        }
+      }
+      if (preloadEpoch !== this.previousTrackEpoch) return;
+      if (stream.expiresAtMs !== null && Date.now() >= stream.expiresAtMs - 15_000) return;
+      this.bridge.audioSetPreviousTrack?.(
+        JSON.stringify({
+          url: stream.url,
+          mimeType: stream.mimeType,
+          trackId: track.id,
+          title: track.title,
+          artist: track.artists || "",
+          album:
+            typeof track.album === "string"
+              ? track.album
+              : (track.album as { title?: string } | undefined)?.title || "Liner",
+          coverUrl: track.coverUrl || "",
+          durationMs: track.durationMs || 0,
+          startMs: 0,
+        } satisfies NativeLoadPayload),
+      );
+    } catch (error) {
+      if (preloadEpoch === this.previousTrackEpoch) {
+        log(
+          "yellow",
+          "preload",
+          `previous-track resolution failed for "${track.title}": ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+  }
+
+  public clearPreloadedTrack(): void {
+    this.nextTrackEpoch += 1;
+    this.bridge.audioSetNextTrack?.(null, false);
+  }
+
+  public clearPreloadedPreviousTrack(): void {
+    this.previousTrackEpoch += 1;
+    this.bridge.audioSetPreviousTrack?.(null);
+  }
+
+  private readNativeTrackId(payload: unknown): string | null {
+    if (payload && typeof payload === "object" && "trackId" in payload) {
+      const value = (payload as { trackId: unknown }).trackId;
+      return typeof value === "string" && value ? value : null;
+    }
+    if (typeof payload !== "string") return null;
+    try {
+      const parsed: unknown = JSON.parse(payload);
+      if (parsed && typeof parsed === "object" && "trackId" in parsed) {
+        const value = (parsed as { trackId: unknown }).trackId;
+        return typeof value === "string" && value ? value : null;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
+  private handleNativeAutoAdvance(trackId: string): void {
+    const next = peekAutoNextTrack(usePlayerStore.getState());
+    if (next?.id !== trackId) return;
+    this.adoptTrackId = trackId;
+    usePlayerStore.getState().dispatch({ type: "SKIP_NEXT", isAutoEnd: true });
+  }
+
+  private handleNativeNextAdvance(trackId: string): void {
+    const store = usePlayerStore.getState();
+    const nextIndex = computeNextIndex(store);
+    if (nextIndex === null || store.queue[nextIndex]?.id !== trackId) return;
+    this.adoptTrackId = trackId;
+    store.dispatch({ type: "SKIP_NEXT" });
+  }
+
+  private handleNativePreviousAdvance(trackId: string): void {
+    const store = usePlayerStore.getState();
+    const previousIndex =
+      store.currentIndex > 0
+        ? store.currentIndex - 1
+        : store.repeat === "all" && store.queue.length > 0
+          ? store.queue.length - 1
+          : store.currentIndex;
+    if (store.queue[previousIndex]?.id !== trackId || trackId === store.currentTrack?.id) return;
+    this.adoptTrackId = trackId;
+    store.dispatch({ type: "SKIP_PREVIOUS" });
   }
 
   /**
@@ -316,7 +447,12 @@ export class AndroidPlayerRuntime {
       clearTimeout(timeout);
       if (epoch !== this.crossfadeEpoch) return;
       if (stream.expiresAtMs !== null && Date.now() >= stream.expiresAtMs - 15_000) return;
-      if (usePlayerStore.getState().status !== "playing") return;
+      const store = usePlayerStore.getState();
+      if (store.status !== "playing" || store.currentTrack?.id !== this.currentTrackId) return;
+      const live = this.readState();
+      if (!live) return;
+      const remainingNow = (live.durationMs ?? 0) - (live.positionMs ?? 0);
+      if (remainingNow < CROSSFADE_MIN_MS) return;
 
       const payload: NativeLoadPayload = {
         url: stream.url,
@@ -334,13 +470,7 @@ export class AndroidPlayerRuntime {
       };
       this.bridge.audioCrossfadeLoad(JSON.stringify(payload));
 
-      // Fit the blend to the time actually left right now, not when we decided.
-      const live = this.readState();
-      const remainingNow = (live?.durationMs ?? 0) - (live?.positionMs ?? 0);
-      const window = Math.max(
-        1_000,
-        Math.min(windowMs, remainingNow > 0 ? remainingNow : windowMs),
-      );
+      const window = Math.min(windowMs, remainingNow);
       this.bridge.audioCrossfadeStart(window);
       this.crossfadeTrackId = next.id;
       log("cyan", "audio", `native crossfade armed (${window}ms into "${next.title}")`);
@@ -367,21 +497,47 @@ export class AndroidPlayerRuntime {
     log("cyan", "audio", "native crossfade cancelled");
   }
 
-  public async preloadTrack(track: Track): Promise<void> {
+  public async preloadTrack(track: Track, autoAdvance = true): Promise<void> {
+    const preloadEpoch = ++this.nextTrackEpoch;
+    this.bridge.audioSetNextTrack?.(null, false);
     if (this.currentTrackId === track.id) return;
-    if (this.preloaded.has(track.id)) return;
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 12_000);
-      const stream = await resolvePlaybackStream(
-        track,
-        controller.signal,
-        "playback",
-        usePlayerStore.getState().audioQuality,
-      );
-      clearTimeout(timeout);
+      const cached = this.preloaded.get(track.id);
+      let stream = cached?.stream;
+      if (!stream || (stream.expiresAtMs !== null && Date.now() >= stream.expiresAtMs - 15_000)) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 12_000);
+        try {
+          stream = await resolvePlaybackStream(
+            track,
+            controller.signal,
+            "playback",
+            usePlayerStore.getState().audioQuality,
+          );
+        } finally {
+          clearTimeout(timeout);
+        }
+      }
+      if (preloadEpoch !== this.nextTrackEpoch) return;
       if (stream.expiresAtMs !== null && Date.now() >= stream.expiresAtMs - 15_000) return;
       this.preloaded.set(track.id, { stream, at: Date.now() });
+      this.bridge.audioSetNextTrack?.(
+        JSON.stringify({
+          url: stream.url,
+          mimeType: stream.mimeType,
+          trackId: track.id,
+          title: track.title,
+          artist: track.artists || "",
+          album:
+            typeof track.album === "string"
+              ? track.album
+              : (track.album as { title?: string } | undefined)?.title || "Liner",
+          coverUrl: track.coverUrl || "",
+          durationMs: track.durationMs || 0,
+          startMs: 0,
+        } satisfies NativeLoadPayload),
+        autoAdvance,
+      );
       // keep the map bounded; a queue is at most a few dozen tracks
       if (this.preloaded.size > 12) {
         const oldest = [...this.preloaded.entries()].sort((a, b) => a[1].at - b[1].at)[0];
@@ -389,6 +545,7 @@ export class AndroidPlayerRuntime {
       }
       log("cyan", "preload", `resolved next stream for "${track.title}"`);
     } catch (err) {
+      if (preloadEpoch !== this.nextTrackEpoch) return;
       log(
         "yellow",
         "preload",
@@ -398,20 +555,28 @@ export class AndroidPlayerRuntime {
   }
 
   public async loadAndPlay(track: Track, startPositionMs = 0): Promise<void> {
+    // Start synchronously from the playback gesture so iOS can grant the
+    // background media assertion before stream resolution awaits network I/O.
+    this.startRendererKeepAlive();
     if (this.adoptTrackId === track.id) {
       // Queue advance after a completed crossfade: the native side is already
       // playing this track mid-song — adopt it instead of reloading.
       this.adoptTrackId = null;
       const live = this.readState();
       const store = usePlayerStore.getState();
-      if (live?.trackId === track.id && live.status === "playing") {
+      if (
+        live?.trackId === track.id &&
+        (live.status === "playing" || live.status === "paused" || live.status === "buffering")
+      ) {
+        this.currentTrackId = track.id;
+        this.endedTrackId = null;
+        this.currentSessionExpiresAt = null;
+        this.activeStream = null;
         if (typeof live.positionMs === "number" && live.positionMs >= 0) {
           store.setPosition(live.positionMs);
         }
-        store.setStatus("playing");
-        // Keep the renderer running while the native player owns the audio.
-        this.startRendererKeepAlive();
-        log("green", "playback", `adopted crossfaded track "${track.title}"`);
+        store.setStatus(live.status === "buffering" ? "loading" : live.status);
+        log("green", "playback", `adopted native track "${track.title}"`);
         return;
       }
     }
@@ -445,7 +610,7 @@ export class AndroidPlayerRuntime {
     store.setPosition(startPositionMs);
     store.setDuration(track.durationMs ?? 0);
     this.bridge.requestNotificationPermission();
-    this.bridge.setKeepScreenOn(true);
+    this.bridge.setKeepScreenOn(false);
     // Start from silence when a fade-in is configured; the ramp fires once the
     // native player has the new stream attached below.
     this.cancelRamp();
@@ -488,9 +653,6 @@ export class AndroidPlayerRuntime {
         startMs: startPositionMs,
       };
       this.bridge.audioLoad(JSON.stringify(payload));
-      // iOS suspends WKWebView timers with the app; the silent loop keeps the
-      // poll (crossfade arming and queue advance) running in the background.
-      this.startRendererKeepAlive();
       if (fadeInMs > 0 && epoch === this.loadEpoch) {
         void this.rampNativeVolume(store.volume, fadeInMs);
       }
@@ -511,6 +673,7 @@ export class AndroidPlayerRuntime {
       console.error("[AndroidPlaybackError]", track.id, err);
       usePlayerStore.getState().setStatus("error", message);
       this.onError?.({ trackId: track.id, message });
+      this.stopRendererKeepAlive();
     }
   }
 
@@ -522,6 +685,7 @@ export class AndroidPlayerRuntime {
     this.cancelRamp();
     this.endFadeTrackId = null;
     this.bridge.audioPause();
+    this.stopRendererKeepAlive();
     usePlayerStore.getState().setStatus("paused");
     this.bridge.setKeepScreenOn(false);
   }
@@ -536,7 +700,7 @@ export class AndroidPlayerRuntime {
     this.bridge.audioResume();
     this.startRendererKeepAlive();
     store.setStatus("playing");
-    this.bridge.setKeepScreenOn(true);
+    this.bridge.setKeepScreenOn(false);
   }
 
   public seek(positionMs: number): void {
@@ -635,7 +799,16 @@ export class AndroidPlayerRuntime {
   private poll(): void {
     if (!this.currentTrackId) return;
     const state = this.readState();
-    if (!state || !state.trackId || state.trackId !== this.currentTrackId) return;
+    if (!state || !state.trackId) return;
+    if (state.trackId !== this.currentTrackId) {
+      const next = peekAutoNextTrack(usePlayerStore.getState());
+      if (next?.id === state.trackId) {
+        this.handleNativeAutoAdvance(state.trackId);
+      } else {
+        this.handleNativePreviousAdvance(state.trackId);
+      }
+      return;
+    }
     const store = usePlayerStore.getState();
 
     if (typeof state.durationMs === "number" && state.durationMs > 0) {

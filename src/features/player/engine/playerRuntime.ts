@@ -8,8 +8,16 @@ import type { Track } from "@/shared/types";
 import { pitchShifter } from "./pitchShifter";
 import { resolvePlaybackStream, type PlaybackStream } from "./streamResolver";
 import { downloadAudioBytes } from "@/shared/media/innertube";
-import { autoCrossfadeWindowMs, equalPowerBlend, transitionSpec, CROSSFADE_MAX_MS } from "./transitions";
+import {
+  autoCrossfadeWindowMs,
+  equalPowerBlend,
+  transitionSpec,
+  CROSSFADE_MAX_MS,
+  CROSSFADE_MIN_MS,
+} from "./transitions";
 import { peekAutoNextTrack } from "./queueNext";
+import { EQUALIZER_BANDS, effectiveEqualizerGains } from "./equalizer";
+import { useEqualizerSettingsStore } from "../store/equalizerSettingsStore";
 
 /**
  * When false, playback streams directly and never writes audio to disk; files
@@ -24,6 +32,9 @@ const WAITING_GRACE_MS = 300; // a buffering hiccup shorter than this never show
 
 export class PlayerRuntime {
   private audio: HTMLAudioElement;
+  private audioContext: AudioContext | null = null;
+  private equalizerGraphs = new Set<BiquadFilterNode[]>();
+  private equalizerSources = new WeakMap<HTMLAudioElement, MediaElementAudioSourceNode>();
   private currentTrackId: string | null = null;
   private loadEpoch = 0;
   private loadAbortController: AbortController | null = null;
@@ -42,6 +53,7 @@ export class PlayerRuntime {
     timer: ReturnType<typeof setTimeout> | null;
   } | null = null;
   private crossfadeEpoch = 0;
+  private crossfadeInFlight = false;
   /** Track already promoted from a crossfade; its queue advance adopts it. */
   private adoptTrackId: string | null = null;
   private stallStartTime: number | null = null;
@@ -86,6 +98,7 @@ export class PlayerRuntime {
       win.__liner_audio = audio;
     }
     this.audio = audio;
+    this.connectEqualizer(audio);
     this.setupAudioListeners(this.audio);
 
     const initialVolume = usePlayerStore.getState().volume;
@@ -127,10 +140,49 @@ export class PlayerRuntime {
         this.applyPlaybackRateAndPitch(rate, preservesPitch);
       }
     });
+    useEqualizerSettingsStore.subscribe((state) => this.applyEqualizer(state.enabled, state.gains));
+    const equalizer = useEqualizerSettingsStore.getState();
+    this.applyEqualizer(equalizer.enabled, equalizer.gains);
 
     this.setupDeviceChangeListener();
     this.setupMediaSession();
     log("green", "boot", "player runtime initialized");
+  }
+
+  private connectEqualizer(audio: HTMLAudioElement): void {
+    if (typeof window === "undefined" || !window.AudioContext || this.equalizerSources.has(audio)) {
+      return;
+    }
+    try {
+      this.audioContext ??= new AudioContext();
+      const source = this.audioContext.createMediaElementSource(audio);
+      let previous: AudioNode = source;
+      const filters = EQUALIZER_BANDS.map(({ frequency }) => {
+        const filter = this.audioContext!.createBiquadFilter();
+        filter.type = "peaking";
+        filter.frequency.value = frequency;
+        filter.Q.value = 0.8;
+        previous.connect(filter);
+        previous = filter;
+        return filter;
+      });
+      previous.connect(this.audioContext.destination);
+      this.equalizerSources.set(audio, source);
+      this.equalizerGraphs.add(filters);
+      const settings = useEqualizerSettingsStore.getState();
+      this.applyEqualizer(settings.enabled, settings.gains);
+    } catch (error) {
+      log("yellow", "audio", `equalizer unavailable: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private applyEqualizer(enabled: boolean, gains: number[]): void {
+    const effectiveGains = effectiveEqualizerGains(enabled, gains);
+    for (const filters of this.equalizerGraphs) {
+      filters.forEach((filter, index) => {
+        filter.gain.setTargetAtTime(effectiveGains[index] ?? 0, filter.context.currentTime, 0.025);
+      });
+    }
   }
 
   private setupDeviceChangeListener() {
@@ -606,7 +658,7 @@ export class PlayerRuntime {
    */
   private maybeStartCrossfade(audioEl: HTMLAudioElement): void {
     const spec = transitionSpec(usePlayerStore.getState().transitionPreset);
-    if (!spec.overlap || this.crossfade) return;
+    if (!spec.overlap || this.crossfade || this.crossfadeInFlight) return;
     const duration = audioEl.duration;
     if (!Number.isFinite(duration) || duration <= 0) return;
     const remainingMs = (duration - audioEl.currentTime) * 1000;
@@ -620,24 +672,49 @@ export class PlayerRuntime {
 
   private async startCrossfade(next: Track, windowMs: number): Promise<void> {
     const epoch = ++this.crossfadeEpoch;
+    this.crossfadeInFlight = true;
+    let incomingElement: HTMLAudioElement | null = null;
+    let incomingUrl: string | null = null;
+    let incomingBlobUrl: string | null = null;
     log("cyan", "audio", `crossfade starting into "${next.title}" (${windowMs}ms window)`);
     try {
       const element = this.xAudio ?? this.createCrossfadeElement();
       this.xAudio = element;
+      incomingElement = element;
+      this.connectEqualizer(element);
 
       const stream = await resolvePlaybackStream(
         next,
         undefined,
         usePlayerStore.getState().audioQuality,
       );
-      if (epoch !== this.crossfadeEpoch) return;
-      if (!this.currentTrackId) return;
       if (!stream.url) return;
+      if (epoch !== this.crossfadeEpoch) {
+        if (stream.url.startsWith("blob:")) URL.revokeObjectURL(stream.url);
+        return;
+      }
+      if (!this.currentTrackId) {
+        if (stream.url.startsWith("blob:")) URL.revokeObjectURL(stream.url);
+        return;
+      }
+      const store = usePlayerStore.getState();
+      if (store.status !== "playing" || store.currentTrack?.id !== this.currentTrackId) {
+        if (stream.url.startsWith("blob:")) URL.revokeObjectURL(stream.url);
+        return;
+      }
+
+      const remainingNow = (this.audio.duration - this.audio.currentTime) * 1000;
+      if (!Number.isFinite(remainingNow) || remainingNow < CROSSFADE_MIN_MS) {
+        if (stream.url.startsWith("blob:")) URL.revokeObjectURL(stream.url);
+        return;
+      }
 
       const isBlob = stream.url.startsWith("blob:");
       const previousBlob = element.src.startsWith("blob:") ? element.src : null;
       element.src = stream.url;
+      incomingUrl = stream.url;
       (element as HTMLAudioElement & { __linerIsBlob?: boolean }).__linerIsBlob = isBlob;
+      incomingBlobUrl = isBlob ? stream.url : null;
       element.playbackRate = this.audio.playbackRate;
       element.volume = 0;
       element.load();
@@ -645,17 +722,18 @@ export class PlayerRuntime {
 
       await element.play();
       if (epoch !== this.crossfadeEpoch) {
-        element.pause();
+        if (element.src === stream.url) {
+          element.pause();
+          element.removeAttribute("src");
+          element.load();
+          if (incomingBlobUrl) URL.revokeObjectURL(incomingBlobUrl);
+        }
         return;
       }
 
       // Fit the blend to the time that is actually left now that both songs
       // are audible.
-      const remainingNow = (this.audio.duration - this.audio.currentTime) * 1000;
-      const window = Math.max(
-        1_000,
-        Math.min(windowMs, Number.isFinite(remainingNow) && remainingNow > 0 ? remainingNow : windowMs),
-      );
+      const window = Math.min(windowMs, remainingNow);
 
       const state = {
         trackId: next.id,
@@ -681,6 +759,18 @@ export class PlayerRuntime {
       };
       tick();
     } catch (err) {
+      if (
+        incomingElement &&
+        incomingElement.src === incomingUrl &&
+        this.crossfade?.element !== incomingElement
+      ) {
+        try {
+          incomingElement.pause();
+          incomingElement.removeAttribute("src");
+          incomingElement.load();
+        } catch {}
+        if (incomingBlobUrl) URL.revokeObjectURL(incomingBlobUrl);
+      }
       if (epoch === this.crossfadeEpoch) {
         log(
           "yellow",
@@ -688,6 +778,8 @@ export class PlayerRuntime {
           `crossfade skipped for "${next.title}": ${err instanceof Error ? err.message : String(err)}`,
         );
       }
+    } finally {
+      if (epoch === this.crossfadeEpoch) this.crossfadeInFlight = false;
     }
   }
 
@@ -732,11 +824,13 @@ export class PlayerRuntime {
     const element = new Audio();
     element.preload = "auto";
     element.crossOrigin = "anonymous";
+    this.connectEqualizer(element);
     return element;
   }
 
   private cancelCrossfade(): void {
     this.crossfadeEpoch += 1;
+    this.crossfadeInFlight = false;
     const state = this.crossfade;
     this.crossfade = null;
     if (state?.timer) clearTimeout(state.timer);
@@ -807,7 +901,7 @@ export class PlayerRuntime {
     log("cyan", "playback", "pending load cancelled");
   }
 
-  public async preloadTrack(track: Track): Promise<void> {
+  public async preloadTrack(track: Track, _autoAdvance = true): Promise<void> {
     if (this.currentTrackId === track.id) return;
     if (this.preloadingTrackId === track.id) return;
 
@@ -848,12 +942,24 @@ export class PlayerRuntime {
           this.preloadingPromise = null;
           this.preloadAbortController = null;
         }
+
       }
     })();
 
     this.preloadingPromise = promise;
     await promise;
   }
+
+  public clearPreloadedTrack(): void {
+    this.preloadAbortController?.abort();
+    this.preloadAbortController = null;
+    this.preloadingTrackId = null;
+    this.preloadingPromise = null;
+  }
+
+  public async preloadPreviousTrack(_track: Track): Promise<void> {}
+
+  public clearPreloadedPreviousTrack(): void {}
 
   private pendingStartPositionMs = 0;
 

@@ -25,11 +25,15 @@ final class PlaybackEngine {
     private var artist = ""
     private var album = ""
     private var coverUrl: String?
+    private var nextTrackPayload: String?
+    private var autoAdvancePayload: String?
+    private var previousTrackPayload: String?
     private var status = "idle"
     private var errorMessage: String?
     private var desiredRate: Double = 1
     private var payloadDurationMs: Double = 0
     private var wantsPlay = false
+    private var interrupted = false
     private var ended = false
 
     private var tickTimer: Timer?
@@ -47,7 +51,7 @@ final class PlaybackEngine {
     }
 
 
-    func load(_ payloadJSON: String) {
+    func load(_ payloadJSON: String, autoplay: Bool = true) {
         guard
             let data = payloadJSON.data(using: .utf8),
             let raw = try? JSONSerialization.jsonObject(with: data),
@@ -61,6 +65,9 @@ final class PlaybackEngine {
             return
         }
 
+        nextTrackPayload = nil
+        autoAdvancePayload = nil
+        previousTrackPayload = nil
         cancelCrossfade()
         teardownObservers()
         trackId = loadedTrackId
@@ -72,7 +79,7 @@ final class PlaybackEngine {
         let startMs = PlaybackEngine.number(payload["startMs"])
         errorMessage = nil
         ended = false
-        wantsPlay = true
+        wantsPlay = autoplay
         status = "buffering"
 
         let asset = AVURLAsset(
@@ -97,11 +104,13 @@ final class PlaybackEngine {
 
         loadArtwork()
         updateNowPlaying()
+        pushState()
     }
 
     func pause() {
         cancelCrossfade()
         wantsPlay = false
+        interrupted = false
         player.pause()
         status = "paused"
         updateNowPlaying()
@@ -111,6 +120,7 @@ final class PlaybackEngine {
     func resume() {
         guard currentItem != nil else { return }
         wantsPlay = true
+        interrupted = false
         ended = false
         player.playImmediately(atRate: Float(desiredRate))
         status = "playing"
@@ -135,6 +145,7 @@ final class PlaybackEngine {
     func stop() {
         cancelCrossfade()
         wantsPlay = false
+        interrupted = false
         ended = false
         player.pause()
         player.replaceCurrentItem(with: nil)
@@ -147,6 +158,9 @@ final class PlaybackEngine {
         coverUrl = nil
         errorMessage = nil
         payloadDurationMs = 0
+        nextTrackPayload = nil
+        autoAdvancePayload = nil
+        previousTrackPayload = nil
         status = "idle"
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         pushState()
@@ -154,7 +168,74 @@ final class PlaybackEngine {
 
     func setVolume(_ volume: Double) {
         userVolume = max(0, min(1, volume))
-        player.volume = Float(userVolume)
+        if let startedAt = crossfadeStartedAt, crossfadeDurationMs > 0 {
+            let progress = Date().timeIntervalSince(startedAt) * 1000 / crossfadeDurationMs
+            applyCrossfadeVolumes(progress: progress)
+        } else {
+            player.volume = Float(userVolume)
+        }
+    }
+
+    func setNextTrack(_ payloadJSON: String?, autoAdvance: Bool) {
+        nextTrackPayload = validatedTrackPayload(payloadJSON)
+        autoAdvancePayload = autoAdvance ? nextTrackPayload : nil
+    }
+
+    func setPreviousTrack(_ payloadJSON: String?) {
+        previousTrackPayload = validatedTrackPayload(payloadJSON)
+    }
+
+    private func validatedTrackPayload(_ payloadJSON: String?) -> String? {
+        guard
+            let payloadJSON,
+            let data = payloadJSON.data(using: .utf8),
+            let raw = try? JSONSerialization.jsonObject(with: data),
+            let payload = raw as? [String: Any],
+            let url = payload["url"] as? String,
+            url.hasPrefix("http"),
+            let trackId = payload["trackId"] as? String,
+            !trackId.isEmpty
+        else {
+            return nil
+        }
+        return payloadJSON
+    }
+
+    func skipToNext() {
+        guard let payload = nextTrackPayload else {
+            emitCommand(["type": "next"])
+            return
+        }
+        nextTrackPayload = nil
+        autoAdvancePayload = nil
+        let shouldPlay = wantsPlay
+        load(payload, autoplay: shouldPlay)
+        if let trackId {
+            LinerHost.shared.emit(
+                "playbackNextAdvanced",
+                PlaybackEngine.json(["trackId": trackId]) ?? "{}"
+            )
+        }
+    }
+
+    func skipToPrevious() {
+        if currentPositionMs() > 3_000 {
+            seek(0)
+            return
+        }
+        guard let payload = previousTrackPayload else {
+            emitCommand(["type": "prev"])
+            return
+        }
+        previousTrackPayload = nil
+        let shouldPlay = wantsPlay
+        load(payload, autoplay: shouldPlay)
+        if let trackId {
+            LinerHost.shared.emit(
+                "playbackPreviousAdvanced",
+                PlaybackEngine.json(["trackId": trackId]) ?? "{}"
+            )
+        }
     }
 
     func setSpeed(_ rate: Double) {
@@ -276,15 +357,19 @@ final class PlaybackEngine {
         guard let incoming = transitionPlayer, let startedAt = crossfadeStartedAt else { return }
         let elapsedMs = Date().timeIntervalSince(startedAt) * 1000
         let t = min(1, max(0, elapsedMs / crossfadeDurationMs))
-
-        // Equal-power blend scaled by the user volume.
-        let angle = t * Double.pi / 2
-        player.volume = Float(userVolume * cos(angle))
-        incoming.volume = Float(userVolume * sin(angle))
+        applyCrossfadeVolumes(progress: t)
 
         if t >= 1 {
             promoteCrossfade(epoch: epoch)
         }
+    }
+
+    private func applyCrossfadeVolumes(progress: Double) {
+        guard let incoming = transitionPlayer else { return }
+        let t = min(1, max(0, progress))
+        let angle = t * Double.pi / 2
+        player.volume = Float(userVolume * cos(angle))
+        incoming.volume = Float(userVolume * sin(angle))
     }
 
     /// Hands playback over to the incoming player at full volume.
@@ -302,6 +387,9 @@ final class PlaybackEngine {
         let promotedId = crossfadeTrackId
         let payload = crossfadePayload
 
+        nextTrackPayload = nil
+        autoAdvancePayload = nil
+        previousTrackPayload = nil
         trackId = promotedId
         title = payload?["title"] as? String ?? ""
         artist = payload?["artist"] as? String ?? ""
@@ -403,7 +491,7 @@ final class PlaybackEngine {
             case .readyToPlay:
                 if ended {
                     status = "ended"
-                } else if !wantsPlay {
+                } else if !wantsPlay || interrupted {
                     status = "paused"
                 } else {
                     switch player.timeControlStatus {
@@ -430,6 +518,18 @@ final class PlaybackEngine {
     }
 
     private func handleEnded() {
+        if wantsPlay, let next = autoAdvancePayload {
+            autoAdvancePayload = nil
+            nextTrackPayload = nil
+            load(next, autoplay: true)
+            if let trackId {
+                LinerHost.shared.emit(
+                    "playbackAutoAdvanced",
+                    PlaybackEngine.json(["trackId": trackId]) ?? "{}"
+                )
+            }
+            return
+        }
         ended = true
         wantsPlay = false
         status = "ended"
@@ -550,11 +650,11 @@ final class PlaybackEngine {
             return .success
         }
         center.nextTrackCommand.addTarget { [weak self] _ in
-            self?.emitCommand(["type": "next"])
+            self?.skipToNext()
             return .success
         }
         center.previousTrackCommand.addTarget { [weak self] _ in
-            self?.emitCommand(["type": "prev"])
+            self?.skipToPrevious()
             return .success
         }
         center.changePlaybackPositionCommand.addTarget { [weak self] event in
@@ -587,6 +687,7 @@ final class PlaybackEngine {
 
             switch type {
             case .began:
+                self.interrupted = true
                 self.player.pause()
                 self.status = "paused"
                 self.updateNowPlaying()
@@ -595,8 +696,16 @@ final class PlaybackEngine {
                 let options = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
                 if AVAudioSession.InterruptionOptions(rawValue: options).contains(.shouldResume),
                    self.wantsPlay {
+                    self.interrupted = false
                     self.player.playImmediately(atRate: Float(self.desiredRate))
+                    self.status = "playing"
+                } else {
+                    self.interrupted = false
+                    self.wantsPlay = false
+                    self.status = "paused"
                 }
+                self.updateNowPlaying()
+                self.pushState()
             @unknown default:
                 break
             }

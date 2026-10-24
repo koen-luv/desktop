@@ -95,6 +95,21 @@ class LinerBridge(private val activity: MainActivity) {
     }
 
     @JavascriptInterface
+    fun lanDiscover(requestId: String) {
+        httpExecutor.execute {
+            val payload = LanControl.discover(requestId)
+            NativeEvents.emit("lanDiscovery", payload)
+        }
+    }
+
+    @JavascriptInterface
+    fun lanRequest(requestId: String, method: String, url: String, body: String?) {
+        httpExecutor.execute {
+            NativeEvents.emit("lanResponse", LanControl.request(requestId, method, url, body))
+        }
+    }
+
+    @JavascriptInterface
     fun autoBrowseResponse(requestId: String, payloadJson: String) {
         AutoBrowse.deliver(requestId, payloadJson)
     }
@@ -218,6 +233,13 @@ class LinerBridge(private val activity: MainActivity) {
     fun audioCrossfadeCancel() = PlaybackHolder.crossfadeCancel()
 
     @JavascriptInterface
+    fun audioSetNextTrack(payload: String?, autoAdvance: Boolean) =
+        PlaybackHolder.setNextTrack(payload, autoAdvance)
+
+    @JavascriptInterface
+    fun audioSetPreviousTrack(payload: String?) = PlaybackHolder.setPreviousTrack(payload)
+
+    @JavascriptInterface
     fun audioPause() = PlaybackHolder.pause()
 
     @JavascriptInterface
@@ -240,6 +262,11 @@ class LinerBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun audioSetReverb(level: Float) = PlaybackHolder.setReverb(level)
+
+    @JavascriptInterface
+    fun audioSetEqualizer(enabled: Boolean, gainsJson: String) {
+        PlaybackHolder.setEqualizer(enabled, gainsJson)
+    }
 
     @JavascriptInterface
     fun audioSleepAt(deadlineMs: Double) = PlaybackHolder.setSleepAt(deadlineMs.toLong())

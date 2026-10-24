@@ -1,8 +1,8 @@
 /**
  * Host side of remote device control: the PC (or any Liner instance running
  * the player) shows a six-digit code, waits for a controller to join through
- * the relay, then applies incoming control commands and streams authoritative
- * playback state back.
+ * a relay invite or same-network LAN discovery, then applies incoming control
+ * commands and streams authoritative playback state back.
  */
 import { createTranslatorSync, getStoredLocale } from "@/languages";
 import { useAuthStore } from "@/features/auth";
@@ -32,6 +32,7 @@ let relayCode: string | null = null;
 let relayAbort: AbortController | null = null;
 let openTimer: number | null = null;
 let stopBroadcast: (() => void) | null = null;
+let stopLocalAnswerListener: (() => void) | null = null;
 
 function tr(key: string, vars?: Record<string, string | number>): string {
   return createTranslatorSync(getStoredLocale())(key, vars);
@@ -128,6 +129,9 @@ function startBroadcast(): void {
 export function stopHosting(): void {
   clearOpenTimer();
   clearRelay();
+  stopLocalAnswerListener?.();
+  stopLocalAnswerListener = null;
+  void window.linerElectron?.stopLanHost?.();
   pendingId = null;
   stopBroadcast?.();
   const store = useDeviceControlStore.getState();
@@ -155,7 +159,9 @@ export function startHosting(): void {
     hostConnections: new Map(),
   });
 
-  if (!isPartyRelayEnabled()) {
+  const electron = window.linerElectron;
+  const hasLocalLanHost = Boolean(electron?.startLanHost && electron.onLanAnswer);
+  if (!hasLocalLanHost && !isPartyRelayEnabled()) {
     useDeviceControlStore.setState({ hostPhase: "error", hostError: tr("devices.error_relay_disabled") });
     return;
   }
@@ -184,6 +190,49 @@ export function startHosting(): void {
     try {
       const invite = await conn.createInviteCode();
       if (pendingId !== id) return;
+
+      if (electron?.startLanHost && electron.onLanAnswer) {
+        stopLocalAnswerListener?.();
+        stopLocalAnswerListener = electron.onLanAnswer((answer) => {
+          if (pendingId !== id) return;
+          useDeviceControlStore.setState({ hostPhase: "connecting" });
+          void conn.acceptAnswerCode(answer).then(() => {
+            if (pendingId !== id) return;
+            openTimer = window.setTimeout(() => {
+              if (conn.isOpen) return;
+              if (pendingId === id) pendingId = null;
+              useDeviceControlStore.getState().hostConnections.delete(id);
+              conn.close();
+              useDeviceControlStore.setState({
+                hostPhase: "error",
+                hostError: tr("devices.error_timeout"),
+              });
+            }, CONNECT_TIMEOUT_MS);
+          }).catch(() => {
+            if (pendingId !== id) return;
+            pendingId = null;
+            conn.close();
+            void electron.stopLanHost?.();
+            useDeviceControlStore.setState({
+              hostPhase: "error",
+              hostError: tr("devices.error_connect_failed"),
+            });
+          });
+        });
+
+        const info = await electron.startLanHost(ownName(), invite);
+        if (pendingId !== id) {
+          stopLocalAnswerListener?.();
+          stopLocalAnswerListener = null;
+          void electron.stopLanHost?.();
+          return;
+        }
+        useDeviceControlStore.setState({
+          hostPhase: "waiting",
+          hostCode: info.addresses.map((address) => `http://${address}:${info.port}`).join("\n"),
+        });
+        return;
+      }
 
       const joinCode = await createRelayRoom(invite);
       if (pendingId !== id) {
@@ -266,6 +315,11 @@ function onControllerClose(id: string): void {
   const controllers = store.controllers.filter((c) => c.id !== id);
   const wasPending = pendingId === id;
   if (wasPending) pendingId = null;
+  if (wasPending) {
+    stopLocalAnswerListener?.();
+    stopLocalAnswerListener = null;
+    void window.linerElectron?.stopLanHost?.();
+  }
 
   if (controllers.length === 0) stopBroadcast?.();
   useDeviceControlStore.setState({

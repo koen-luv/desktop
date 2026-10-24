@@ -26,18 +26,26 @@ class LinerForwardingPlayer(player: Player) : ForwardingPlayer(player) {
     override fun hasPreviousMediaItem(): Boolean = true
 
     override fun seekToNext() {
-        NativeEvents.emit("mediaCommand", "{\"command\":\"next\"}")
+        PlaybackHolder.skipToNext()
     }
 
     override fun seekToNextMediaItem() {
-        NativeEvents.emit("mediaCommand", "{\"command\":\"next\"}")
+        PlaybackHolder.skipToNext()
     }
 
     override fun seekToPrevious() {
-        NativeEvents.emit("mediaCommand", "{\"command\":\"previous\"}")
+        PlaybackHolder.skipToPrevious()
     }
 
     override fun seekToPreviousMediaItem() {
-        NativeEvents.emit("mediaCommand", "{\"command\":\"previous\"}")
+        PlaybackHolder.skipToPrevious()
+    }
+
+    override fun play() {
+        PlaybackHolder.resume()
+    }
+
+    override fun pause() {
+        PlaybackHolder.pause()
     }
 }

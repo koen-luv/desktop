@@ -7,7 +7,7 @@ import {
 } from "../store/playerStore";
 import { playerRuntime } from "./runtime";
 import { isRadioContext, shouldRefillRadio } from "./radioMode";
-import { computeNextIndex } from "./queueNext";
+import { computeNextIndex, peekAutoNextTrack } from "./queueNext";
 import { pitchShifter } from "./pitchShifter";
 import {
   api,
@@ -18,6 +18,7 @@ import {
   type RecordPlaybackEventRequest,
 } from "@/shared/api";
 import { toClientTrack } from "@/shared/api/track";
+import { fetchYouTubeMusicLyrics } from "@/shared/api/ytmusicLyrics";
 import { log } from "@/shared/utils/logger";
 import {
   parseRawLyrics,
@@ -274,6 +275,7 @@ class PlayerEngine {
   private radioFetchInFlight: Promise<void> | null = null;
   private consecutiveAutoSkips = 0;
   private lastPreloadKey: string | null = null;
+  private lastPreviousPreloadKey: string | null = null;
   private inFlightLyricsPrefetches = new Map<string, Promise<void>>();
 
   constructor() {
@@ -1165,6 +1167,7 @@ class PlayerEngine {
   private preloadNextTrack(state: PlayerState): void {
     const queue = state.queue;
     const currentIndex = state.currentIndex;
+    const currentId = state.currentTrack?.id || "none";
     let nextTrack: Track | null = null;
     if (currentIndex >= 0 && currentIndex < queue.length - 1) {
       nextTrack = queue[currentIndex + 1];
@@ -1172,16 +1175,34 @@ class PlayerEngine {
       nextTrack = queue[0];
     }
 
+    const previousIndex =
+      currentIndex > 0
+        ? currentIndex - 1
+        : state.repeat === "all" && !isRadioContext(state.playbackContext)
+          ? queue.length - 1
+          : -1;
+    const previousTrack = previousIndex >= 0 ? queue[previousIndex] : null;
+    const previousKey =
+      previousTrack && previousTrack.id !== state.currentTrack?.id
+        ? `${currentId}<-${previousTrack.id}`
+        : null;
+    if (previousKey !== this.lastPreviousPreloadKey) {
+      this.lastPreviousPreloadKey = previousKey;
+      if (previousTrack && previousTrack.id !== state.currentTrack?.id) {
+        void playerRuntime?.preloadPreviousTrack(previousTrack);
+      } else {
+        playerRuntime?.clearPreloadedPreviousTrack();
+      }
+    }
+
     if (!nextTrack) {
       this.lastPreloadKey = null;
+      playerRuntime?.clearPreloadedTrack();
       return;
     }
 
-    const currentId = state.currentTrack?.id || "none";
     const preloadKey = `${currentId}->${nextTrack.id}`;
-    if (this.lastPreloadKey === preloadKey) {
-      return;
-    }
+    if (this.lastPreloadKey === preloadKey) return;
     this.lastPreloadKey = preloadKey;
 
     if (nextTrack.coverUrl) {
@@ -1195,8 +1216,12 @@ class PlayerEngine {
     void linerDb.putTrack(nextTrack);
 
     if (playerRuntime) {
-      void playerRuntime.preloadTrack(nextTrack);
+      void playerRuntime.preloadTrack(
+        nextTrack,
+        peekAutoNextTrack(state)?.id === nextTrack.id,
+      );
     }
+
   }
 
   private async prefetchLyrics(trackId: string, hint?: LyricsHint): Promise<void> {
@@ -1510,6 +1535,31 @@ class PlayerEngine {
         });
       }
     } finally {
+      if (
+        token === this.lyricsLoadToken &&
+        !controller.signal.aborted &&
+        (!bestCandidate || bestCandidate.syncLevel === "plain")
+      ) {
+        const fallback = await fetchYouTubeMusicLyrics(trackId, controller.signal);
+        if (fallback && token === this.lyricsLoadToken && !controller.signal.aborted) {
+          const current = useLyricsStore.getState();
+          if (!current.availableProviders.some((provider) => provider.syncLevel !== "plain")) {
+            const parsed = parseRawLyrics(fallback.content, "plain");
+            current.setLyricsState({
+              lyricsLoading: false,
+              lyricsError: null,
+              rawLyrics: fallback.content,
+              rawFormat: "plain",
+              braccatoLyrics: parsed.braccatoLyrics,
+              syncedLines: parsed.syncedLines,
+              plainLyrics: parsed.plainLyrics,
+              lyricsQuality: 0,
+              currentLyricsTrackId: trackId,
+              activeProvider: fallback.provider,
+            });
+          }
+        }
+      }
       if (token === this.lyricsLoadToken) {
         useLyricsStore.getState().setLyricsState({ lyricsLoading: false });
       }

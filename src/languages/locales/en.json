@@ -804,7 +804,7 @@
       "remove_button": "Remove",
       "wallpaper_blur": "Wallpaper blur",
       "wallpaper_dim": "Wallpaper dimming",
-      "wallpaper_opacity": "Wallpaper opacity"
+      "wallpaper_opacity": "Wallpaper opacity",
       "blocks_title": "Interface Blocks Glassmorphism",
       "blocks_description": "Adjust transparency, backdrop blur and dimming for each interface area.",
       "block_sidebar": "Sidebar",

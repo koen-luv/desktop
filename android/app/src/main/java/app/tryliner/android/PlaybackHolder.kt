@@ -17,6 +17,7 @@ import android.media.audiofx.Equalizer
 import android.media.audiofx.PresetReverb
 import android.net.Uri
 import org.json.JSONObject
+import org.json.JSONArray
 import java.io.File
 
 object PlaybackHolder {
@@ -27,6 +28,9 @@ object PlaybackHolder {
         internal set
 
     private var pendingLoad: String? = null
+    @Volatile private var nextTrackPayload: String? = null
+    @Volatile private var autoAdvancePayload: String? = null
+    @Volatile private var previousTrackPayload: String? = null
     private var pendingActions = mutableListOf<() -> Unit>()
 
     @Volatile private var volume = 1f
@@ -62,6 +66,9 @@ object PlaybackHolder {
     private var lastEqSweepAt = 0L
     private var mainEqualizer: Equalizer? = null
     private var transitionEqualizer: Equalizer? = null
+    @Volatile private var equalizerEnabled = false
+    @Volatile private var equalizerGains = FloatArray(5)
+    private val equalizerFrequencies = floatArrayOf(60f, 230f, 910f, 3600f, 14000f)
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -71,7 +78,31 @@ object PlaybackHolder {
                 if (crossfadeTrackId == null) {
                     val id = currentTrackId
                     if (id != null) {
-                        NativeEvents.emit("playbackEnded", JSONObject.quote(id))
+                        val next = autoAdvancePayload
+                        if (next != null && playWhenReadyIntent) {
+                            nextTrackPayload = null
+                            autoAdvancePayload = null
+                            previousTrackPayload = null
+                            main.post {
+                                if (currentTrackId != id || player?.playbackState != Player.STATE_ENDED) {
+                                    return@post
+                                }
+                                val nextId = try {
+                                    JSONObject(next).optString("trackId").takeIf { it.isNotBlank() }
+                                } catch (_: Exception) {
+                                    null
+                                }
+                                applyLoad(next)
+                                if (nextId != null && currentTrackId == nextId) {
+                                    NativeEvents.emit(
+                                        "playbackAutoAdvanced",
+                                        JSONObject().put("trackId", nextId).toString(),
+                                    )
+                                }
+                            }
+                        } else {
+                            NativeEvents.emit("playbackEnded", JSONObject.quote(id))
+                        }
                     }
                 }
             }
@@ -181,6 +212,63 @@ object PlaybackHolder {
         runOnPlayer { it.play() }
     }
 
+    fun togglePlayback() {
+        if (player?.isPlaying == true) pause() else resume()
+    }
+
+    fun setNextTrack(payload: String?, autoAdvance: Boolean) {
+        nextTrackPayload = validateTrackPayload(payload)
+        autoAdvancePayload = if (autoAdvance) nextTrackPayload else null
+    }
+
+    fun setPreviousTrack(payload: String?) {
+        previousTrackPayload = validateTrackPayload(payload)
+    }
+
+    private fun validateTrackPayload(payload: String?): String? =
+        payload?.takeIf { raw ->
+            try {
+                val json = JSONObject(raw)
+                json.optString("trackId").isNotBlank() && json.optString("url").startsWith("http")
+            } catch (_: Exception) {
+                false
+            }
+        }
+
+    fun skipToNext() {
+        val next = nextTrackPayload
+        if (next != null) {
+            nextTrackPayload = null
+            autoAdvancePayload = null
+            previousTrackPayload = null
+            runOnPlayer {
+                applyLoad(next)
+                emitTrackChange("playbackNextAdvanced", next)
+            }
+        } else {
+            NativeEvents.emit("mediaCommand", "{\"command\":\"next\"}")
+        }
+    }
+
+    fun skipToPrevious() {
+        runOnPlayer { current ->
+            if (current.currentPosition > 3_000L) {
+                current.seekTo(0L)
+            } else {
+                val previous = previousTrackPayload
+                if (previous != null) {
+                    previousTrackPayload = null
+                    nextTrackPayload = null
+                    autoAdvancePayload = null
+                    applyLoad(previous)
+                    emitTrackChange("playbackPreviousAdvanced", previous)
+                } else {
+                    current.seekTo(0L)
+                }
+            }
+        }
+    }
+
     fun seek(positionMs: Long) {
         cancelCrossfadeLocked()
         runOnPlayer {
@@ -215,6 +303,35 @@ object PlaybackHolder {
     fun setReverb(level: Float) {
         reverbLevel = level.coerceIn(0f, 1f)
         runOnPlayer { ensureReverb(it) }
+    }
+
+    fun setEqualizer(enabled: Boolean, gainsJson: String) {
+        val parsed = try {
+            val values = JSONArray(gainsJson)
+            FloatArray(equalizerFrequencies.size) { index ->
+                if (index < values.length()) values.optDouble(index, 0.0).toFloat().coerceIn(-12f, 12f)
+                else 0f
+            }
+        } catch (_: Exception) {
+            return
+        }
+        equalizerEnabled = enabled
+        equalizerGains = parsed
+        runOnPlayer {
+            if (enabled) equalizerFor(it, isMain = true)
+            applyEqualizerSettings()
+        }
+    }
+
+    private fun applyEqualizerSettings() {
+        listOf(mainEqualizer, transitionEqualizer).forEach { eq ->
+            if (eq == null) return@forEach
+            try {
+                eq.enabled = equalizerEnabled || crossfadeTrackId != null
+                for (band in 0 until eq.numberOfBands.toInt()) setBand(eq, band, 0f)
+            } catch (_: Exception) {
+            }
+        }
     }
 
     private fun ensureReverb(p: ExoPlayer) {
@@ -252,6 +369,9 @@ object PlaybackHolder {
     fun stop() = runOnPlayer {
         cancelCrossfadeLocked()
         playWhenReadyIntent = false
+        nextTrackPayload = null
+        autoAdvancePayload = null
+        previousTrackPayload = null
         it.volume = volume
         it.stop()
         it.clearMediaItems()
@@ -449,6 +569,7 @@ object PlaybackHolder {
         return try {
             val eq = Equalizer(1000, sessionId).apply { enabled = true }
             if (isMain) mainEqualizer = eq else transitionEqualizer = eq
+            applyEqualizerSettings()
             eq
         } catch (_: Exception) {
             null
@@ -458,7 +579,12 @@ object PlaybackHolder {
     private fun setBand(eq: Equalizer, band: Int, millibel: Float) {
         try {
             val range = eq.bandLevelRange
-            val clamped = millibel.toInt().coerceIn(range[0].toInt(), range[1].toInt())
+            val centerHz = eq.getCenterFreq(band.coerceIn(0, eq.numberOfBands - 1).toShort()) / 1000f
+            val profileIndex = equalizerFrequencies.indices.minByOrNull { index ->
+                kotlin.math.abs(kotlin.math.ln(centerHz.coerceAtLeast(1f) / equalizerFrequencies[index]))
+            } ?: 0
+            val profileGain = if (equalizerEnabled) equalizerGains[profileIndex] * 1000f else 0f
+            val clamped = (millibel + profileGain).toInt().coerceIn(range[0].toInt(), range[1].toInt())
             eq.setBandLevel(band.coerceIn(0, eq.numberOfBands - 1).toShort(), clamped.toShort())
         } catch (_: Exception) {
         }
@@ -498,6 +624,25 @@ object PlaybackHolder {
         try { session?.setPlayer(promotedSessionPlayer) } catch (_: Exception) {}
         transitionPlayer = null
         crossfadeTrackId = null
+        if (nextTrackPayload?.let {
+                try { JSONObject(it).optString("trackId") == promotedId } catch (_: Exception) { false }
+            } == true
+        ) {
+            nextTrackPayload = null
+        }
+        if (autoAdvancePayload?.let {
+                try { JSONObject(it).optString("trackId") == promotedId } catch (_: Exception) { false }
+            } == true
+        ) {
+            autoAdvancePayload = null
+        }
+        if (previousTrackPayload?.let {
+                try { JSONObject(it).optString("trackId") == promotedId } catch (_: Exception) { false }
+            } == true
+        ) {
+            previousTrackPayload = null
+        }
+        applyEqualizerSettings()
 
         try { mainPlayer.stop(); mainPlayer.clearMediaItems() } catch (_: Exception) {}
         try { mainPlayer.release() } catch (_: Exception) {}
@@ -511,6 +656,7 @@ object PlaybackHolder {
         crossfadeRunnable?.let { main.removeCallbacks(it) }
         crossfadeRunnable = null
         crossfadeTrackId = null
+        applyEqualizerSettings()
         transitionPlayer?.let { transition ->
             try { transition.stop() } catch (_: Exception) {}
             try { transition.release() } catch (_: Exception) {}
@@ -527,6 +673,19 @@ object PlaybackHolder {
             val url = payload.optString("url")
             val trackId = payload.optString("trackId")
             if (url.isBlank() || trackId.isBlank()) return
+            if (nextTrackPayload?.let {
+                    try { JSONObject(it).optString("trackId") == trackId } catch (_: Exception) { false }
+                } == true
+            ) {
+                nextTrackPayload = null
+            }
+
+            if (previousTrackPayload?.let {
+                    try { JSONObject(it).optString("trackId") == trackId } catch (_: Exception) { false }
+                } == true
+            ) {
+                previousTrackPayload = null
+            }
             val mime = payload.optString("mimeType").ifBlank { null }
             val metadata = MediaMetadata.Builder()
                 .setTitle(payload.optString("title").ifBlank { null })
@@ -562,6 +721,15 @@ object PlaybackHolder {
         }
     }
 
+    private fun emitTrackChange(event: String, payload: String) {
+        val trackId = try {
+            JSONObject(payload).optString("trackId").takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            null
+        } ?: return
+        NativeEvents.emit(event, JSONObject().put("trackId", trackId).toString())
+    }
+
     private fun describePlaybackError(error: PlaybackException): String {
         val cause = error.cause
         val builder = StringBuilder(error.errorCodeName)
@@ -591,6 +759,9 @@ object PlaybackHolder {
             override fun run() {
                 updateState()
                 val p = player
+                if (equalizerEnabled && p != null && mainEqualizer == null) {
+                    equalizerFor(p, isMain = true)
+                }
                 if (p != null && reverbLevel > 0.01f && reverb == null) ensureReverb(p)
                 main.postDelayed(this, 250L)
             }

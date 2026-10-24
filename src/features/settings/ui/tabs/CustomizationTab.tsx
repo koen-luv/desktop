@@ -33,7 +33,6 @@ type BlockTarget = "sidebar" | "contentView" | "miniplayer";
 export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeBlock, setActiveBlock] = useState<BlockTarget>("contentView");
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -121,7 +120,6 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
   return (
     <div className="flex flex-col gap-[16px]">
       <input
-        ref={fileInputRef}
         id="liner-wallpaper-input"
         type="file"
         accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
@@ -163,15 +161,14 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
                   />
                 )}
                 <div className="absolute right-[8px] top-[8px] flex items-center gap-[6px]">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="!h-[28px] !px-[10px] !gap-[5px] !text-[12px] bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border-0"
+                  <label
+                    htmlFor="liner-wallpaper-input"
+                    className="inline-flex h-[28px] items-center justify-center gap-[5px] rounded-md px-[10px] text-[12px] text-white bg-black/60 hover:bg-black/80 backdrop-blur-md cursor-pointer select-none"
+                    aria-label={t("settings.customization.change_button") || "Change"}
                   >
                     <Upload2Line size={14} />
                     {t("settings.customization.change_button") || "Change"}
-                  </Button>
+                  </label>
                   <Button
                     variant="secondary"
                     size="sm"
