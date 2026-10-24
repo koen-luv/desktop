@@ -33,12 +33,23 @@ export interface LastfmSettings {
   sessionKey: string | null;
   /** Last.fm username the session belongs to (for the settings UI). */
   username: string | null;
+  /**
+   * Request token waiting for the user to approve it in Last.fm's browser
+   * page. Persisted because the authorization page opens outside the app — a
+   * settings tab unmount or a killed WebView must not lose the pending token,
+   * otherwise the approval can never be exchanged for a session.
+   */
+  pendingToken: string | null;
+  /** Epoch ms the pending token was requested (when it is stale enough to auto-finish). */
+  pendingTokenAt: number | null;
 }
 
 interface LastfmSettingsState extends LastfmSettings {
   setEnabled: (enabled: boolean) => void;
   setApiKey: (apiKey: string) => void;
   setApiSecret: (apiSecret: string) => void;
+  /** Remembers a freshly requested token until the browser approval comes back. */
+  setPendingToken: (token: string | null) => void;
   /** Exchanges an authorized request token for a session and stores it. */
   connect: (token: string) => Promise<void>;
   disconnect: () => void;
@@ -52,18 +63,29 @@ export const useLastfmSettingsStore = create<LastfmSettingsState>()(
       apiSecret: "",
       sessionKey: null,
       username: null,
+      pendingToken: null,
+      pendingTokenAt: null,
 
       setEnabled: (enabled) => set({ enabled }),
       setApiKey: (apiKey) => set({ apiKey: apiKey.trim() }),
       setApiSecret: (apiSecret) => set({ apiSecret: apiSecret.trim() }),
+      setPendingToken: (pendingToken) =>
+        set({ pendingToken, pendingTokenAt: pendingToken ? Date.now() : null }),
 
       connect: async (token) => {
         const { apiKey, apiSecret } = resolveLastfmCredentials(get().apiKey, get().apiSecret);
         const session = await lastfmGetSession({ apiKey, apiSecret }, token);
-        set({ sessionKey: session.key, username: session.username, enabled: true });
+        set({
+          sessionKey: session.key,
+          username: session.username,
+          enabled: true,
+          pendingToken: null,
+          pendingTokenAt: null,
+        });
       },
 
-      disconnect: () => set({ sessionKey: null, username: null }),
+      disconnect: () =>
+        set({ sessionKey: null, username: null, pendingToken: null, pendingTokenAt: null }),
     }),
     {
       name: "liner_lastfm_settings_v1",
@@ -74,12 +96,27 @@ export const useLastfmSettingsStore = create<LastfmSettingsState>()(
         apiSecret: state.apiSecret,
         sessionKey: state.sessionKey,
         username: state.username,
+        pendingToken: state.pendingToken,
+        pendingTokenAt: state.pendingTokenAt,
       }),
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<LastfmSettingsState>;
+        const merged = { ...current, ...saved } as LastfmSettingsState;
+        // Builds from before the master switch existed stored a session with
+        // no `enabled` flag. Scrobbling was implicitly on for them, so keep it
+        // on instead of silently leaving authorized users disabled forever.
+        if (saved.sessionKey && typeof saved.enabled !== "boolean") {
+          merged.enabled = true;
+        }
+        return merged;
+      },
     },
   ),
 );
 
 /** Effective credentials for a settings snapshot (built-in app as fallback). */
-export function lastfmCredentials(state: LastfmSettings): LastfmCredentials {
+export function lastfmCredentials(
+  state: Pick<LastfmSettings, "apiKey" | "apiSecret">,
+): LastfmCredentials {
   return resolveLastfmCredentials(state.apiKey, state.apiSecret);
 }

@@ -20,6 +20,14 @@ const MIN_SCROBBLE_MS = 30_000;
 /** Scrobble after half the track or 4 minutes of listening, whichever is first. */
 const MAX_SCROBBLE_MS = 4 * 60 * 1_000;
 
+/**
+ * Upper bound on the time a single tick may credit. Timers are throttled in
+ * hidden windows and suspended while an Android WebView is in the background,
+ * so a tick can arrive minutes late after a legitimately-listened gap; the cap
+ * keeps a machine that slept overnight from scrobbling on its own.
+ */
+const MAX_TICK_CREDIT_MS = 5 * 60 * 1_000;
+
 function artistNamesOf(track: Track): string {
   if (track.artists && typeof track.artists === "string" && track.artists.trim()) {
     return track.artists.trim();
@@ -52,10 +60,13 @@ interface ListenSession {
 /**
  * Client-side Last.fm scrobbler.
  *
- * While a track is playing the hook credits one second of listening per tick,
- * sends a now-playing update on the first playing tick of each track, and
- * scrobbles once the official threshold is crossed:
+ * While a track is playing the hook credits the real elapsed time per tick
+ * (not a fixed second, so throttled timers still count), sends a now-playing
+ * update on the first playing tick of each track, and scrobbles once the
+ * official threshold is crossed:
  *   duration ≥ 30s AND listened ≥ min(duration / 2, 4 minutes).
+ * When the duration is unknown (0 for some catalog sources) the 4-minute
+ * ceiling is used, so those tracks can still be scrobbled.
  * The scrobble timestamp is the moment playback of that track started,
  * derived as (now − listenedMs) so pauses never shift it.
  *
@@ -76,6 +87,9 @@ export function useLastfmScrobbler() {
     scrobbled: false,
   });
 
+  // Wall-clock anchor for the next tick; reset whenever the effect restarts.
+  const lastTickAtRef = useRef<number>(Date.now());
+
   // The scrobbler only runs when a completed account is on file.
   const enabled = useLastfmSettingsStore((s) => s.enabled);
   const apiKey = useLastfmSettingsStore((s) => s.apiKey);
@@ -83,16 +97,23 @@ export function useLastfmScrobbler() {
   const sessionKey = useLastfmSettingsStore((s) => s.sessionKey);
 
   useEffect(() => {
-    const credentials = lastfmCredentials({
-      enabled,
-      apiKey,
-      apiSecret,
-      sessionKey,
-      username: null,
-    });
+    const credentials = lastfmCredentials({ apiKey, apiSecret });
     if (!enabled || !sessionKey) return;
 
+    lastTickAtRef.current = Date.now();
+
     const tick = () => {
+      // Credit the time that actually passed, not a fixed tick length: hidden
+      // windows throttle timers and a backgrounded Android WebView suspends
+      // them entirely, which used to make long listens never reach the
+      // scrobble threshold.
+      const now = Date.now();
+      const elapsed = Math.max(
+        0,
+        Math.min(now - lastTickAtRef.current, MAX_TICK_CREDIT_MS),
+      );
+      lastTickAtRef.current = now;
+
       const snapshot = playerRef.current;
       const session = sessionRef.current;
       const track = snapshot.currentTrack;
@@ -108,7 +129,7 @@ export function useLastfmScrobbler() {
 
       if (!track || snapshot.status !== "playing") return;
 
-      session.listenedMs += TICK_MS;
+      session.listenedMs += elapsed;
 
       if (!session.nowPlayingSent) {
         session.nowPlayingSent = true;
@@ -125,8 +146,12 @@ export function useLastfmScrobbler() {
       if (session.scrobbled) return;
 
       const durationMs = track.durationMs || snapshot.durationMs || 0;
-      const thresholdMs = Math.min(durationMs / 2, MAX_SCROBBLE_MS);
-      if (durationMs >= MIN_SCROBBLE_MS && session.listenedMs >= thresholdMs) {
+      // Unknown length (0 from some catalog sources): fall back to the
+      // four-minute ceiling instead of never scrobbling at all.
+      const thresholdMs =
+        durationMs > 0 ? Math.min(durationMs / 2, MAX_SCROBBLE_MS) : MAX_SCROBBLE_MS;
+      if (durationMs > 0 && durationMs < MIN_SCROBBLE_MS) return;
+      if (session.listenedMs >= thresholdMs) {
         session.scrobbled = true;
         const startedAtSeconds = Math.floor((Date.now() - session.listenedMs) / 1000);
         void lastfmScrobble(

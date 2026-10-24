@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/languages";
 import {
   lastfmAuthorizeUrl,
@@ -31,10 +31,12 @@ export function LastFmTab({ searchQuery }: { searchQuery?: string }) {
   const setApiSecret = useLastfmSettingsStore((s) => s.setApiSecret);
   const sessionKey = useLastfmSettingsStore((s) => s.sessionKey);
   const username = useLastfmSettingsStore((s) => s.username);
+  const pendingToken = useLastfmSettingsStore((s) => s.pendingToken);
+  const pendingTokenAt = useLastfmSettingsStore((s) => s.pendingTokenAt);
+  const setPendingToken = useLastfmSettingsStore((s) => s.setPendingToken);
   const connect = useLastfmSettingsStore((s) => s.connect);
   const disconnect = useLastfmSettingsStore((s) => s.disconnect);
 
-  const [pendingToken, setPendingToken] = useState<string | null>(null);
   const [busy, setBusy] = useState<"token" | "session" | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -62,19 +64,55 @@ export function LastFmTab({ searchQuery }: { searchQuery?: string }) {
     }
   };
 
-  const finishConnecting = async () => {
+  const finishConnecting = useCallback(async () => {
     if (!pendingToken) return;
     setBusy("session");
     setAuthError(null);
     try {
       await connect(pendingToken);
-      setPendingToken(null);
     } catch (error) {
       setAuthError(errorMessage(error));
     } finally {
       setBusy(null);
     }
-  };
+  }, [pendingToken, connect]);
+
+  /**
+   * The Last.fm approval happens in the system browser, so the settings tab —
+   * or the whole WebView — can be unmounted while the user is away. The token
+   * is persisted, and this effect exchanges it as soon as the app comes back
+   * to the foreground, so "authorized" actually turns into an active session.
+   */
+  const wasAway = useRef(false);
+  useEffect(() => {
+    if (!pendingToken || connected) return;
+
+    const markAway = () => {
+      wasAway.current = true;
+    };
+    const tryFinish = () => {
+      if (document.visibilityState === "hidden" || !wasAway.current) return;
+      wasAway.current = false;
+      void finishConnecting();
+    };
+
+    window.addEventListener("blur", markAway);
+    window.addEventListener("focus", tryFinish);
+    document.addEventListener("visibilitychange", tryFinish);
+
+    // A token restored from storage means the app was killed or reloaded while
+    // the user was authorizing; give the approval a moment, then exchange it.
+    const staleMs = pendingTokenAt ? Date.now() - pendingTokenAt : 0;
+    const timer =
+      staleMs > 10_000 ? window.setTimeout(() => void finishConnecting(), 600) : null;
+
+    return () => {
+      window.removeEventListener("blur", markAway);
+      window.removeEventListener("focus", tryFinish);
+      document.removeEventListener("visibilitychange", tryFinish);
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [pendingToken, pendingTokenAt, connected, finishConnecting]);
 
   return (
     <div className="flex flex-col gap-[18px]">
