@@ -7,6 +7,10 @@ import type { Track } from "@/shared/types";
 import { resolvePlaybackStream, type ResolvedPlaybackStream } from "./playbackSource";
 import { autoCrossfadeWindowMs, transitionSpec, CROSSFADE_MAX_MS } from "./transitions";
 import { peekAutoNextTrack } from "./queueNext";
+import {
+  startBackgroundAudioKeepAlive,
+  stopBackgroundAudioKeepAlive,
+} from "./backgroundAudio";
 
 /** When false, native playback never caches audio to disk (only Download saves). */
 const AUTO_CACHE_AUDIO = false;
@@ -174,6 +178,15 @@ export class AndroidPlayerRuntime {
     this.pendingStartPositionMs = positionMs;
     usePlayerStore.getState().setPosition(positionMs);
     this.bridge.audioSeek(positionMs);
+  }
+
+  /** iOS only: keep the WKWebView renderer out of suspension while audio plays. */
+  private startRendererKeepAlive(): void {
+    if (this.bridge.getPlatform() === "ios") startBackgroundAudioKeepAlive();
+  }
+
+  private stopRendererKeepAlive(): void {
+    if (this.bridge.getPlatform() === "ios") stopBackgroundAudioKeepAlive();
   }
 
   private setNativeVolume(next: number): void {
@@ -396,6 +409,8 @@ export class AndroidPlayerRuntime {
           store.setPosition(live.positionMs);
         }
         store.setStatus("playing");
+        // Keep the renderer running while the native player owns the audio.
+        this.startRendererKeepAlive();
         log("green", "playback", `adopted crossfaded track "${track.title}"`);
         return;
       }
@@ -473,6 +488,9 @@ export class AndroidPlayerRuntime {
         startMs: startPositionMs,
       };
       this.bridge.audioLoad(JSON.stringify(payload));
+      // iOS suspends WKWebView timers with the app; the silent loop keeps the
+      // poll (crossfade arming and queue advance) running in the background.
+      this.startRendererKeepAlive();
       if (fadeInMs > 0 && epoch === this.loadEpoch) {
         void this.rampNativeVolume(store.volume, fadeInMs);
       }
@@ -516,6 +534,7 @@ export class AndroidPlayerRuntime {
       return;
     }
     this.bridge.audioResume();
+    this.startRendererKeepAlive();
     store.setStatus("playing");
     this.bridge.setKeepScreenOn(true);
   }
@@ -555,6 +574,7 @@ export class AndroidPlayerRuntime {
     this.endedTrackId = null;
     this.bridge.audioStop();
     this.bridge.setKeepScreenOn(false);
+    this.stopRendererKeepAlive();
     usePlayerStore.getState().setStatus("paused");
   }
 

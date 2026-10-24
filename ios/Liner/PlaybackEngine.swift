@@ -33,6 +33,7 @@ final class PlaybackEngine {
     private var ended = false
 
     private var tickTimer: Timer?
+    private var tickCount = 0
     private var sleepTimer: Timer?
     private var endObserver: NSObjectProtocol?
     private var failObserver: NSObjectProtocol?
@@ -384,6 +385,7 @@ final class PlaybackEngine {
     }
 
     private func tick() {
+        tickCount &+= 1
         guard trackId != nil else {
             if status != "idle" {
                 status = "idle"
@@ -419,6 +421,11 @@ final class PlaybackEngine {
             }
         }
 
+        // The background keepalive audio element can take over the system
+        // now-playing item; refresh ours periodically while playing.
+        if status == "playing", tickCount % 8 == 0 {
+            updateNowPlaying()
+        }
         pushState()
     }
 
