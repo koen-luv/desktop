@@ -177,6 +177,7 @@ function toTrack(item: ApiUserPlaylistItem): Track {
   return {
     ...base,
     playlistItemId: item.id,
+    playlistAddedAt: item.addedAt,
   };
 }
 

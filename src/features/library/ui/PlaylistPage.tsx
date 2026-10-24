@@ -17,7 +17,7 @@ import {
   Search2Line,
 } from "@mingcute/react";
 import { AnimatePresence, motion } from "framer-motion";
-import { LuPencil, LuTrash2, LuText, LuShuffle } from "react-icons/lu";
+import { LuArrowUpDown, LuCheck, LuImageOff, LuImagePlus, LuPencil, LuTrash2, LuText, LuShuffle } from "react-icons/lu";
 import { buildShareUrl } from "@/shared/utils/share";
 import Button from "@/shared/ui/Button";
 import DropdownMenu from "@/shared/ui/DropdownMenu";
@@ -35,6 +35,17 @@ import type { Track } from "@/shared/types";
 import { useTranslation } from "@/languages";
 import { api } from "@/shared/api";
 import { useIsContentTransparent } from "@/features/settings/store/customizationStore";
+import {
+  usePlaylistCoverOverride,
+  usePlaylistSortKey,
+  usePlaylistViewStore,
+} from "../store/playlistViewStore";
+import {
+  PLAYLIST_SORT_KEYS,
+  PLAYLIST_SORT_LABEL_KEYS,
+  sortPlaylistTracks,
+} from "../utils/playlistSort";
+import { fileToPlaylistCover, PlaylistCoverError } from "../utils/playlistCoverImage";
 import {
   useTrackSearch,
   useTrackSearchButtonLabel,
@@ -134,6 +145,16 @@ function LibraryPlaylistContent() {
 
   const isLoading = isLikesMode ? likesLoading : playlistLoading;
 
+  // Presentation prefs are per device: a custom cover (the API has no cover
+  // field) and the chosen sort order, both remembered per playlist.
+  const playlistKey = isLikesMode ? "likes" : decodedId;
+  const customCover = usePlaylistCoverOverride(isLikesMode ? null : decodedId);
+  const sortKey = usePlaylistSortKey(playlistKey);
+  const setSortKey = usePlaylistViewStore((s) => s.setSort);
+  const setCustomCover = usePlaylistViewStore((s) => s.setCover);
+  const clearCustomCover = usePlaylistViewStore((s) => s.clearCover);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
   const viewData = (() => {
     if (isLikesMode) {
       if (!likesData) return null;
@@ -153,14 +174,15 @@ function LibraryPlaylistContent() {
     }
     if (!playlistDetail) return null;
     const bio = playlistDetail.description?.trim() ?? "";
+    const generatedUrls =
+      playlistDetail.coverUrls ??
+      (playlistDetail.coverUrl ? [playlistDetail.coverUrl] : []);
     return {
       title: playlistDetail.title || t("playlist.untitled_playlist"),
       bio,
       countLabel: t("common.tracks", { count: playlistDetail.trackCount }),
-      coverUrl: playlistDetail.coverUrl || "",
-      coverUrls:
-        playlistDetail.coverUrls ??
-        (playlistDetail.coverUrl ? [playlistDetail.coverUrl] : []),
+      coverUrl: customCover || playlistDetail.coverUrl || "",
+      coverUrls: customCover ? [customCover] : generatedUrls,
       tracks: playlistDetail.tracks,
       revision: playlistDetail.revision,
     };
@@ -201,12 +223,19 @@ function LibraryPlaylistContent() {
     return optimisticTracks ?? viewData?.tracks ?? [];
   }, [optimisticTracks, viewData?.tracks]);
 
-  const search = useTrackSearch(currentTracks, id);
+  // What the page shows (and plays) in the chosen order. `custom` keeps the
+  // server order so drag-reordering stays meaningful.
+  const sortedTracks = useMemo(
+    () => sortPlaylistTracks(currentTracks, sortKey),
+    [currentTracks, sortKey],
+  );
+
+  const search = useTrackSearch(sortedTracks, id);
   const searchButtonLabel = useTrackSearchButtonLabel();
   const isFiltering = search.matches !== null;
   const visibleTracks = useMemo(
-    () => search.matches ?? currentTracks.map((track, index) => ({ track, index })),
-    [search.matches, currentTracks],
+    () => search.matches ?? sortedTracks.map((track, index) => ({ track, index })),
+    [search.matches, sortedTracks],
   );
 
   // results start at the top, not wherever the full list was scrolled to
@@ -218,38 +247,38 @@ function LibraryPlaylistContent() {
     const first = search.matches?.[0];
     if (!first || !viewData) return;
     const context = decodedId ? `playlist:${decodedId}` : viewData.title;
-    playerEngine.playTrack(first.track, currentTracks, context, viewData.coverUrl);
-  }, [search.matches, viewData, decodedId, currentTracks]);
+    playerEngine.playTrack(first.track, sortedTracks, context, viewData.coverUrl);
+  }, [search.matches, viewData, decodedId, sortedTracks]);
 
   const handlePlayAll = useCallback(() => {
-    if (!currentTracks.length || !viewData) return;
+    if (!sortedTracks.length || !viewData) return;
     const context = decodedId ? `playlist:${decodedId}` : viewData.title;
     playerEngine.clearQueue();
     playerEngine.playTrack(
-      currentTracks[0],
-      currentTracks,
+      sortedTracks[0],
+      sortedTracks,
       context,
       viewData.coverUrl,
     );
-  }, [currentTracks, viewData, decodedId]);
+  }, [sortedTracks, viewData, decodedId]);
 
   const handleShufflePlay = useCallback(() => {
-    if (!currentTracks.length || !viewData) return;
+    if (!sortedTracks.length || !viewData) return;
     const context = decodedId ? `playlist:${decodedId}` : viewData.title;
     playerEngine.clearQueue();
     void playerEngine.playShuffled(
-      currentTracks,
+      sortedTracks,
       context,
       viewData.coverUrl,
     );
-  }, [currentTracks, viewData, decodedId]);
+  }, [sortedTracks, viewData, decodedId]);
 
   const { toast } = useToast();
   const [addedToQueue, setAddedToQueue] = useState(false);
 
   const handleAddToQueue = useCallback(() => {
-    if (!currentTracks.length || !viewData) return;
-    for (const track of currentTracks) {
+    if (!sortedTracks.length || !viewData) return;
+    for (const track of sortedTracks) {
       playerEngine.addToQueue(track);
     }
     const playlistTitle = viewData.title || t("playlist.untitled_playlist");
@@ -261,7 +290,27 @@ function LibraryPlaylistContent() {
       setAddedToQueue(false);
     }, 1200);
     return () => clearTimeout(timer);
-  }, [currentTracks, viewData, toast, t]);
+  }, [sortedTracks, viewData, toast, t]);
+
+  const handleCoverFile = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      if (!file || !decodedId || isLikesMode) return;
+      try {
+        const dataUrl = await fileToPlaylistCover(file);
+        setCustomCover(decodedId, dataUrl);
+        toast(t("playlist.cover_updated"), "checkmark");
+      } catch (error) {
+        const code = error instanceof PlaylistCoverError ? error.code : "decode_failed";
+        toast(
+          code === "too_large" ? t("playlist.cover_too_large") : t("playlist.cover_invalid"),
+          "error",
+        );
+      }
+    },
+    [decodedId, isLikesMode, setCustomCover, t, toast],
+  );
 
   const handleShare = useCallback(() => {
     if (typeof navigator !== "undefined" && navigator.clipboard && decodedId) {
@@ -307,7 +356,7 @@ function LibraryPlaylistContent() {
     itemWidth,
     handleCardGrab,
   } = useListReorder<Track>({
-    items: currentTracks,
+    items: sortedTracks,
     scrollContainerRef: scrollRef,
     listContainerRef: trackListContainerRef,
     itemHeight: 64,
@@ -771,6 +820,35 @@ function LibraryPlaylistContent() {
                           <Search2Line size={16} />
                         </Button>
 
+                        <input
+                          ref={coverInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleCoverFile}
+                          data-no-window-drag
+                        />
+
+                        <DropdownMenu
+                          trigger={
+                            <Button
+                              variant={hasCustomBg ? "glass-action" : "outline"}
+                              className="!h-[36px] !w-[36px] shrink-0 !p-0 flex items-center justify-center text-text-primary"
+                              title={t(PLAYLIST_SORT_LABEL_KEYS[sortKey])}
+                            >
+                              <LuArrowUpDown size={16} />
+                            </Button>
+                          }
+                          items={PLAYLIST_SORT_KEYS.map((key) => ({
+                            id: `sort-${key}`,
+                            icon: sortKey === key ? <LuCheck size={15} /> : undefined,
+                            label: t(PLAYLIST_SORT_LABEL_KEYS[key]),
+                            onClick: () => {
+                              if (playlistKey) setSortKey(playlistKey, key);
+                            },
+                          }))}
+                        />
+
                         {!isLikesMode && (
                           <DropdownMenu
                             trigger={
@@ -801,6 +879,26 @@ function LibraryPlaylistContent() {
                                 label: t("common.share"),
                                 onClick: handleShare,
                               },
+                              {
+                                id: "change-cover",
+                                icon: <LuImagePlus size={15} />,
+                                label: t("playlist.cover_change"),
+                                onClick: () => coverInputRef.current?.click(),
+                              },
+                              ...(customCover
+                                ? [
+                                    {
+                                      id: "remove-cover",
+                                      icon: <LuImageOff size={15} />,
+                                      label: t("playlist.cover_remove"),
+                                      onClick: () => {
+                                        if (!decodedId) return;
+                                        clearCustomCover(decodedId);
+                                        toast(t("playlist.cover_removed"), "info");
+                                      },
+                                    },
+                                  ]
+                                : []),
                               {
                                 id: "delete",
                                 icon: <LuTrash2 size={15} />,
@@ -902,8 +1000,14 @@ function LibraryPlaylistContent() {
                   }
 
                   // reordering a filtered view would be ambiguous, so it waits for the full list
+                  // Reordering is only meaningful in the stored (custom) order;
+                  // sorted views are read-only until the user switches back.
                   const canReorder = Boolean(
-                    !isLikesMode && decodedId && track.playlistItemId && !isFiltering,
+                    !isLikesMode &&
+                      decodedId &&
+                      track.playlistItemId &&
+                      !isFiltering &&
+                      sortKey === "custom",
                   );
 
                   return (
@@ -915,7 +1019,7 @@ function LibraryPlaylistContent() {
                       playlistId={isLikesMode ? undefined : (decodedId ?? undefined)}
                       playlistTitle={viewData.title}
                       playlistCoverUrl={viewData.coverUrl}
-                      allTracks={currentTracks}
+                      allTracks={sortedTracks}
                       showReorderHandle={canReorder}
                       highlight={search.activeQuery || undefined}
                       onGrabStart={

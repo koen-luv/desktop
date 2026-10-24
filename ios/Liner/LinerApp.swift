@@ -1,6 +1,7 @@
 import AVFoundation
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 import WebKit
 
 @main
@@ -45,9 +46,11 @@ struct RootView: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: LinerWebViewController, context: Context) {}
 }
 
-final class LinerWebViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
+final class LinerWebViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, UIDocumentPickerDelegate {
     private var webView: WKWebView?
     private var hasLoaded = false
+    /// Pending `<input type="file">` completion, resolved by the document picker.
+    private var filePickerCompletion: (([URL]?) -> Void)?
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
         LinerHost.shared.lightBars ? .darkContent : .lightContent
@@ -206,5 +209,35 @@ final class LinerWebViewController: UIViewController, WKNavigationDelegate, WKUI
             LinerHost.shared.openExternal(url.absoluteString)
         }
         return nil
+    }
+
+    /// WKWebView asks the host to present a picker for `<input type="file">`
+    /// (custom playlist covers, wallpaper, playlist imports).
+    func webView(
+        _ webView: WKWebView,
+        runOpenPanelWith parameters: WKOpenPanelParameters,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping ([URL]?) -> Void
+    ) {
+        filePickerCompletion = completionHandler
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.image], asCopy: true)
+        picker.allowsMultipleSelection = parameters.allowsMultipleSelection
+        picker.delegate = self
+        present(picker, animated: true)
+    }
+
+    func documentPicker(
+        _ controller: UIDocumentPickerViewController,
+        didPickDocumentsAt urls: [URL]
+    ) {
+        let completion = filePickerCompletion
+        filePickerCompletion = nil
+        completion?(urls)
+    }
+
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        let completion = filePickerCompletion
+        filePickerCompletion = nil
+        completion?(nil)
     }
 }

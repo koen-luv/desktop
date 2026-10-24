@@ -8,6 +8,7 @@ import CoverImage from "@/features/covers/ui/CoverImage";
 import { useTranslation } from "@/languages";
 import { useAddPlaylistTracks, usePlaylistsList } from "../../hooks";
 import { useModalStore } from "../../store/modalStore";
+import { usePlaylistViewStore } from "../../store/playlistViewStore";
 
 const font = { fontFamily: "var(--font-inter), sans-serif" } as const;
 
@@ -29,6 +30,7 @@ export default function AddToPlaylistModal() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { data: playlistData } = usePlaylistsList();
   const addTrack = useAddPlaylistTracks();
+  const coverOverrides = usePlaylistViewStore((state) => state.covers);
 
   const rawPlaylists = track?.playlists ?? playlistData?.playlists ?? [];
 
@@ -188,9 +190,9 @@ export default function AddToPlaylistModal() {
                 className="flex items-center gap-[12px] p-[8px] rounded-md transition-colors hover:bg-bg-elevated active:bg-border-alpha-14 text-left group w-full border-none bg-transparent cursor-pointer disabled:opacity-50"
               >
                 <div className="relative h-[44px] w-[44px] rounded-lg bg-bg-elevated overflow-hidden shrink-0 flex items-center justify-center">
-                  {playlist.coverUrl ? (
+                  {(coverOverrides[playlist.id] || playlist.coverUrl) ? (
                     <CoverImage
-                      src={playlist.coverUrl}
+                      src={coverOverrides[playlist.id] || playlist.coverUrl}
                       alt={playlist.title}
                       fill
                       sizes="44px"

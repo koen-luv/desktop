@@ -31,6 +31,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewAssetLoader.AssetsPathHandler
+import android.app.Activity
+import android.webkit.ValueCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
@@ -42,6 +45,27 @@ class MainActivity : ComponentActivity() {
     @Volatile var notificationPermissionAsked = false
     private var pageReady = false
     private var pendingDeeplink: String? = null
+    private var pendingFileCallback: ValueCallback<Array<Uri>>? = null
+
+    /** Backs `<input type="file">` (playlist covers, wallpaper, imports). */
+    private val fileChooserLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val callback = pendingFileCallback ?: return@registerForActivityResult
+        pendingFileCallback = null
+        if (result.resultCode != Activity.RESULT_OK) {
+            callback.onReceiveValue(null)
+            return@registerForActivityResult
+        }
+        val data = result.data
+        val clip = data?.clipData
+        val uris: Array<Uri> = when {
+            clip != null -> Array(clip.itemCount) { index -> clip.getItemAt(index).uri }
+            data?.data != null -> arrayOf(data.data!!)
+            else -> emptyArray()
+        }
+        callback.onReceiveValue(uris)
+    }
     private var lightSystemBars = false
     private var rendererRecovered = false
 
@@ -262,6 +286,22 @@ class MainActivity : ComponentActivity() {
                 resultMsg: android.os.Message,
             ): Boolean {
                 return false
+            }
+
+            override fun onShowFileChooser(
+                webView: WebView,
+                filePathCallback: ValueCallback<Array<Uri>>,
+                fileChooserParams: FileChooserParams,
+            ): Boolean {
+                pendingFileCallback?.onReceiveValue(null)
+                pendingFileCallback = filePathCallback
+                return try {
+                    fileChooserLauncher.launch(fileChooserParams.createIntent())
+                    true
+                } catch (_: Exception) {
+                    pendingFileCallback = null
+                    false
+                }
             }
         }
 

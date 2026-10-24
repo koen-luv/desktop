@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { api } from "@/shared/api";
 import { notifyLibraryChanged, evictPlaylistFromCache } from "./usePlaylists";
+import { usePlaylistViewStore } from "../store/playlistViewStore";
 import { applyOptimisticLike, applyOptimisticUnlike } from "./useLikedTracks";
 
 type Options = {
@@ -73,6 +74,7 @@ export function useCreatePlaylist() {
 export function useDeletePlaylist() {
   return useMutation(async ({ playlistId }: { playlistId: string }) => {
     evictPlaylistFromCache(playlistId);
+    usePlaylistViewStore.getState().forgetPlaylist(playlistId);
     return api.deletePlaylist(playlistId);
   });
 }

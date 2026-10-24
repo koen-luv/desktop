@@ -8,6 +8,8 @@ export interface TrackArtist {
 export interface Track {
   id: string;
   playlistItemId?: string;
+  /** When the track was added to its playlist (ISO timestamp); drives "recently added" sorting. */
+  playlistAddedAt?: string;
   title: string;
   artists: string;
   artistId?: string;

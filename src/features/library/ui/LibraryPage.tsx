@@ -19,6 +19,7 @@ import { useTranslation } from "@/languages";
 import { useModalStore } from "../store/modalStore";
 import { useImportStore } from "../store/importStore";
 import { useIsContentTransparent } from "@/features/settings/store/customizationStore";
+import { usePlaylistViewStore } from "../store/playlistViewStore";
 import ImportingPlaylistCard from "./ImportingPlaylistCard";
 
 const PAGE_SIZE = 24;
@@ -187,23 +188,29 @@ export default function LibraryPage() {
     useLikedTrackCount();
   const openCreatePlaylist = useModalStore((state) => state.openCreatePlaylist);
   const hasCustomBg = useIsContentTransparent();
+  // Device-local custom covers override the generated collage everywhere the
+  // playlist is listed.
+  const coverOverrides = usePlaylistViewStore((state) => state.covers);
 
   const playlistItems: LibraryItemViewModel[] = useMemo(() => {
     if (!playlistsData) return [];
     const list = playlistsData.playlists ?? [];
-    return list.map((playlist) => ({
-      id: playlist.id,
-      title: playlist.title,
-      subtitle: t("common.tracks", { count: playlist.trackCount }),
-      imageUrl: playlist.coverUrl || "",
-      coverUrls: playlist.coverUrls,
-      kind: "playlist" as const,
-      isOwned: true,
-      href: `/library/playlist?id=${encodeURIComponent(playlist.id)}`,
-      addedAt:
-        playlist.updatedAt || playlist.createdAt || new Date().toISOString(),
-    }));
-  }, [playlistsData, t]);
+    return list.map((playlist) => {
+      const customCover = coverOverrides[playlist.id];
+      return {
+        id: playlist.id,
+        title: playlist.title,
+        subtitle: t("common.tracks", { count: playlist.trackCount }),
+        imageUrl: customCover || playlist.coverUrl || "",
+        coverUrls: customCover ? [customCover] : playlist.coverUrls,
+        kind: "playlist" as const,
+        isOwned: true,
+        href: `/library/playlist?id=${encodeURIComponent(playlist.id)}`,
+        addedAt:
+          playlist.updatedAt || playlist.createdAt || new Date().toISOString(),
+      };
+    });
+  }, [playlistsData, t, coverOverrides]);
 
   const initialLoading = playlistsLoading;
 
