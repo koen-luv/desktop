@@ -750,6 +750,7 @@ export default function AppFrame({ children }: AppFrameProps) {
   const backgroundImage = useCustomizationStore((s) => s.backgroundImage);
   const backgroundBlur = useCustomizationStore((s) => s.backgroundBlur);
   const backgroundDim = useCustomizationStore((s) => s.backgroundDim);
+  const backgroundOpacity = useCustomizationStore((s) => s.backgroundOpacity);
   const contentViewConfig = useCustomizationStore((s) => s.contentView);
 
   const hasCustomBg = Boolean(backgroundImage);
@@ -784,6 +785,7 @@ export default function AppFrame({ children }: AppFrameProps) {
             className="w-full h-full object-cover select-none"
             style={{
               filter: backgroundBlur > 0 ? `blur(${backgroundBlur}px)` : undefined,
+              opacity: backgroundOpacity / 100,
               transform: backgroundBlur > 0 ? "scale(1.05)" : undefined,
             }}
           />

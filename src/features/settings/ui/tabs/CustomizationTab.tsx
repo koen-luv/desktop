@@ -4,7 +4,7 @@ import {
   TrashBin2,
   Refresh,
 } from "@solar-icons/react";
-import { Upload2Line, CopyLine } from "@mingcute/react";
+import { Upload2Line, CopyLine, ArrowUpLine, ArrowDownLine } from "@mingcute/react";
 
 import { useTranslation } from "@/languages";
 import { Button, Slider, ToggleSwitch, useToast } from "@/shared/ui";
@@ -22,6 +22,8 @@ import {
   MAX_BLUR,
   MIN_DIM,
   MAX_DIM,
+  PLAYER_ELEMENT_IDS,
+  type PlayerElementId,
 } from "../../store/customizationStore";
 
 const font = { fontFamily: "var(--font-inter), sans-serif" } as const;
@@ -38,6 +40,7 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
   const backgroundImage = useCustomizationStore((s) => s.backgroundImage);
   const backgroundBlur = useCustomizationStore((s) => s.backgroundBlur);
   const backgroundDim = useCustomizationStore((s) => s.backgroundDim);
+  const backgroundOpacity = useCustomizationStore((s) => s.backgroundOpacity);
   const sidebar = useCustomizationStore((s) => s.sidebar);
   const contentView = useCustomizationStore((s) => s.contentView);
   const miniplayer = useCustomizationStore((s) => s.miniplayer);
@@ -45,10 +48,24 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
   const setBackgroundImage = useCustomizationStore((s) => s.setBackgroundImage);
   const setBackgroundBlur = useCustomizationStore((s) => s.setBackgroundBlur);
   const setBackgroundDim = useCustomizationStore((s) => s.setBackgroundDim);
+  const setBackgroundOpacity = useCustomizationStore((s) => s.setBackgroundOpacity);
   const setBlockConfig = useCustomizationStore((s) => s.setBlockConfig);
   const applyToAllBlocks = useCustomizationStore((s) => s.applyToAllBlocks);
   const resetBlock = useCustomizationStore((s) => s.resetBlock);
   const resetAll = useCustomizationStore((s) => s.resetAll);
+  const playerElementOrder = useCustomizationStore((s) => s.playerElementOrder);
+  const movePlayerElement = useCustomizationStore((s) => s.movePlayerElement);
+
+  const playerElementLabels: Record<PlayerElementId, string> = {
+    artwork: t("settings.customization.player_artwork") || "Album artwork",
+    trackInfo: t("settings.customization.player_track_info") || "Track title & artist",
+    timeline: t("settings.customization.player_timeline") || "Seek bar & times",
+    controls: t("settings.customization.player_controls") || "Playback controls",
+    volume: t("settings.customization.player_volume") || "Volume",
+  };
+  const orderedPlayerElements = playerElementOrder.length
+    ? playerElementOrder
+    : PLAYER_ELEMENT_IDS;
 
   const handleFileChange = useCallback(
     (file: File) => {
@@ -105,9 +122,14 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
     <div className="flex flex-col gap-[16px]">
       <input
         ref={fileInputRef}
+        id="liner-wallpaper-input"
         type="file"
         accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
-        className="hidden"
+        // Keep the input in the layout instead of display:none: WebViews
+        // (Android/iOS) refuse to open a file picker from a programmatic
+        // click on a hidden input. It is visually hidden but still clickable
+        // through the label below.
+        className="sr-only"
         onChange={onFileInputChange}
       />
 
@@ -193,22 +215,36 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
                     ariaLabel={t("settings.customization.wallpaper_dim") || "Wallpaper dimming"}
                   />
                 </div>
+                <div className="flex flex-col gap-[4px]">
+                  <span className="text-text-secondary text-[12px]" style={font}>
+                    {t("settings.customization.wallpaper_opacity") || "Wallpaper opacity"}
+                  </span>
+                  <Slider
+                    value={backgroundOpacity}
+                    onChange={setBackgroundOpacity}
+                    min={MIN_OPACITY}
+                    max={MAX_OPACITY}
+                    unit="%"
+                    ariaLabel={t("settings.customization.wallpaper_opacity") || "Wallpaper opacity"}
+                  />
+                </div>
               </div>
             </div>
           ) : (
-            <div
+            <label
+              htmlFor="liner-wallpaper-input"
               onDragOver={(e) => {
                 e.preventDefault();
                 setIsDragOver(true);
               }}
               onDragLeave={() => setIsDragOver(false)}
               onDrop={onDrop}
-              onClick={() => fileInputRef.current?.click()}
               className={`flex flex-col items-center justify-center gap-[8px] rounded-xl border border-dashed py-[24px] px-[16px] text-center cursor-pointer transition-colors ${
                 isDragOver
                   ? "border-text-primary bg-border-alpha-20"
                   : "border-border-secondary hover:border-text-tertiary hover:bg-border-alpha-14"
               }`}
+              style={{ padding: "8px" }}
             >
               <div className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-border-alpha-14 text-text-tertiary">
                 <Gallery size={20} />
@@ -221,7 +257,7 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
                   {t("settings.customization.upload_hint") || "PNG, JPEG, GIF, WebP (up to 30MB)"}
                 </span>
               </div>
-            </div>
+            </label>
           )}
         </SettingBlock>
       </SettingSection>
@@ -302,7 +338,8 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
                     {t("settings.customization.opacity") || "Opacity"}
                   </span>
                   <span className="text-text-tertiary text-[11.5px]" style={font}>
-                    {t("settings.customization.opacity_desc") || "Background opacity level (min. 25%)"}
+                    {t("settings.customization.opacity_desc") ||
+                      "Background opacity (0% is fully transparent)"}
                   </span>
                 </div>
                 <div className="w-full shrink-0 sm:w-[190px]">
@@ -361,6 +398,50 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
                 </div>
               </div>
             </div>
+          </div>
+        </SettingBlock>
+
+        <SettingBlock
+          title={t("settings.customization.player_layout_title") || "Fullscreen player layout"}
+          description={
+            t("settings.customization.player_layout_description") ||
+            "Reorder the elements shown around the artwork in fullscreen playback."
+          }
+          titleKey="settings.customization.player_layout_title"
+          descKey="settings.customization.player_layout_description"
+          searchQuery={searchQuery}
+        >
+          <div className="flex flex-col gap-[6px] rounded-xl border border-border-primary/60 bg-border-alpha-14 p-[10px]">
+            {orderedPlayerElements.map((id, index) => (
+              <div
+                key={id}
+                className="flex items-center justify-between gap-[10px] rounded-lg bg-bg-primary/40 px-[10px] py-[8px]"
+              >
+                <span className="min-w-0 truncate text-text-primary text-[12.5px]" style={font}>
+                  {playerElementLabels[id]}
+                </span>
+                <div className="flex shrink-0 items-center gap-[2px]">
+                  <button
+                    type="button"
+                    aria-label={`${t("settings.customization.move_up") || "Move up"}: ${playerElementLabels[id]}`}
+                    disabled={index === 0}
+                    onClick={() => movePlayerElement(id, -1)}
+                    className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-md border-0 bg-transparent text-text-tertiary transition-colors hover:bg-border-alpha-14 hover:text-text-primary disabled:opacity-30 cursor-pointer"
+                  >
+                    <ArrowUpLine size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`${t("settings.customization.move_down") || "Move down"}: ${playerElementLabels[id]}`}
+                    disabled={index === orderedPlayerElements.length - 1}
+                    onClick={() => movePlayerElement(id, 1)}
+                    className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-md border-0 bg-transparent text-text-tertiary transition-colors hover:bg-border-alpha-14 hover:text-text-primary disabled:opacity-30 cursor-pointer"
+                  >
+                    <ArrowDownLine size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </SettingBlock>
 

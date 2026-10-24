@@ -206,6 +206,9 @@
     "popularAlbums": "Top Albums",
     "popularArtists": "Trending Artists",
     "popularPlaylists": "Popular Playlists",
+    "artistRecommendations": "Artists for you",
+    "newReleases": "New releases",
+    "forgottenMemories": "Forgotten memories",
     "dailyMixes": "Daily Mixes",
     "dailyMixesSubtitle": "Fresh playlists curated around your favorite artists and genres"
   },
@@ -520,7 +523,16 @@
     "up_next": "Up next",
     "queue_empty": "The queue is empty.",
     "nothing_playing": "Nothing playing",
-    "stop": "Stop"
+    "stop": "Stop",
+    "nearby_title": "Nearby on this Wi-Fi",
+    "scan": "Scan",
+    "scanning": "Scanning…",
+    "no_nearby": "No Liner devices found on this Wi-Fi yet.",
+    "allow_wifi": "Allow control on this Wi-Fi",
+    "allow_wifi_desc": "No code needed. Phones on the same network find this computer automatically while this is on.",
+    "waiting_wifi": "Waiting for a phone on this Wi-Fi…",
+    "code_fallback": "Or connect with a six-digit code",
+    "error_local_unsupported": "Local Wi-Fi control is available in the desktop app."
   },
   "settings": {
     "title": "Settings",
@@ -709,9 +721,9 @@
       "section_title": "Device control",
       "section_desc": "Pair your phone and computer to control playback and the queue from either one.",
       "controller_title": "Control another device",
-      "controller_desc": "Enter the pairing code shown on your computer to control its playback from here.",
+      "controller_desc": "Find this computer automatically on the same Wi-Fi, or use a pairing code from anywhere.",
       "host_title": "Control from your phone",
-      "host_desc": "Show a pairing code so another device can control this player.",
+      "host_desc": "Let a phone on the same Wi-Fi control this player, or show a pairing code for remote control.",
       "show_code": "Show pairing code",
       "new_code": "New code",
       "open_remote": "Open remote"
@@ -750,7 +762,7 @@
         "description": "Keep status visible on Discord with a paused indicator when music is paused."
       },
       "show_button": {
-        "title": "'Listen on Liner' Button",
+        "title": "'Listen Along' Button",
         "description": "Add an interactive button linking to the song on Liner."
       },
       "show_download_button": {
@@ -792,13 +804,14 @@
       "remove_button": "Remove",
       "wallpaper_blur": "Wallpaper blur",
       "wallpaper_dim": "Wallpaper dimming",
+      "wallpaper_opacity": "Wallpaper opacity"
       "blocks_title": "Interface Blocks Glassmorphism",
       "blocks_description": "Adjust transparency, backdrop blur and dimming for each interface area.",
       "block_sidebar": "Sidebar",
       "block_content": "Content View",
       "block_miniplayer": "Miniplayer",
       "opacity": "Opacity (transparency)",
-      "opacity_desc": "Background opacity level (min. 25%)",
+      "opacity_desc": "Background opacity (0% is fully transparent)",
       "blur": "Backdrop blur",
       "blur_desc": "Frosted glass blur intensity",
       "dim": "Dimming",
@@ -815,7 +828,16 @@
       "removed": "Wallpaper removed",
       "invalid_file_type": "Please select an image or GIF file",
       "file_too_large": "File size must be under 30 MB",
-      "read_error": "Failed to read image file"
+      "read_error": "Failed to read image file",
+      "player_layout_title": "Fullscreen player layout",
+      "player_layout_description": "Reorder the elements shown around the artwork in fullscreen playback.",
+      "player_artwork": "Album artwork",
+      "player_track_info": "Track title & artist",
+      "player_timeline": "Seek bar & times",
+      "player_controls": "Playback controls",
+      "player_volume": "Volume",
+      "move_up": "Move up",
+      "move_down": "Move down"
     },
 
     "audio_data": {
@@ -845,7 +867,8 @@
     },
     "transitions": {
       "title": "Track transition",
-      "description": "How one song flows into the next. Auto blends them like a DJ crossfade, sized to fit both songs.",
+      "description": "How one song flows into the next. Auto blends them like a DJ crossfade; Finish song first always plays the track to its end.",
+      "finish": "Finish song first",
       "auto": "Auto crossfade",
       "off": "None (instant)",
       "fade-in": "Fade in",
@@ -974,6 +997,20 @@
       "high": "High Quality (AAC 256kbps)",
       "lossless": "Lossless (FLAC/ALAC)",
       "lossless_description": "Plays the lossless master (FLAC/ALAC) when Liner has one; other tracks use the best available stream."
+    },
+    "equalizer": {
+      "title": "Equalizer",
+      "description": "Five-band tone control for headphones and speakers. Applies to desktop and Android playback; 0 dB is untouched audio.",
+      "preset": "Preset",
+      "reset": "Flat",
+      "presets": {
+        "flat": "Flat",
+        "bass": "Bass boost",
+        "vocal": "Vocal",
+        "treble": "Treble",
+        "loudness": "Loudness",
+        "custom": "Custom"
+      }
     },
     "profile": {
       "title": "Profile",

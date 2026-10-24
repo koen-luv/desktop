@@ -1,11 +1,45 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { debouncedStorage } from "@/shared/utils/storage";
-
-export interface BlockCustomization {
+import { debouncedStorage } from "@/shared/utils/storage";export interface BlockCustomization {
   opacity: number;
+  backgroundOpacity: number;
   blur: number;
   dim: number;
+}
+export type PlayerElementId =
+  | "artwork"
+  | "trackInfo"
+  | "timeline"
+  | "controls"
+  | "volume";
+
+export const PLAYER_ELEMENT_IDS: PlayerElementId[] = [
+  "artwork",
+  "trackInfo",
+  "timeline",
+  "controls",
+  "volume",
+];
+
+export const DEFAULT_PLAYER_ELEMENT_ORDER: PlayerElementId[] = [...PLAYER_ELEMENT_IDS];
+
+export function normalizePlayerElementOrder(order: unknown): PlayerElementId[] {
+  const valid = new Set<PlayerElementId>(PLAYER_ELEMENT_IDS);
+  const seen = new Set<PlayerElementId>();
+  const normalized: PlayerElementId[] = [];
+  if (Array.isArray(order)) {
+    for (const value of order) {
+      if (typeof value !== "string" || !valid.has(value as PlayerElementId)) continue;
+      const id = value as PlayerElementId;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      normalized.push(id);
+    }
+  }
+  for (const id of PLAYER_ELEMENT_IDS) {
+    if (!seen.has(id)) normalized.push(id);
+  }
+  return normalized;
 }
 
 export interface CustomizationState {
@@ -15,6 +49,7 @@ export interface CustomizationState {
   sidebar: BlockCustomization;
   contentView: BlockCustomization;
   miniplayer: BlockCustomization;
+  playerElementOrder: PlayerElementId[];
 
   setBackgroundImage: (image: string | null) => void;
   setBackgroundBlur: (blur: number) => void;
@@ -25,24 +60,28 @@ export interface CustomizationState {
   ) => void;
   applyToAllBlocks: (sourceBlock: "sidebar" | "contentView" | "miniplayer") => void;
   resetBlock: (block: "sidebar" | "contentView" | "miniplayer") => void;
+  setPlayerElementOrder: (order: PlayerElementId[]) => void;
+  movePlayerElement: (id: PlayerElementId, direction: -1 | 1) => void;
   resetAll: () => void;
 }
 
-export const MIN_OPACITY = 25;
+export const MIN_OPACITY = 0;
 export const MAX_OPACITY = 100;
-export const MIN_BLUR = 10;
+export const MIN_BLUR = 0;
 export const MAX_BLUR = 40;
 export const MIN_DIM = 8;
 export const MAX_DIM = 85;
 
 export const DEFAULT_BLOCK_CONFIG: BlockCustomization = {
   opacity: 100,
+  backgroundOpacity: 100,
   blur: 0,
   dim: 0,
 };
 
 export const DEFAULT_GLASS_CONFIG: BlockCustomization = {
   opacity: 60,
+  backgroundOpacity: 60,
   blur: 20,
   dim: 15,
 };
@@ -108,6 +147,9 @@ export const clampBlockConfig = (cfg: Partial<BlockCustomization>): BlockCustomi
   const opacity = typeof cfg.opacity === "number"
     ? Math.max(MIN_OPACITY, Math.min(MAX_OPACITY, Math.round(cfg.opacity)))
     : DEFAULT_BLOCK_CONFIG.opacity;
+  const backgroundOpacity = typeof cfg.backgroundOpacity === "number"
+    ? Math.max(MIN_OPACITY, Math.min(MAX_OPACITY, Math.round(cfg.backgroundOpacity)))
+    : DEFAULT_BLOCK_CONFIG.backgroundOpacity;
 
   const blur = typeof cfg.blur === "number"
     ? Math.max(MIN_BLUR, Math.min(MAX_BLUR, Math.round(cfg.blur)))
@@ -117,7 +159,7 @@ export const clampBlockConfig = (cfg: Partial<BlockCustomization>): BlockCustomi
     ? Math.max(MIN_DIM, Math.min(MAX_DIM, Math.round(cfg.dim)))
     : DEFAULT_BLOCK_CONFIG.dim;
 
-  return { opacity, blur, dim };
+  return { opacity, backgroundOpacity, blur, dim };
 };
 
 export const wallpaperBroadcast =
@@ -144,9 +186,11 @@ export const useCustomizationStore = create<CustomizationState>()(
       backgroundImage: null,
       backgroundBlur: 0,
       backgroundDim: 0,
+      backgroundOpacity: 100,
       sidebar: { ...DEFAULT_BLOCK_CONFIG },
       contentView: { ...DEFAULT_BLOCK_CONFIG },
       miniplayer: { ...DEFAULT_BLOCK_CONFIG },
+      playerElementOrder: [...DEFAULT_PLAYER_ELEMENT_ORDER],
 
       setBackgroundImage: (image) => {
         const prev = get().backgroundImage;
@@ -225,6 +269,22 @@ export const useCustomizationStore = create<CustomizationState>()(
         }));
       },
 
+      setPlayerElementOrder: (order) =>
+        set({ playerElementOrder: normalizePlayerElementOrder(order) }),
+
+      movePlayerElement: (id, direction) =>
+        set((state) => {
+          const order = normalizePlayerElementOrder(state.playerElementOrder);
+          const from = order.indexOf(id);
+          if (from < 0) return state;
+          const to = Math.min(order.length - 1, Math.max(0, from + direction));
+          if (to === from) return state;
+          const next = [...order];
+          next.splice(from, 1);
+          next.splice(to, 0, id);
+          return { playerElementOrder: next };
+        }),
+
       resetAll: () => {
         void savePersistedWallpaper(null);
         wallpaperBroadcast?.postMessage({ type: "wallpaper_changed", image: null });
@@ -235,6 +295,7 @@ export const useCustomizationStore = create<CustomizationState>()(
           sidebar: { ...DEFAULT_BLOCK_CONFIG },
           contentView: { ...DEFAULT_BLOCK_CONFIG },
           miniplayer: { ...DEFAULT_BLOCK_CONFIG },
+          playerElementOrder: [...DEFAULT_PLAYER_ELEMENT_ORDER],
         });
       },
     }),
@@ -244,15 +305,18 @@ export const useCustomizationStore = create<CustomizationState>()(
       partialize: (state) => ({
         backgroundBlur: state.backgroundBlur,
         backgroundDim: state.backgroundDim,
+        backgroundOpacity: state.backgroundOpacity,
         sidebar: state.sidebar,
         contentView: state.contentView,
         miniplayer: state.miniplayer,
+        playerElementOrder: state.playerElementOrder,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         state.sidebar = clampBlockConfig(state.sidebar || {});
         state.contentView = clampBlockConfig(state.contentView || {});
         state.miniplayer = clampBlockConfig(state.miniplayer || {});
+        state.playerElementOrder = normalizePlayerElementOrder(state.playerElementOrder);
         void loadPersistedWallpaper().then((img) => {
           if (img) {
             useCustomizationStore.setState({ backgroundImage: img });
@@ -293,7 +357,7 @@ export function getBlockStyle(
     };
   }
 
-  const alpha = config.opacity / 100;
+  const alpha = config.backgroundOpacity / 100;
   const dimAlpha = config.dim / 100;
 
   let bg: string;
@@ -335,7 +399,7 @@ export function isGlassThemeActive(state: {
 }): boolean {
   if (!state.backgroundImage) return false;
   return [state.sidebar, state.contentView, state.miniplayer].some(
-    (b) => b.opacity < 100 && b.blur > 0,
+    (b) => b.opacity < 100 && b.blur > 0 && b.backgroundOpacity < 100,
   );
 }
 
