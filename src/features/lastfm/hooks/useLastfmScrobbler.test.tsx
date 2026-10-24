@@ -48,8 +48,6 @@ describe("useLastfmScrobbler", () => {
     vi.setSystemTime(new Date("2026-10-24T10:00:00Z"));
     useLastfmSettingsStore.setState({
       enabled: true,
-      apiKey: "",
-      apiSecret: "",
       sessionKey: "SK-test",
       username: "tester",
       pendingToken: null,

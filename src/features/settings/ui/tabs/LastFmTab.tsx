@@ -7,7 +7,7 @@ import {
   useLastfmSettingsStore,
 } from "@/features/lastfm";
 import { nativeOpenExternal } from "@/platform";
-import { Button, TextInput, ToggleSwitch } from "@/shared/ui";
+import { Button, ToggleSwitch } from "@/shared/ui";
 import { SettingRow, SettingSection } from "../controls";
 
 function errorMessage(error: unknown): string {
@@ -16,19 +16,16 @@ function errorMessage(error: unknown): string {
 }
 
 /**
- * Last.fm account setup: paste an API key/secret, authorize through the
- * out-of-band flow, then control scrobbling. Works on Android and desktop —
- * the authorization page opens in the system browser via the native bridge.
+ * Last.fm account setup: authorize through the out-of-band flow, then control
+ * scrobbling. Liner's own Last.fm application is always used, so there are no
+ * API credentials to paste. Works on Android and desktop — the authorization
+ * page opens in the system browser via the native bridge.
  */
 export function LastFmTab({ searchQuery }: { searchQuery?: string }) {
   const { t } = useTranslation();
 
   const enabled = useLastfmSettingsStore((s) => s.enabled);
   const setEnabled = useLastfmSettingsStore((s) => s.setEnabled);
-  const apiKey = useLastfmSettingsStore((s) => s.apiKey);
-  const setApiKey = useLastfmSettingsStore((s) => s.setApiKey);
-  const apiSecret = useLastfmSettingsStore((s) => s.apiSecret);
-  const setApiSecret = useLastfmSettingsStore((s) => s.setApiSecret);
   const sessionKey = useLastfmSettingsStore((s) => s.sessionKey);
   const username = useLastfmSettingsStore((s) => s.username);
   const pendingToken = useLastfmSettingsStore((s) => s.pendingToken);
@@ -41,8 +38,8 @@ export function LastFmTab({ searchQuery }: { searchQuery?: string }) {
   const [authError, setAuthError] = useState<string | null>(null);
 
   const connected = Boolean(sessionKey);
-  // The built-in Liner app is used whenever the user has not pasted their own.
-  const credentials = resolveLastfmCredentials(apiKey, apiSecret);
+  // Liner's own Last.fm application — no user-provided credentials anymore.
+  const credentials = resolveLastfmCredentials("", "");
   const authUrl = pendingToken ? lastfmAuthorizeUrl(credentials.apiKey, pendingToken) : null;
 
   const openAuthorization = async () => {
@@ -154,55 +151,6 @@ export function LastFmTab({ searchQuery }: { searchQuery?: string }) {
           descKey="settings.lastfm.enable.description"
           searchQuery={searchQuery}
           control={<ToggleSwitch checked={enabled} onChange={setEnabled} />}
-        />
-      </SettingSection>
-
-      {/* API credentials */}
-      <SettingSection label={t("settings.lastfm.section_credentials") || "API Credentials"}>
-        <SettingRow
-          title={t("settings.lastfm.api_key.title") || "API Key"}
-          description={
-            t("settings.lastfm.api_key.description") ||
-            "Uses Liner's built-in Last.fm application by default; paste your own key to override."
-          }
-          titleKey="settings.lastfm.api_key.title"
-          descKey="settings.lastfm.api_key.description"
-          searchQuery={searchQuery}
-          control={
-            <TextInput
-              size="sm"
-              variant="transparent"
-              className="w-[240px] text-right"
-              value={apiKey}
-              disabled={connected || busy !== null}
-              placeholder="api key"
-              aria-label={t("settings.lastfm.api_key.title") || "API Key"}
-              onChange={(event) => setApiKey(event.target.value)}
-            />
-          }
-        />
-        <SettingRow
-          title={t("settings.lastfm.api_secret.title") || "API Secret"}
-          description={
-            t("settings.lastfm.api_secret.description") ||
-            "Shared secret of your Last.fm application (Liner's built-in one is used by default)."
-          }
-          titleKey="settings.lastfm.api_secret.title"
-          descKey="settings.lastfm.api_secret.description"
-          searchQuery={searchQuery}
-          control={
-            <TextInput
-              size="sm"
-              variant="transparent"
-              type="password"
-              className="w-[240px] text-right"
-              value={apiSecret}
-              disabled={connected || busy !== null}
-              placeholder="api secret"
-              aria-label={t("settings.lastfm.api_secret.title") || "API Secret"}
-              onChange={(event) => setApiSecret(event.target.value)}
-            />
-          }
         />
       </SettingSection>
 

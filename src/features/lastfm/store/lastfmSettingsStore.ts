@@ -5,30 +5,26 @@ import { lastfmGetSession, type LastfmCredentials } from "../lib/lastfmClient";
 
 /**
  * Liner's own Last.fm API application (registered by the project owner).
- * Shipped as the default so scrobbling works without any setup; users can
- * still paste their own key/secret to override.
+ * It is the only credential source — the settings UI no longer accepts
+ * user-provided keys, so scrobbling works without any setup.
  */
 const LASTFM_DEFAULT_API_KEY = "e7bad882b0268344492d389582f21514";
 const LASTFM_DEFAULT_API_SECRET = "429ffb72c7aa50452e15a7d303c778ff";
 
-/** Effective credentials: user-provided values win, otherwise the built-in app. */
+/** Effective credentials: always the built-in Liner application. */
 export function resolveLastfmCredentials(
-  apiKey: string | undefined,
-  apiSecret: string | undefined,
+  _apiKey?: string,
+  _apiSecret?: string,
 ): LastfmCredentials {
   return {
-    apiKey: (apiKey ?? "").trim() || LASTFM_DEFAULT_API_KEY,
-    apiSecret: (apiSecret ?? "").trim() || LASTFM_DEFAULT_API_SECRET,
+    apiKey: LASTFM_DEFAULT_API_KEY,
+    apiSecret: LASTFM_DEFAULT_API_SECRET,
   };
 }
 
 export interface LastfmSettings {
   /** Master switch for now-playing + scrobble submission. */
   enabled: boolean;
-  /** User-provided Last.fm API application key. */
-  apiKey: string;
-  /** User-provided Last.fm API application secret. */
-  apiSecret: string;
   /** Long-lived session key obtained via the out-of-band auth flow. */
   sessionKey: string | null;
   /** Last.fm username the session belongs to (for the settings UI). */
@@ -46,8 +42,6 @@ export interface LastfmSettings {
 
 interface LastfmSettingsState extends LastfmSettings {
   setEnabled: (enabled: boolean) => void;
-  setApiKey: (apiKey: string) => void;
-  setApiSecret: (apiSecret: string) => void;
   /** Remembers a freshly requested token until the browser approval comes back. */
   setPendingToken: (token: string | null) => void;
   /** Exchanges an authorized request token for a session and stores it. */
@@ -59,22 +53,17 @@ export const useLastfmSettingsStore = create<LastfmSettingsState>()(
   persist(
     (set, get) => ({
       enabled: false,
-      apiKey: "",
-      apiSecret: "",
       sessionKey: null,
       username: null,
       pendingToken: null,
       pendingTokenAt: null,
 
       setEnabled: (enabled) => set({ enabled }),
-      setApiKey: (apiKey) => set({ apiKey: apiKey.trim() }),
-      setApiSecret: (apiSecret) => set({ apiSecret: apiSecret.trim() }),
       setPendingToken: (pendingToken) =>
         set({ pendingToken, pendingTokenAt: pendingToken ? Date.now() : null }),
 
       connect: async (token) => {
-        const { apiKey, apiSecret } = resolveLastfmCredentials(get().apiKey, get().apiSecret);
-        const session = await lastfmGetSession({ apiKey, apiSecret }, token);
+        const session = await lastfmGetSession(resolveLastfmCredentials(), token);
         set({
           sessionKey: session.key,
           username: session.username,
@@ -92,16 +81,18 @@ export const useLastfmSettingsStore = create<LastfmSettingsState>()(
       storage: createJSONStorage(() => debouncedStorage),
       partialize: (state) => ({
         enabled: state.enabled,
-        apiKey: state.apiKey,
-        apiSecret: state.apiSecret,
         sessionKey: state.sessionKey,
         username: state.username,
         pendingToken: state.pendingToken,
         pendingTokenAt: state.pendingTokenAt,
       }),
       merge: (persisted, current) => {
-        const saved = (persisted ?? {}) as Partial<LastfmSettingsState>;
-        const merged = { ...current, ...saved } as LastfmSettingsState;
+        const saved = { ...((persisted ?? {}) as Record<string, unknown>) };
+        // apiKey/apiSecret were removed from the store; strip any persisted
+        // copies so an old custom key can never come back.
+        delete saved.apiKey;
+        delete saved.apiSecret;
+        const merged = { ...current, ...(saved as Partial<LastfmSettingsState>) } as LastfmSettingsState;
         // Builds from before the master switch existed stored a session with
         // no `enabled` flag. Scrobbling was implicitly on for them, so keep it
         // on instead of silently leaving authorized users disabled forever.
@@ -114,9 +105,9 @@ export const useLastfmSettingsStore = create<LastfmSettingsState>()(
   ),
 );
 
-/** Effective credentials for a settings snapshot (built-in app as fallback). */
+/** Effective credentials for a settings snapshot (always the built-in app). */
 export function lastfmCredentials(
-  state: Pick<LastfmSettings, "apiKey" | "apiSecret">,
+  _state?: Pick<LastfmSettings, never>,
 ): LastfmCredentials {
-  return resolveLastfmCredentials(state.apiKey, state.apiSecret);
+  return resolveLastfmCredentials();
 }

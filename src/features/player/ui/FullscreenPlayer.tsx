@@ -572,7 +572,7 @@ export function FullscreenPlayer({
         aria-label={t("devices.remote_title")}
         onClick={() => useDeviceControlStore.getState().setOpen(true)}
         data-no-window-drag
-        className={`absolute top-[calc(var(--inset-top,0px)+12px)] right-[48px] z-30 inline-flex h-[32px] w-[32px] items-center justify-center rounded-lg border-none backdrop-blur-xl active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto ${
+        className={`absolute top-[calc(var(--inset-top,0px)+52px)] right-[12px] z-30 inline-flex h-[32px] w-[32px] items-center justify-center rounded-lg border-none backdrop-blur-xl active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto ${
           useDeviceControlStore.getState().controllerPhase === "connected"
             ? "bg-accent-primary/30 text-white ring-1 ring-accent-primary/60 hover:bg-accent-primary/40"
             : "bg-black/50 text-white/80 hover:text-white hover:bg-white/10"

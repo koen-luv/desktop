@@ -92,12 +92,10 @@ export function useLastfmScrobbler() {
 
   // The scrobbler only runs when a completed account is on file.
   const enabled = useLastfmSettingsStore((s) => s.enabled);
-  const apiKey = useLastfmSettingsStore((s) => s.apiKey);
-  const apiSecret = useLastfmSettingsStore((s) => s.apiSecret);
   const sessionKey = useLastfmSettingsStore((s) => s.sessionKey);
 
   useEffect(() => {
-    const credentials = lastfmCredentials({ apiKey, apiSecret });
+    const credentials = lastfmCredentials();
     if (!enabled || !sessionKey) return;
 
     lastTickAtRef.current = Date.now();
@@ -172,5 +170,5 @@ export function useLastfmScrobbler() {
 
     const timer = window.setInterval(tick, TICK_MS);
     return () => window.clearInterval(timer);
-  }, [enabled, apiKey, apiSecret, sessionKey]);
+  }, [enabled, sessionKey]);
 }
