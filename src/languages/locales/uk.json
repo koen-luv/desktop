@@ -729,17 +729,6 @@
       "long": "Довгий перехід",
       "swell": "Крещендо"
     },
-    "discord": {
-      "section": "Discord",
-      "enabled": {
-        "title": "Discord Rich Presence",
-        "description": "Показувати прослуховуваний трек у вашому профілі Discord (десктоп і Android — в Android треба встановити Discord та увійти в обліковий запис)."
-      },
-      "client_id": {
-        "title": "ID застосунку (Client ID)",
-        "description": "З Порталу розробників Discord: створіть застосунок, додайте https://localhost як RPC Origin і вставте його ID. Залиште порожнім, щоб вимкнути."
-      }
-    },
     "sleep_timer": {
       "title": "Таймер сну",
       "description": "Автоматично ставить відтворення на паузу через обраний час. Працює нативно на Android, тому спрацьовує навіть із вимкненим екраном."

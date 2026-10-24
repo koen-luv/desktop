@@ -42,6 +42,7 @@
     "sec": "sec"
   },
   "common": {
+    "navigation": "Navigation",
     "app": {
       "name": "Liner",
       "description": "More of what you like",
@@ -429,6 +430,9 @@
     "waiting_hint": "Waiting for the host to connect…",
     "reading_invite": "Reading invite…",
     "synced_hint": "Synced — the host controls playback.",
+    "queue_control_title": "Guests can edit the queue",
+    "queue_control_desc": "Friends can add, reorder and remove songs from their device.",
+    "queue_control_hint": "You can edit the host's queue.",
     "listening_count": "{count} listening",
     "share": "Share",
     "copy": "Copy",
@@ -472,6 +476,37 @@
     "playlists": "Playlists",
     "no_results": "No results found",
     "type_to_search": "Type to search"
+  },
+  "devices": {
+    "remote_title": "Remote control",
+    "remote_subtitle": "Control the music playing on another device",
+    "remote_playing_on": "Playing on {name}",
+    "remote_disconnected": "No device connected",
+    "code_placeholder": "Enter the 6-digit code",
+    "connect": "Connect",
+    "connecting_code": "Connecting…",
+    "connected_to": "Connected to {name}",
+    "default_controller": "a device",
+    "controlled_by": "Controlled by {name}",
+    "host_connecting": "Pairing the controller…",
+    "waiting": "Waiting for a device to connect…",
+    "disconnect": "Disconnect",
+    "open_remote": "Open remote",
+    "live_controls_hint": "Live controls",
+    "play": "Play",
+    "pause": "Pause",
+    "next": "Next",
+    "previous": "Previous",
+    "jump": "Play this song",
+    "move_up": "Move up",
+    "move_down": "Move down",
+    "remove": "Remove",
+    "like": "Like",
+    "unlike": "Unlike",
+    "up_next": "Up next",
+    "queue_empty": "The queue is empty.",
+    "nothing_playing": "Nothing playing",
+    "stop": "Stop"
   },
   "settings": {
     "title": "Settings",
@@ -588,6 +623,10 @@
     },
     "overlay": {
       "description": "Desktop overlay behavior, global shortcut and position settings.",
+      "show_lyrics": {
+        "title": "Show lyrics",
+        "description": "Display synced lyrics in the desktop overlay."
+      },
       "enabled": {
         "title": "Enable overlay",
         "description": "Show a floating miniature player above other windows."
@@ -651,6 +690,17 @@
         "waiting": "Waiting for account",
         "disabled": "Disabled"
       }
+    },
+    "devices": {
+      "section_title": "Device control",
+      "section_desc": "Pair your phone and computer to control playback and the queue from either one.",
+      "controller_title": "Control another device",
+      "controller_desc": "Enter the pairing code shown on your computer to control its playback from here.",
+      "host_title": "Control from your phone",
+      "host_desc": "Show a pairing code so another device can control this player.",
+      "show_code": "Show pairing code",
+      "new_code": "New code",
+      "open_remote": "Open remote"
     },
     "discord": {
       "description": "Show what you're listening to on Discord with album art, artist badge and progress bar.",
@@ -790,17 +840,6 @@
       "medium": "Medium fade",
       "long": "Long fade",
       "swell": "Swell"
-    },
-    "discord": {
-      "section": "Discord",
-      "enabled": {
-        "title": "Discord Rich Presence",
-        "description": "Show the song you're listening to on your Discord profile (desktop and Android — on Android the Discord app must be installed and signed in)."
-      },
-      "client_id": {
-        "title": "Application (Client) ID",
-        "description": "From the Discord Developer Portal: create an application, add https://localhost as its RPC Origin, and paste its Application ID. Leave empty to disable."
-      }
     },
     "sleep_timer": {
       "title": "Sleep timer",

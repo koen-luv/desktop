@@ -637,17 +637,6 @@
       "long": "Fundido largo",
       "swell": "Creciente"
     },
-    "discord": {
-      "section": "Discord",
-      "enabled": {
-        "title": "Rich Presence de Discord",
-        "description": "Muestra la canción que escuchas en tu perfil de Discord (escritorio y Android; en Android la app de Discord debe estar instalada e iniciar sesión)."
-      },
-      "client_id": {
-        "title": "ID de la aplicación (Client ID)",
-        "description": "Del Portal de Desarrolladores de Discord: crea una aplicación, añade https://localhost como RPC Origin y pega su ID. Déjalo vacío para desactivarlo."
-      }
-    },
     "sleep_timer": {
       "title": "Temporizador de sueño",
       "description": "Pausa la reproducción automáticamente tras el tiempo elegido. Se aplica de forma nativa en Android, así que también funciona con la pantalla apagada."
