@@ -57,7 +57,15 @@ class PlaybackService : MediaLibraryService() {
             ),
         )
 
-    private val dataSourceFactory = DefaultDataSource.Factory(this, httpDataSourceFactory)
+    /**
+     * Built lazily: field initializers run before `attachBaseContext`, when
+     * `this` is a ContextWrapper with a null base context. Touching it there
+     * makes [DefaultDataSource.Factory] call `getApplicationContext()` on a
+     * null context and kills the service process the moment playback starts.
+     */
+    private val dataSourceFactory: DefaultDataSource.Factory by lazy {
+        DefaultDataSource.Factory(this, httpDataSourceFactory)
+    }
 
     private val audioAttributes = AudioAttributes.Builder()
         .setUsage(C.USAGE_MEDIA)
