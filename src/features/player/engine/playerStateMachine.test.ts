@@ -365,15 +365,12 @@ describe("Player auto-skip on playback error", () => {
       await playerEngine.playTrack(tracks[0], tracks);
       expect(usePlayerStore.getState().currentIndex).toBe(0);
 
-      expect(preloadSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ id: "queue-2" }),
-      );
-      expect(preloadSpy).not.toHaveBeenCalledWith(
-        expect.objectContaining({ id: "queue-3" }),
-      );
-      expect(preloadSpy).not.toHaveBeenCalledWith(
-        expect.objectContaining({ id: "queue-4" }),
-      );
+      // preloadTrack also receives an auto-advance flag, so assert on the
+      // track itself rather than on the whole argument list.
+      const preloadedIds = preloadSpy.mock.calls.map((call) => call[0]?.id);
+      expect(preloadedIds).toContain("queue-2");
+      expect(preloadedIds).not.toContain("queue-3");
+      expect(preloadedIds).not.toContain("queue-4");
 
       preloadSpy.mockRestore();
     });

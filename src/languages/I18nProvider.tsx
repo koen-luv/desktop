@@ -42,15 +42,19 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
 export function useTranslation(): I18nContextValue {
   const ctx = useContext(I18nContext);
-  if (!ctx) {
-    // fallback gracefully so components never crash during hmr or outside provider
-    const locale = getStoredLocale();
-    return {
-      locale,
-      t: createTranslatorSync(locale),
+  // Fallback for when there is no provider (HMR, isolated tests): keep the
+  // value referentially stable for a given locale, otherwise `t` is a brand
+  // new function on every render and any effect depending on it re-runs,
+  // which can turn a single state update into an infinite render loop.
+  const fallbackLocale = getStoredLocale();
+  const fallback = useMemo<I18nContextValue>(
+    () => ({
+      locale: fallbackLocale,
+      t: createTranslatorSync(fallbackLocale),
       setLocale: storeLocale,
       loading: false,
-    };
-  }
-  return ctx;
+    }),
+    [fallbackLocale],
+  );
+  return ctx ?? fallback;
 }
