@@ -4,7 +4,6 @@ import { debouncedStorage } from "@/shared/utils/storage";
 
 export interface BlockCustomization {
   opacity: number;
-  backgroundOpacity?: number;
   blur: number;
   dim: number;
 }
@@ -49,6 +48,7 @@ export interface CustomizationState {
   backgroundBlur: number;
   backgroundDim: number;
   backgroundOpacity: number;
+  useWallpaperInFullscreen: boolean;
   sidebar: BlockCustomization;
   contentView: BlockCustomization;
   miniplayer: BlockCustomization;
@@ -58,6 +58,7 @@ export interface CustomizationState {
   setBackgroundBlur: (blur: number) => void;
   setBackgroundDim: (dim: number) => void;
   setBackgroundOpacity: (opacity: number) => void;
+  setUseWallpaperInFullscreen: (enabled: boolean) => void;
   setBlockConfig: (
     block: "sidebar" | "contentView" | "miniplayer",
     patch: Partial<BlockCustomization>,
@@ -78,14 +79,12 @@ export const MAX_DIM = 85;
 
 export const DEFAULT_BLOCK_CONFIG: BlockCustomization = {
   opacity: 100,
-  backgroundOpacity: 100,
   blur: 0,
   dim: 0,
 };
 
 export const DEFAULT_GLASS_CONFIG: BlockCustomization = {
   opacity: 60,
-  backgroundOpacity: 60,
   blur: 20,
   dim: 15,
 };
@@ -93,6 +92,7 @@ export const DEFAULT_GLASS_CONFIG: BlockCustomization = {
 const DB_NAME = "liner_customization_db";
 const STORE_NAME = "wallpapers";
 const BG_KEY = "active_wallpaper";
+let wallpaperRevision = 0;
 
 // opens simple indexeddb instance for wallpaper storage
 function openWallpaperDb(): Promise<IDBDatabase | null> {
@@ -151,9 +151,6 @@ export const clampBlockConfig = (cfg: Partial<BlockCustomization>): BlockCustomi
   const opacity = typeof cfg.opacity === "number"
     ? Math.max(MIN_OPACITY, Math.min(MAX_OPACITY, Math.round(cfg.opacity)))
     : DEFAULT_BLOCK_CONFIG.opacity;
-  const backgroundOpacity = typeof cfg.backgroundOpacity === "number"
-    ? Math.max(MIN_OPACITY, Math.min(MAX_OPACITY, Math.round(cfg.backgroundOpacity)))
-    : DEFAULT_BLOCK_CONFIG.backgroundOpacity;
 
   const blur = typeof cfg.blur === "number"
     ? Math.max(MIN_BLUR, Math.min(MAX_BLUR, Math.round(cfg.blur)))
@@ -163,7 +160,7 @@ export const clampBlockConfig = (cfg: Partial<BlockCustomization>): BlockCustomi
     ? Math.max(MIN_DIM, Math.min(MAX_DIM, Math.round(cfg.dim)))
     : DEFAULT_BLOCK_CONFIG.dim;
 
-  return { opacity, backgroundOpacity, blur, dim };
+  return { opacity, blur, dim };
 };
 
 export const wallpaperBroadcast =
@@ -174,6 +171,7 @@ export const wallpaperBroadcast =
 if (wallpaperBroadcast) {
   wallpaperBroadcast.onmessage = (e) => {
     if (e.data?.type === "wallpaper_changed") {
+      wallpaperRevision++;
       useCustomizationStore.setState({ backgroundImage: e.data.image });
     } else if (e.data?.type === "request_wallpaper") {
       const current = useCustomizationStore.getState().backgroundImage;
@@ -191,6 +189,7 @@ export const useCustomizationStore = create<CustomizationState>()(
       backgroundBlur: 0,
       backgroundDim: 0,
       backgroundOpacity: 100,
+      useWallpaperInFullscreen: false,
       sidebar: { ...DEFAULT_BLOCK_CONFIG },
       contentView: { ...DEFAULT_BLOCK_CONFIG },
       miniplayer: { ...DEFAULT_BLOCK_CONFIG },
@@ -198,6 +197,7 @@ export const useCustomizationStore = create<CustomizationState>()(
 
       setBackgroundImage: (image) => {
         const prev = get().backgroundImage;
+        wallpaperRevision++;
         set({ backgroundImage: image });
         void savePersistedWallpaper(image);
         wallpaperBroadcast?.postMessage({ type: "wallpaper_changed", image });
@@ -248,6 +248,9 @@ export const useCustomizationStore = create<CustomizationState>()(
         set({ backgroundOpacity: clamped });
       },
 
+      setUseWallpaperInFullscreen: (enabled) =>
+        set({ useWallpaperInFullscreen: enabled }),
+
       setBlockConfig: (block, patch) => {
         set((state) => ({
           [block]: {
@@ -295,6 +298,7 @@ export const useCustomizationStore = create<CustomizationState>()(
         }),
 
       resetAll: () => {
+        wallpaperRevision++;
         void savePersistedWallpaper(null);
         wallpaperBroadcast?.postMessage({ type: "wallpaper_changed", image: null });
         set({
@@ -302,6 +306,7 @@ export const useCustomizationStore = create<CustomizationState>()(
           backgroundBlur: 0,
           backgroundDim: 0,
           backgroundOpacity: 100,
+          useWallpaperInFullscreen: false,
           sidebar: { ...DEFAULT_BLOCK_CONFIG },
           contentView: { ...DEFAULT_BLOCK_CONFIG },
           miniplayer: { ...DEFAULT_BLOCK_CONFIG },
@@ -316,6 +321,7 @@ export const useCustomizationStore = create<CustomizationState>()(
         backgroundBlur: state.backgroundBlur,
         backgroundDim: state.backgroundDim,
         backgroundOpacity: state.backgroundOpacity,
+        useWallpaperInFullscreen: state.useWallpaperInFullscreen,
         sidebar: state.sidebar,
         contentView: state.contentView,
         miniplayer: state.miniplayer,
@@ -323,6 +329,7 @@ export const useCustomizationStore = create<CustomizationState>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
+        const loadRevision = wallpaperRevision;
         state.sidebar = clampBlockConfig(state.sidebar || {});
         state.contentView = clampBlockConfig(state.contentView || {});
         state.miniplayer = clampBlockConfig(state.miniplayer || {});
@@ -330,9 +337,14 @@ export const useCustomizationStore = create<CustomizationState>()(
           typeof state.backgroundOpacity === "number"
             ? Math.max(MIN_OPACITY, Math.min(MAX_OPACITY, Math.round(state.backgroundOpacity)))
             : 100;
+        state.useWallpaperInFullscreen = state.useWallpaperInFullscreen === true;
         state.playerElementOrder = normalizePlayerElementOrder(state.playerElementOrder);
         void loadPersistedWallpaper().then((img) => {
-          if (img) {
+          if (
+            img &&
+            loadRevision === wallpaperRevision &&
+            useCustomizationStore.getState().backgroundImage === null
+          ) {
             useCustomizationStore.setState({ backgroundImage: img });
           }
         });
@@ -371,11 +383,13 @@ export function getBlockStyle(
     };
   }
 
-  const alpha = (config.backgroundOpacity ?? config.opacity) / 100;
+  const alpha = config.opacity / 100;
   const dimAlpha = config.dim / 100;
 
   let bg: string;
-  if (dimAlpha > 0) {
+  if (alpha === 0) {
+    bg = "transparent";
+  } else if (dimAlpha > 0) {
     bg = `linear-gradient(rgba(0, 0, 0, ${dimAlpha}), rgba(0, 0, 0, ${dimAlpha})), rgba(${baseRgb}, ${alpha})`;
   } else {
     bg = `rgba(${baseRgb}, ${alpha})`;
@@ -415,8 +429,7 @@ export function isGlassThemeActive(state: {
   return [state.sidebar, state.contentView, state.miniplayer].some(
     (b) =>
       b.opacity < 100 &&
-      b.blur > 0 &&
-      (b.backgroundOpacity ?? b.opacity) < 100,
+      b.blur > 0,
   );
 }
 

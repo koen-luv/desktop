@@ -589,7 +589,7 @@ function MiniPlayer({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 6, scale: 0.96 }}
             transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute bottom-[52px] z-[99] w-[38px] rounded-xl bg-bg-surface/90 dark:bg-[#161618]/95 backdrop-blur-2xl pt-[6px] pb-[8px] px-[4px] shadow-[0_8px_24px_rgba(0,0,0,0.14)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.5)] prevent-seek"
+            className="absolute bottom-[52px] z-[99] w-[40px] rounded-full bg-bg-surface/92 backdrop-blur-2xl pt-[7px] pb-[9px] px-[4px] shadow-e2 border border-border-primary/60 prevent-seek"
             style={volumePopupStyle}
             onPointerDown={(e) => e.stopPropagation()}
             onMouseEnter={clearVolumeHoverTimer}
@@ -619,7 +619,7 @@ function MiniPlayer({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.985 }}
             transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute bottom-[74px] z-[92] w-[270px] rounded-xl bg-bg-primary border border-border-primary/50 p-[12px] shadow-2xl prevent-seek"
+            className="absolute bottom-[74px] z-[92] w-[270px] rounded-[20px] bg-bg-surface border border-border-primary/70 p-[14px] shadow-e3 prevent-seek"
             style={speedPopupStyle}
             onPointerDown={(e) => e.stopPropagation()}
           >
@@ -631,17 +631,17 @@ function MiniPlayer({
       <div
         className={`relative h-[64px] w-full overflow-hidden cursor-pointer ${
           usesRoundedStyle
-            ? `rounded-full border-[0.5px] border-border-tertiary ${
-                hasCustomBg ? "" : "bg-bg-primary"
+            ? `rounded-full border border-border-primary/70 shadow-e1 ${
+                hasCustomBg ? "" : "bg-bg-surface"
               }`
             : embedded
-              ? `rounded-sm ${
-                  isEdgeToEdge ? "rounded-br-none" : "rounded-br-xl"
-                } ${
-                  hasCustomBg ? "" : "bg-bg-primary"
-                }`
-              : `rounded-3xl border-[0.5px] border-border-tertiary ${
-                  hasCustomBg ? "" : "bg-bg-primary"
+              ? `${
+                  isEdgeToEdge
+                    ? "rounded-none"
+                    : "rounded-none md:rounded-[24px] md:border md:border-border-primary/60 md:shadow-e1"
+                } ${hasCustomBg ? "" : "bg-bg-surface"}`
+              : `rounded-[24px] border border-border-primary/70 shadow-e2 ${
+                  hasCustomBg ? "" : "bg-bg-surface"
                 }`
         }`}
         style={miniplayerCustomStyle}
@@ -737,7 +737,7 @@ function MiniPlayer({
               role="button"
               tabIndex={0}
               aria-label="Open player"
-              className={`relative h-[38px] w-[38px] shrink-0 overflow-hidden rounded-[8px] bg-bg-elevated cursor-pointer pointer-events-auto prevent-seek ${
+              className={`relative h-[40px] w-[40px] shrink-0 overflow-hidden rounded-xl bg-bg-elevated shadow-e1 cursor-pointer pointer-events-auto prevent-seek ${
                 coverUrl && !isCoverLoaded ? "animate-pulse" : ""
               }`}
               onClick={onFullscreenOpen}
@@ -868,7 +868,7 @@ function MiniPlayer({
             }`}
           >
             <div
-              className="ml-auto flex items-center gap-[2px] rounded-lg bg-[#ebebed] dark:bg-[#141414] p-[3px] pointer-events-auto prevent-seek cursor-default"
+              className="ml-auto flex items-center gap-[2px] rounded-full bg-bg-elevated shadow-[inset_0_0_0_1px_var(--border-primary)] p-[3px] pointer-events-auto prevent-seek cursor-default"
               onPointerDown={(e) => e.stopPropagation()}
             >
               <button

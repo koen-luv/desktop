@@ -17,9 +17,7 @@ import {
 } from "@/features/lyrics";
 import { AnimatePresence, motion } from "framer-motion";
 import { PlayerUiElements } from "./PlayerUiElements";
-import { DownLine, Group2Line, RemoteControlLine } from "@mingcute/react";
-import { usePartyStore } from "@/features/party/store/partyStore";
-import { useDeviceControlStore } from "@/features/deviceControl";
+import { DownLine } from "@mingcute/react";
 import { preloadCoverArt, useCoverSrc } from "@/features/covers";
 import "@braccato/core/element";
 import "@braccato/core/styles/variables.css";
@@ -27,7 +25,8 @@ import "@braccato/core/styles/lyrics.css";
 import "@braccato/core/styles/instrumental.css";
 import KawarpWrapper from "./KawarpWrapper";
 import { useTranslation } from "@/languages";
-import { isAndroidApp, isWindowsDesktop } from "@/platform";
+import { isAndroidApp } from "@/platform";
+import { useCustomizationStore } from "@/features/settings/store/customizationStore";
 
 const BRACCATO_TAG = "braccato-lyrics";
 const KAWARP_FADE_IN_MS = 600;
@@ -373,13 +372,16 @@ export function FullscreenPlayer({
   const player = usePlayerState();
   const coverUrl = player.currentTrack?.coverUrl;
   const kawarpSrc = useCoverSrc(coverUrl);
-  // Highlight the party button while a session (or handshake) is running.
-  const partyActive = usePartyStore(
-    (s) => s.role !== null && s.phase !== "idle" && s.phase !== "error",
+  const wallpaper = useCustomizationStore((state) => state.backgroundImage);
+  const wallpaperBlur = useCustomizationStore((state) => state.backgroundBlur);
+  const wallpaperDim = useCustomizationStore((state) => state.backgroundDim);
+  const wallpaperOpacity = useCustomizationStore(
+    (state) => state.backgroundOpacity,
   );
-  const windowsDesktop = isWindowsDesktop();
-  const deviceConnected = useDeviceControlStore((s) => s.controllerPhase === "connected");
-
+  const useWallpaperInFullscreen = useCustomizationStore(
+    (state) => state.useWallpaperInFullscreen,
+  );
+  const showWallpaper = Boolean(useWallpaperInFullscreen && wallpaper);
   useEffect(() => {
     if (!player.currentTrack) {
       onClose();
@@ -440,18 +442,40 @@ export function FullscreenPlayer({
           className="absolute inset-0"
           style={{ backgroundColor: "var(--color-bg-primary)" }}
         />
-        {kawarpSrc && !kawarpShown && (
+        {showWallpaper && wallpaper ? (
+          <img
+            src={wallpaper}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{
+              filter: wallpaperBlur > 0 ? `blur(${wallpaperBlur}px)` : undefined,
+              opacity: wallpaperOpacity / 100,
+              transform: wallpaperBlur > 0 ? "scale(1.05)" : undefined,
+            }}
+          />
+        ) : kawarpSrc && !kawarpShown ? (
           <div
             className="absolute inset-0 bg-cover bg-center filter blur-3xl scale-110 opacity-70 pointer-events-none"
             style={{ backgroundImage: `url(${kawarpSrc})` }}
           />
+        ) : null}
+        {showWallpaper && wallpaper && wallpaperDim > 0 && (
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 bg-black"
+            style={{ opacity: (wallpaperDim / 100) * (wallpaperOpacity / 100) }}
+          />
         )}
-        {effectsReady ? (
+        {!showWallpaper && effectsReady ? (
           <KawarpWrapper src={kawarpSrc} onLoad={onKawarpLoad} onError={onError} />
         ) : null}
       </div>
 
-      <div className="absolute inset-0 z-[1] bg-black/40" />
+      <div
+        className={`absolute inset-0 z-[1] ${
+          showWallpaper ? "bg-black/25" : "bg-black/40"
+        }`}
+      />
 
       <div className="absolute inset-0 z-10 flex flex-col landscape:flex-row md:flex-row pt-[var(--inset-top,0px)] pb-[var(--inset-bottom,0px)]">
         <div className="w-full landscape:w-[42%] landscape:flex-none shrink-0 md:flex-1 flex flex-col items-center justify-center gap-3 landscape:gap-2 md:gap-5 px-4 landscape:px-2 pt-12 landscape:pt-0 pb-2 md:p-0">
@@ -565,39 +589,9 @@ export function FullscreenPlayer({
         aria-label={t("player.close_fullscreen")}
         onClick={onClose}
         data-no-window-drag
-        className="absolute top-[calc(var(--inset-top,0px)+12px)] left-[12px] z-30 inline-flex h-[32px] w-[32px] items-center justify-center rounded-lg border-none bg-black/50 backdrop-blur-xl text-white/80 hover:text-white hover:bg-white/10 active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto"
+        className="absolute top-[calc(var(--inset-top,0px)+12px)] left-[12px] z-30 inline-flex h-[36px] w-[36px] items-center justify-center rounded-full border border-white/10 bg-white/8 backdrop-blur-xl text-white/80 hover:text-white hover:bg-white/16 hover:scale-105 active:scale-[0.94] transition-all duration-200 ease-[var(--motion-ease)] cursor-pointer select-none pointer-events-auto"
       >
         <DownLine size={18} />
-      </button>
-      <button
-        type="button"
-        aria-label={t("devices.remote_title")}
-        onClick={() => useDeviceControlStore.getState().setOpen(true)}
-        data-no-window-drag
-        className={`absolute top-[calc(var(--inset-top,0px)+52px)] right-[12px] z-30 inline-flex h-[32px] w-[32px] items-center justify-center rounded-lg border-none backdrop-blur-xl active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto ${
-          windowsDesktop ? "hidden" : ""
-        } ${
-          deviceConnected
-            ? "bg-accent-primary/30 text-white ring-1 ring-accent-primary/60 hover:bg-accent-primary/40"
-            : "bg-black/50 text-white/80 hover:text-white hover:bg-white/10"
-        }`}
-      >
-        <RemoteControlLine size={18} />
-      </button>
-      <button
-        type="button"
-        aria-label={t("party.title")}
-        onClick={() => usePartyStore.getState().setOpen(true)}
-        data-no-window-drag
-        className={`absolute top-[calc(var(--inset-top,0px)+12px)] right-[12px] z-30 inline-flex h-[32px] w-[32px] items-center justify-center rounded-lg border-none backdrop-blur-xl active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto ${
-          windowsDesktop ? "hidden" : ""
-        } ${
-          partyActive
-            ? "bg-accent-primary/30 text-white ring-1 ring-accent-primary/60 hover:bg-accent-primary/40"
-            : "bg-black/50 text-white/80 hover:text-white hover:bg-white/10"
-        }`}
-      >
-        <Group2Line size={18} />
       </button>
     </div>
   );

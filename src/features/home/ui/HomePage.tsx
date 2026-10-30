@@ -18,6 +18,7 @@ import SongCard from "@/features/player/ui/SongCard";
 import SongCardWithMenu from "@/features/player/ui/SongCardWithMenu";
 import { useTranslation } from "@/languages";
 import { useIsContentTransparent } from "@/features/settings/store/customizationStore";
+import SectionHeading from "@/shared/ui/SectionHeading";
 import {
   FireFill,
   TrophyFill,
@@ -91,7 +92,25 @@ export default function HomePage() {
 
   const quickCardClass = hasCustomBg
     ? "apple-glass-action"
-    : "bg-bg-elevated hover:bg-[#dedee3] dark:hover:bg-border-alpha-14 transition-colors duration-150 ease-out";
+    : "bg-bg-elevated/80 shadow-[inset_0_0_0_1px_var(--border-primary)] hover:bg-bg-elevated hover:shadow-e1 transition-[background-color,box-shadow] duration-200 ease-[var(--motion-ease)]";
+
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) return t("home.goodMorning") || "Good morning";
+    if (hour >= 12 && hour < 18) return t("home.goodAfternoon") || "Good afternoon";
+    if (hour >= 18 && hour < 23) return t("home.goodEvening") || "Good evening";
+    return t("home.goodNight") || "Good night";
+  }, [t]);
+
+  const todayLabel = useMemo(
+    () =>
+      new Intl.DateTimeFormat(undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      }).format(new Date()),
+    [],
+  );
 
   return (
     <div className="relative h-full w-full overflow-y-auto overflow-x-hidden bg-transparent">
@@ -105,9 +124,18 @@ export default function HomePage() {
       {!hasCustomBg && (
         <div
           aria-hidden="true"
-          className={`pointer-events-none absolute -top-8 -left-8 w-[380px] h-[200px] bg-gradient-to-br ${glowClass} blur-3xl opacity-60`}
+          className={`pointer-events-none absolute -top-16 -left-16 w-[520px] h-[280px] bg-gradient-to-br ${glowClass} blur-[64px] opacity-50`}
         />
       )}
+
+      <header className="relative z-1 px-4 md:px-8 pt-[44px] md:pt-[52px] pb-[6px]">
+        <p className="m-0 text-[11px] font-[600] uppercase tracking-[0.16em] text-text-tertiary">
+          {todayLabel}
+        </p>
+        <h1 className="m-0 mt-[8px] text-[34px] md:text-[42px] font-[650] leading-[1.02] tracking-[-0.045em] text-text-primary">
+          {greeting}
+        </h1>
+      </header>
 
       <div className="relative z-1 grid grid-cols-1 items-start w-full">
         {/* Real Content Layer */}
@@ -115,27 +143,19 @@ export default function HomePage() {
           <div className="col-start-1 row-start-1 w-full pb-[16px]">
             {hasEnoughQuickData && (
               <div className="flex flex-col">
-              <div className="mt-[20px] px-4 md:px-8 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex items-center shrink-0">
-                    <FlashCircleFill className="w-5 h-5 text-amber-400" />
-                    </div>
-                    <h2
-                      className="text-text-primary text-[21px] font-semibold m-0 leading-tight tracking-tight"
-                      style={{ fontFamily: "var(--font-inter), sans-serif" }}
-                    >
-                      {t("home.speedDial") || "Speed dial"}
-                    </h2>
-                  </div>
-                </div>
+              <SectionHeading
+                title={t("home.speedDial") || "Speed dial"}
+                icon={<FlashCircleFill className="h-[17px] w-[17px] text-amber-400" />}
+                className="mt-[22px] px-4 md:px-8"
+              />
 
-                <div className="px-4 md:px-8 mt-[12px] relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                <div className="px-4 md:px-8 mt-[14px] relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-[10px]">
                   <SongCard
                     title={t("library.liked_songs")}
                     artists={`${likedData.total} ${likedData.total === 1 ? t("library.song") : t("library.songs")}`}
                     artistsClickable={false}
                     coverUrl=""
-                    icon={<HeartFill size={22} className={hasCustomBg ? "text-white/80" : "text-zinc-400 dark:text-zinc-500"} />}
+                    icon={<HeartFill size={22} className={hasCustomBg ? "text-white/80" : "text-text-tertiary"} />}
                     onPlay={() => navigate("/library/playlist?id=likes")}
                     compact
                     className={quickCardClass}
@@ -198,7 +218,7 @@ export default function HomePage() {
             {dailyMixes && dailyMixes.length > 0 && (
               <DailyMixesSection
                 mixes={dailyMixes}
-                headingMarginTop="mt-[22px]"
+                headingMarginTop="mt-[30px]"
               />
             )}
 
@@ -210,7 +230,7 @@ export default function HomePage() {
               title={t("home.whatEveryonesOn")}
               icon={<FireFill className="w-5 h-5 text-amber-500" />}
               items={popularTracksOnly}
-              headingMarginTop="mt-[22px]"
+              headingMarginTop="mt-[30px]"
             />
           )}
 
@@ -220,7 +240,7 @@ export default function HomePage() {
               title={t("home.jumpBackIn")}
               icon={<TimeFill className="w-5 h-5 text-sky-400" />}
               items={recentlyPlayed}
-              headingMarginTop="mt-[22px]"
+              headingMarginTop="mt-[30px]"
             />
           )}
 
@@ -230,7 +250,7 @@ export default function HomePage() {
               title={t("home.mostListened")}
               icon={<TrophyFill className="w-5 h-5 text-yellow-500" />}
               items={popularTracksAllTime}
-              headingMarginTop="mt-[22px]"
+              headingMarginTop="mt-[30px]"
             />
           )}
 
@@ -240,7 +260,7 @@ export default function HomePage() {
               title={t("home.popularAlbums")}
               icon={<AlbumFill className="w-5 h-5 text-emerald-400" />}
               items={popularAlbums}
-              headingMarginTop="mt-[22px]"
+              headingMarginTop="mt-[30px]"
             />
           )}
 
@@ -250,7 +270,7 @@ export default function HomePage() {
               title={t("home.popularPlaylists")}
               icon={<PlaylistFill className="w-5 h-5 text-rose-400" />}
               items={popularPlaylists}
-              headingMarginTop="mt-[22px]"
+              headingMarginTop="mt-[30px]"
             />
           )}
 
@@ -259,7 +279,7 @@ export default function HomePage() {
               title={t("home.newReleases") || "New releases"}
               icon={<AlbumFill className="w-5 h-5 text-violet-400" />}
               items={newReleases}
-              headingMarginTop="mt-[22px]"
+              headingMarginTop="mt-[30px]"
             />
           )}
 
@@ -268,7 +288,7 @@ export default function HomePage() {
               title={t("home.forgottenMemories") || "Forgotten memories"}
               icon={<TimeFill className="w-5 h-5 text-sky-400" />}
               items={forgottenMemories}
-              headingMarginTop="mt-[22px]"
+              headingMarginTop="mt-[30px]"
             />
           )}
         </div>

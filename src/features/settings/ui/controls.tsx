@@ -38,19 +38,19 @@ export function SettingRow({
   return (
     // Narrow (phone) widths stack the control under its label so wide pill
     // groups never squeeze the description into a sliver of text.
-    <div className="flex flex-col items-start gap-[8px] py-[13px] sm:flex-row sm:items-center sm:justify-between sm:gap-[16px]">
+    <div className="flex flex-col items-start gap-[10px] py-[14px] sm:flex-row sm:items-center sm:justify-between sm:gap-[16px]">
       <div className="flex w-full min-w-0 max-w-[360px] flex-col gap-[2px] sm:w-auto">
         <span
-          className="text-text-primary text-[13px] font-[500] leading-snug"
+          className="text-text-primary text-[13px] font-[500] leading-snug tracking-[-0.006em]"
           style={font}
         >
           {title}
         </span>
         {description ? (
-          <span
-            className="text-text-tertiary text-[12.5px] leading-relaxed"
-            style={font}
-          >
+        <span
+          className="text-text-tertiary text-[12.5px] leading-relaxed"
+          style={font}
+        >
             {description}
           </span>
         ) : null}
@@ -93,19 +93,19 @@ export function SettingBlock({
   }
 
   return (
-    <div className="flex flex-col gap-[10px] py-[13px]">
+    <div className="flex flex-col gap-[10px] py-[14px]">
       <div className="flex min-w-0 max-w-[460px] flex-col gap-[2px]">
         <span
-          className="text-text-primary text-[13px] font-[500] leading-snug"
+          className="text-text-primary text-[13px] font-[500] leading-snug tracking-[-0.006em]"
           style={font}
         >
           {title}
         </span>
         {description ? (
-          <span
-            className="text-text-tertiary text-[12.5px] leading-relaxed"
-            style={font}
-          >
+        <span
+          className="text-text-tertiary text-[12.5px] leading-relaxed"
+          style={font}
+        >
             {description}
           </span>
         ) : null}
@@ -127,7 +127,7 @@ export function SettingSection({
     <section className="flex flex-col">
       {label ? (
         <h4
-          className="text-text-tertiary text-[11px] font-[600] uppercase tracking-[0.07em] m-0 pt-[4px]"
+          className="text-text-tertiary text-[10.5px] font-[600] uppercase tracking-[0.08em] m-0 pb-[6px] pt-[6px]"
           style={font}
         >
           {label}
@@ -158,10 +158,10 @@ export function SegmentedControl<T extends string>({
     <div
       role={ariaLabel ? "group" : undefined}
       aria-label={ariaLabel}
-      className={`inline-flex w-fit shrink-0 items-center gap-[1px] rounded-lg p-[3px] transition-opacity ${
+      className={`inline-flex w-fit shrink-0 items-center gap-[2px] rounded-lg p-[3px] transition-opacity shadow-[inset_0_0_0_1px_var(--border-primary)] ${
         disabled
-          ? "bg-border-alpha-10 opacity-50 cursor-not-allowed pointer-events-none"
-          : "bg-border-alpha-14"
+          ? "bg-bg-hover opacity-50 cursor-not-allowed pointer-events-none"
+          : "bg-bg-hover"
       }`}
     >
       {options.map((opt) => {
@@ -173,16 +173,16 @@ export function SegmentedControl<T extends string>({
             disabled={disabled}
             onClick={() => !disabled && onChange(opt.value)}
             aria-pressed={isActive}
-            className={`inline-flex h-[26px] items-center whitespace-nowrap rounded-md border-0 px-[11px] text-[12.5px] leading-none transition-colors ${
+            className={`inline-flex h-[26px] items-center whitespace-nowrap rounded-md border-0 px-[11px] text-[12.5px] leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/60 ${
               disabled
                 ? isActive
-                  ? "bg-bg-primary/50 text-text-tertiary cursor-not-allowed"
+                  ? "bg-bg-active text-text-tertiary cursor-not-allowed"
                   : "bg-transparent text-text-tertiary/70 cursor-not-allowed"
                 : isActive
-                  ? "bg-bg-primary text-text-primary cursor-pointer"
-                  : "bg-transparent text-text-secondary hover:text-text-primary cursor-pointer"
+                  ? "bg-btn-primary-bg text-btn-primary-text shadow-e1 cursor-pointer"
+                  : "bg-transparent text-text-secondary hover:text-text-primary hover:bg-bg-hover cursor-pointer"
             }`}
-            style={{ ...font, fontWeight: isActive ? 500 : 400 }}
+            style={{ ...font, fontWeight: isActive ? 500 : 450 }}
           >
             {opt.label}
           </button>

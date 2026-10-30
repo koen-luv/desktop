@@ -38,6 +38,10 @@ export { default as ReorderDropPlaceholder } from "./ReorderDropPlaceholder";
 export { default as FloatingDragCard } from "./FloatingDragCard";
 export { default as StickyHeader, type StickyHeaderProps } from "./StickyHeader";
 export {
+  default as SectionHeading,
+  type SectionHeadingProps,
+} from "./SectionHeading";
+export {
   default as EntitySidebar,
   SIDEBAR_TITLE_CLASS,
   SIDEBAR_SUBTITLE_CLASS,

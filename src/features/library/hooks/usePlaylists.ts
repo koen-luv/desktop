@@ -2,6 +2,11 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { api, getAuthSession, mediaUrl, toClientTrack, type ApiUserPlaylistItem } from "@/shared/api";
 import { queryCache } from "@/shared/cache/queryCache";
 import type { Track } from "@/shared/types";
+import {
+  getSharedPlaylist,
+  isSharedPlaylistId,
+  listSharedPlaylists,
+} from "../services/sharedPlaylists";
 
 export interface LibraryPlaylistSummary {
   id: string;
@@ -13,6 +18,8 @@ export interface LibraryPlaylistSummary {
   updatedAt: string;
   createdAt: string;
   revision: number;
+  isShared?: boolean;
+  sharedRole?: "owner" | "editor";
 }
 
 export interface LibraryPlaylistDetail {
@@ -23,6 +30,8 @@ export interface LibraryPlaylistDetail {
   coverUrl: string;
   coverUrls: string[];
   revision: number;
+  isShared?: boolean;
+  sharedRole?: "owner" | "editor";
   tracks: Track[];
 }
 
@@ -104,7 +113,13 @@ function load(force = false): Promise<void> {
 
   request = (async () => {
     const coverCache = readCoverCache();
-    const response = await api.listPlaylists();
+    const [response, sharedPlaylists] = await Promise.all([
+      api.listPlaylists(),
+      listSharedPlaylists().catch((error: unknown) => {
+        console.error("[Shared playlists] Could not load shared playlists:", error);
+        return [];
+      }),
+    ]);
 
     const playlists = await Promise.all(
       response.items.map(async (playlist) => {
@@ -142,7 +157,25 @@ function load(force = false): Promise<void> {
     }
     writeCoverCache(coverCache);
 
-    cache = { playlists, total: playlists.length };
+    const sharedSummaries: LibraryPlaylistSummary[] = sharedPlaylists.map(
+      (playlist) => ({
+        id: `shared:${playlist.id}`,
+        title: playlist.title,
+        description: playlist.description ?? undefined,
+        trackCount: playlist.trackCount ?? 0,
+        coverUrl: playlist.coverUrl ?? "",
+        coverUrls: playlist.coverUrl ? [playlist.coverUrl] : [],
+        updatedAt: playlist.updatedAt,
+        createdAt: playlist.createdAt,
+        revision: playlist.revision,
+        isShared: true,
+        sharedRole: playlist.role,
+      }),
+    );
+    cache = {
+      playlists: [...playlists, ...sharedSummaries],
+      total: playlists.length + sharedSummaries.length,
+    };
     loaded = true;
   })()
     .catch((err) => {
@@ -216,6 +249,37 @@ export function usePlaylist(id: string | null) {
     const fetchDetail = async (isBackground = false) => {
       if (!isBackground && !queryCache.get(cacheKey)) setIsLoading(true);
       try {
+        if (isSharedPlaylistId(id)) {
+          const playlist = await getSharedPlaylist(id);
+          if (!active) return;
+          const items = playlist.items ?? [];
+          const covers = items
+            .map((item) => {
+              const cover = item.track.cover as { url?: string } | undefined;
+              return cover?.url ? mediaUrl(cover.url) : "";
+            })
+            .filter(Boolean)
+            .slice(0, 4);
+          const detail: LibraryPlaylistDetail = {
+            id: `shared:${playlist.id}`,
+            title: playlist.title,
+            description: playlist.description ?? undefined,
+            trackCount: items.length,
+            coverUrl: playlist.coverUrl ? mediaUrl(playlist.coverUrl) : covers[0] ?? "",
+            coverUrls: covers,
+            revision: playlist.revision,
+            isShared: true,
+            sharedRole: playlist.role,
+            tracks: items.map((item) => ({
+              ...toClientTrack(item.track),
+              playlistItemId: item.id,
+              playlistAddedAt: item.addedAt,
+            })),
+          };
+          queryCache.set(cacheKey, detail);
+          setData(detail);
+          return;
+        }
         const response = await api.getUserPlaylist(id);
         if (!active) return;
 

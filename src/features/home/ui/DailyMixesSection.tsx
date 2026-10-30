@@ -9,6 +9,7 @@ import { useTranslation } from "@/languages";
 import DropdownMenu, { type DropdownMenuItem } from "@/shared/ui/DropdownMenu";
 import type { DailyMix } from "../hooks/useDailyMixes";
 import { SparklesFill, PlayFill, AddFill } from "@mingcute/react";
+import SectionHeading from "@/shared/ui/SectionHeading";
 
 interface DailyMixCardProps {
   mix: DailyMix;
@@ -115,7 +116,7 @@ function DailyMixCard({ mix }: DailyMixCardProps) {
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
     >
-      <div className="relative aspect-square w-full overflow-hidden rounded-md bg-border-alpha-14">
+      <div className="relative aspect-square w-full overflow-hidden rounded-[20px] bg-bg-panel shadow-[inset_0_0_0_1px_var(--border-primary)] transition-[transform,box-shadow] duration-300 ease-[var(--motion-ease)] group-hover:-translate-y-[4px] group-hover:shadow-e2">
         {mix.coverUrl && (
           <CoverImage
             src={mix.coverUrl}
@@ -131,13 +132,13 @@ function DailyMixCard({ mix }: DailyMixCardProps) {
       </div>
 
       <div className="flex flex-col mt-[8px]">
-        <span className="truncate text-[14px] font-[500] text-text-primary">
+        <span className="truncate text-[13.5px] font-[550] tracking-[-0.014em] text-text-primary transition-colors duration-200 group-hover:text-accent-primary">
           {mix.title}
         </span>
         <ScrollableText
           text={subtitleText}
           isParentHovered={isCardHovered}
-          className="text-[13px] text-text-tertiary"
+          className="text-[12.5px] text-text-tertiary"
           fadeColorClass="from-bg-primary"
         />
       </div>
@@ -163,27 +164,19 @@ export interface DailyMixesSectionProps {
   headingMarginTop?: string;
 }
 
-function DailyMixesSection({ mixes, headingMarginTop = "mt-[22px]" }: DailyMixesSectionProps) {
+function DailyMixesSection({ mixes, headingMarginTop = "mt-[30px]" }: DailyMixesSectionProps) {
   const { t } = useTranslation();
   if (mixes.length === 0) return null;
 
   return (
     <div className="flex flex-col">
-      <div className={`${headingMarginTop} px-4 md:px-8 flex items-center justify-between`}>
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center shrink-0">
-            <SparklesFill className="w-5 h-5 text-amber-400" />
-          </div>
-          <h2
-            className="text-text-primary text-[21px] font-semibold m-0 leading-tight tracking-tight"
-            style={{ fontFamily: "var(--font-inter), sans-serif" }}
-          >
-            {t("home.dailyMixes") || "Daily Mixes"}
-          </h2>
-        </div>
-      </div>
+      <SectionHeading
+        title={t("home.dailyMixes") || "Daily Mixes"}
+        icon={<SparklesFill className="h-[17px] w-[17px] text-amber-400" />}
+        className={`${headingMarginTop} px-4 md:px-8`}
+      />
 
-      <ScrollableRow className="flex gap-[28px] pl-8 pr-8 mt-[12px] overflow-x-auto pb-[2px]">
+      <ScrollableRow className="flex gap-[20px] pl-4 pr-4 md:pl-8 md:pr-8 mt-[14px] overflow-x-auto pb-[6px]">
         {mixes.map((mix, index) => (
           <DailyMixCard key={`daily-mix-${mix.id}-${index}`} mix={mix} />
         ))}

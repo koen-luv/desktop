@@ -129,8 +129,8 @@ export default function DropdownMenu({
           initial={{ opacity: 0, scale: 0.96, y: side === "top" ? 2 : -2 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: side === "top" ? 2 : -2 }}
-          transition={{ duration: 0.1, ease: "easeOut" }}
-          className={`overflow-hidden rounded-md border border-border-primary/80 bg-bg-primary/95 backdrop-blur-md p-1 min-w-[160px] ${
+          transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+          className={`overflow-hidden rounded-xl border border-border-primary bg-bg-surface/95 backdrop-blur-xl p-[5px] shadow-e3 min-w-[168px] ${
             isFixed ? "fixed z-[99999]" : side === "top" ? "absolute right-0 bottom-full mb-1 z-50" : "absolute right-0 top-full mt-1 z-50"
           }`}
           style={isFixed ? fixedStyle : {}}
@@ -147,10 +147,10 @@ export default function DropdownMenu({
                   setOpen(false);
                   await item.onClick();
                 }}
-                className={`group flex w-full items-center gap-2.5 rounded-sm px-2.5 py-1.5 text-[13px] font-normal tracking-tight transition-colors border-none bg-transparent text-left cursor-pointer select-none outline-none ${
+                className={`group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[13px] font-normal tracking-tight transition-colors duration-150 border-none bg-transparent text-left cursor-pointer select-none outline-none ${
                   item.danger
-                    ? "text-red-400 hover:bg-red-500/10 hover:text-red-400"
-                    : "text-text-primary hover:bg-border-alpha-14"
+                    ? "text-[#e5484d] hover:bg-[#e5484d]/10"
+                    : "text-text-primary hover:bg-bg-hover"
                 } disabled:pointer-events-none disabled:opacity-40`}
                 style={{
                   fontFamily: "var(--font-inter), sans-serif",
@@ -160,7 +160,7 @@ export default function DropdownMenu({
                   <span
                     className={`shrink-0 flex items-center justify-center text-[15px] ${
                       item.danger
-                        ? "text-red-400"
+                        ? "text-[#e5484d]"
                         : "text-text-secondary group-hover:text-text-primary"
                     } transition-colors`}
                   >

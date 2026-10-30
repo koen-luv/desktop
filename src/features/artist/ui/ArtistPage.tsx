@@ -291,7 +291,7 @@ function ArtistContent() {
                 <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-[8px] md:gap-[10px]">
                     <h1
-                      className="m-0 text-[38px] md:text-[48px] font-[700] tracking-[-0.03em] leading-[1.05] text-text-primary"
+                      className="m-0 text-[40px] md:text-[56px] font-[650] tracking-[-0.048em] leading-[0.98] text-text-primary"
                       style={{
                         fontFamily: "var(--font-inter), sans-serif",
                       }}
@@ -316,7 +316,7 @@ function ArtistContent() {
 
                   {data.monthlyListeners ? (
                     <p
-                      className="m-0 mt-[6px] text-[14px] text-text-secondary font-[400]"
+                      className="m-0 mt-[8px] text-[13.5px] text-text-secondary font-[450] tracking-[-0.006em]"
                       style={{ fontFamily: "var(--font-inter), sans-serif" }}
                     >
                       {(() => {
@@ -329,7 +329,7 @@ function ArtistContent() {
                     </p>
                   ) : data.followers ? (
                     <p
-                      className="m-0 mt-[6px] text-[14px] text-text-secondary font-[400]"
+                      className="m-0 mt-[8px] text-[13.5px] text-text-secondary font-[450] tracking-[-0.006em]"
                       style={{ fontFamily: "var(--font-inter), sans-serif" }}
                     >
                       {Intl.NumberFormat("en-US", { notation: "compact" }).format(
@@ -418,20 +418,20 @@ function ArtistContent() {
 
                 {data.description && (
                   <div
-                    className={`w-full md:w-[340px] lg:w-[380px] shrink-0 rounded-md p-[16px] flex flex-col gap-[6px] border-0 !border-none ${
+                    className={`w-full md:w-[340px] lg:w-[380px] shrink-0 rounded-xl p-[16px] flex flex-col gap-[6px] border-0 !border-none ${
                       hasCustomBg
                         ? "apple-glass-pill !border-none text-text-primary"
-                        : "bg-bg-panel/85 backdrop-blur-xl text-text-primary border-0 !border-none"
+                        : "bg-bg-elevated/80 backdrop-blur-xl text-text-primary shadow-[inset_0_0_0_1px_var(--border-primary)] border-0 !border-none"
                     }`}
                   >
                     <span
-                      className="text-[15px] font-[600] tracking-[-0.01em] text-text-primary"
+                      className="text-[13px] font-[600] tracking-[-0.008em] text-text-primary"
                       style={{ fontFamily: "var(--font-inter), sans-serif" }}
                     >
                       {t("artist.about_artist")}
                     </span>
                     <p
-                      className="m-0 text-[13px] leading-[1.5] text-text-secondary font-[400] select-text line-clamp-3"
+                      className="m-0 text-[12.5px] leading-[1.6] text-text-secondary font-[400] select-text line-clamp-3"
                       style={{ fontFamily: "var(--font-inter), sans-serif" }}
                     >
                       {stripMarkdown(data.description)}
@@ -452,11 +452,11 @@ function ArtistContent() {
             </div>
 
             <div className="relative z-10 px-4 md:px-[32px] pt-[24px]">
-              <div className="flex flex-col gap-[40px]">
+              <div className="flex flex-col gap-[36px]">
                 <section id="artist-tracks-section" ref={tracksSectionRef}>
                   <div className="flex items-center justify-between mb-[16px]">
                     <h2
-                      className="text-[22px] font-[500] text-text-primary m-0"
+                      className="text-[20px] font-semibold tracking-[-0.03em] text-text-primary m-0"
                       style={{ fontFamily: "var(--font-inter), sans-serif" }}
                     >
                       {t("artist.popular_songs")}
@@ -559,14 +559,14 @@ function ArtistContent() {
                 {data.albums.length > 0 && (
                   <section>
                     <h2
-                      className="text-[22px] font-[500] text-text-primary mb-[16px]"
+                      className="text-[20px] font-semibold tracking-[-0.03em] text-text-primary mb-[14px] mt-0"
                       style={{ fontFamily: "var(--font-inter), sans-serif" }}
                     >
                       {t("artist.albums")}
                     </h2>
                     <ScrollableRow
                       overlayWidth="w-[32px]"
-                      className="flex w-full gap-[16px] overflow-x-auto pb-[24px]"
+                      className="flex w-full gap-[20px] overflow-x-auto pb-[24px]"
                     >
                       {data.albums.map((album) => (
                         <AlbumCard
@@ -587,14 +587,14 @@ function ArtistContent() {
                 {data.singles.length > 0 && (
                   <section>
                     <h2
-                      className="text-[22px] font-[500] text-text-primary mb-[16px]"
+                      className="text-[20px] font-semibold tracking-[-0.03em] text-text-primary mb-[14px] mt-0"
                       style={{ fontFamily: "var(--font-inter), sans-serif" }}
                     >
                       {t("artist.singles")}
                     </h2>
                     <ScrollableRow
                       overlayWidth="w-[32px]"
-                      className="flex w-full gap-[16px] overflow-x-auto pb-[24px]"
+                      className="flex w-full gap-[20px] overflow-x-auto pb-[24px]"
                     >
                       {data.singles.map((single) => (
                         <ReleaseCard

@@ -312,10 +312,10 @@ function CollectionContent() {
         aria-label={t("common.back")}
         data-no-tooltip="true"
         data-no-window-drag
-        className={`absolute top-[calc(var(--inset-top,0px)+12px)] md:top-[12px] left-4 md:left-[32px] z-20 group inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-md px-[10px] active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto text-[13px] font-[500] border-0 !border-none ${
+        className={`absolute top-[calc(var(--inset-top,0px)+12px)] md:top-[12px] left-4 md:left-[32px] z-20 group inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-full px-[12px] active:scale-[0.95] transition-all cursor-pointer select-none pointer-events-auto text-[12.5px] font-[500] tracking-[-0.006em] border-0 !border-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent-soft ${
           hasCustomBg
             ? "apple-glass-pill !border-none"
-            : "bg-bg-panel/85 backdrop-blur-xl text-text-primary hover:bg-bg-panel border-0 !border-none"
+            : "bg-bg-panel/80 backdrop-blur-xl text-text-secondary hover:bg-bg-panel hover:text-text-primary border-0 !border-none"
         }`}
         style={{ fontFamily: "var(--font-inter), sans-serif" }}
       >
@@ -344,7 +344,7 @@ function CollectionContent() {
               isReady ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
           >
-            <div className="relative z-10 flex flex-col md:flex-row items-stretch gap-2 md:gap-[16px] px-3 md:pl-[32px] md:pr-[16px] h-full w-full min-h-0 box-border">
+            <div className="relative z-10 flex flex-col md:flex-row items-stretch gap-2 md:gap-[24px] px-3 md:pl-[32px] md:pr-[20px] h-full w-full min-h-0 box-border">
               <div
                 className="shrink-0 w-full max-w-[280px] md:w-[280px] self-start pt-[calc(var(--inset-top,0px)+56px)] md:pt-[56px] pb-2 md:pb-[24px]"
                 data-no-window-drag
@@ -404,10 +404,10 @@ function CollectionContent() {
                   <div className="flex items-center flex-wrap gap-[6px]">
                     {data.year && (
                       <div
-                        className={`inline-flex h-[26px] items-center gap-[5px] rounded-md px-[8px] text-[12px] font-[500] select-none ${
+                        className={`inline-flex h-[26px] items-center gap-[5px] rounded-full px-[10px] text-[11.5px] font-[500] tabular-nums select-none ${
                           hasCustomBg
                             ? "apple-glass-pill"
-                            : "bg-bg-panel border border-border-primary/50 text-text-tertiary"
+                            : "bg-bg-hover text-text-secondary shadow-[inset_0_0_0_1px_var(--border-primary)]"
                         }`}
                       >
                         <CalendarLine size={12} className={hasCustomBg ? "text-white shrink-0" : "text-text-tertiary shrink-0"} />
@@ -416,10 +416,10 @@ function CollectionContent() {
                     )}
 
                     <div
-                      className={`inline-flex h-[26px] items-center gap-[6px] rounded-md px-[8px] text-[12px] font-[400] select-none ${
+                      className={`inline-flex h-[26px] items-center gap-[6px] rounded-full px-[10px] text-[11.5px] font-[500] tabular-nums select-none ${
                         hasCustomBg
                           ? "apple-glass-pill"
-                          : "bg-bg-panel border border-border-primary/40 text-text-tertiary"
+                          : "bg-bg-hover text-text-secondary shadow-[inset_0_0_0_1px_var(--border-primary)]"
                       }`}
                     >
                       <MusicLine size={13} className={hasCustomBg ? "text-white shrink-0" : "text-text-tertiary shrink-0"} />
@@ -453,7 +453,7 @@ function CollectionContent() {
                         variant={hasCustomBg ? "glass-primary" : "primary"}
                         onClick={handlePlayAll}
                         disabled={!data || data.tracks.length === 0}
-                        className="!h-[36px] w-full !text-[13.5px] !font-[500] px-[16px] flex items-center justify-center gap-[6px]"
+                        className="!h-[38px] w-full !text-[13.5px] !font-[500] px-[16px] flex items-center justify-center gap-[7px] shadow-e2"
                       >
                         <PlayFill size={16} />
                         <span>{t("common.play_all")}</span>
@@ -464,7 +464,7 @@ function CollectionContent() {
                           variant={hasCustomBg ? "glass-action" : "outline"}
                           onClick={handleAddToQueue}
                           disabled={!data || data.tracks.length === 0}
-                          className={`!h-[36px] flex-1 min-w-0 !text-[13px] !font-[500] px-[12px] flex items-center justify-center gap-[6px] ${
+                          className={`!h-[38px] flex-1 min-w-0 !text-[12.5px] !font-[500] px-[12px] flex items-center justify-center gap-[6px] ${
                             // optical centring: with three icon buttons beside it the label reads 1px right
                             !isDailyMix ? "[&>*]:-translate-x-px" : ""
                           }`}
@@ -502,7 +502,7 @@ function CollectionContent() {
                           variant={hasCustomBg ? "glass-action" : "outline"}
                           onClick={handleShufflePlay}
                           disabled={!data || data.tracks.length === 0}
-                          className="!h-[36px] !w-[36px] shrink-0 !p-0 flex items-center justify-center text-text-primary"
+                          className="!h-[38px] !w-[38px] shrink-0 !p-0 flex items-center justify-center text-text-primary"
                           title={t("common.shuffle")}
                         >
                           <LuShuffle size={16} />
@@ -516,7 +516,7 @@ function CollectionContent() {
                             if (search.isOpen) e.preventDefault();
                           }}
                           disabled={!data || data.tracks.length === 0}
-                          className="!h-[36px] !w-[36px] shrink-0 !p-0 flex items-center justify-center text-text-primary"
+                          className="!h-[38px] !w-[38px] shrink-0 !p-0 flex items-center justify-center text-text-primary"
                           title={searchButtonLabel}
                         >
                           <Search2Line size={16} />
@@ -527,7 +527,7 @@ function CollectionContent() {
                             trigger={
                               <Button
                                 variant={hasCustomBg ? "glass-action" : "outline"}
-                                className="!h-[36px] !w-[36px] shrink-0 !p-0 flex items-center justify-center text-text-primary"
+                                className="!h-[38px] !w-[38px] shrink-0 !p-0 flex items-center justify-center text-text-primary"
                                 title={t("common.more")}
                               >
                                 <More2Line size={18} />

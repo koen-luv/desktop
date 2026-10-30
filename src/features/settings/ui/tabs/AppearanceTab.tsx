@@ -118,12 +118,12 @@ function ThemeCard({
       }`}
     >
       <span
-        className={`relative block h-[76px] w-full overflow-hidden rounded-lg border transition-colors ${
+        className={`relative block h-[76px] w-full overflow-hidden rounded-lg border transition-[border-color,box-shadow] ${
           disabled
             ? "border-border-primary"
             : active
-              ? "border-text-primary ring-1 ring-text-primary"
-              : "border-border-primary group-hover:border-text-tertiary"
+              ? "border-accent-primary ring-1 ring-accent-primary shadow-e1"
+              : "border-border-primary group-hover:border-border-tertiary"
         }`}
       >
         {mode === "system" ? (
@@ -253,10 +253,10 @@ export function AppearanceTab({ searchQuery }: { searchQuery?: string }) {
                   title={label}
                   aria-label={label}
                   aria-pressed={isActive}
-                  className={`flex items-center gap-[8px] pl-[8px] pr-[12px] py-[6px] rounded-md border-none transition-colors cursor-pointer ${
+                  className={`flex items-center gap-[8px] pl-[8px] pr-[12px] py-[6px] rounded-lg border-none transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/60 ${
                     isActive
-                      ? "bg-bg-elevated text-text-primary font-[500]"
-                      : "bg-transparent text-text-secondary hover:bg-bg-elevated hover:text-text-primary"
+                      ? "bg-bg-active text-text-primary font-[500] shadow-[inset_0_0_0_1px_var(--border-secondary)]"
+                      : "bg-transparent text-text-secondary hover:bg-bg-hover hover:text-text-primary"
                   }`}
                 >
                   <div className="w-[22px] h-[22px] flex items-center justify-center shrink-0">

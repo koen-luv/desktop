@@ -71,6 +71,15 @@ function Sidebar({ searchOpen, onSearchToggle, isEdgeToEdge = false }: SidebarPr
     return href ? isRouteActive(href) : false;
   };
 
+  // Shared rail chip: every destination is the same 40px target so the rail
+  // reads as one column, with a tinted chip instead of an opacity change.
+  const railItemClass =
+    "group relative inline-flex h-[40px] w-[40px] items-center justify-center rounded-[14px] border-0 bg-transparent p-0 cursor-pointer transition-[background-color,transform,box-shadow] duration-200 ease-[var(--motion-ease)] active:scale-[0.92] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent-soft";
+  const railStateClass = (active: boolean) =>
+    active
+      ? "bg-accent-soft shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--accent-primary)_22%,transparent)]"
+      : "hover:bg-bg-hover hover:scale-[1.04]";
+
   const renderNavItems = () =>
     sidebarNavItems
       .filter((item) => item.id !== "settings")
@@ -91,12 +100,12 @@ function Sidebar({ searchOpen, onSearchToggle, isEdgeToEdge = false }: SidebarPr
               type="button"
               aria-pressed={searchOpen}
               onClick={onSearchToggle}
-              className={`group relative inline-flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer active:scale-[0.96] transition-transform duration-100`}
+              className={`${railItemClass} ${railStateClass(active)}`}
             >
               <Icon
-                size={26}
-                className={`relative z-10 text-text-primary transition-opacity duration-150 ease-out ${
-                  active ? "opacity-100" : "opacity-55 group-hover:opacity-90"
+                size={21}
+                className={`relative z-10 transition-colors duration-150 ease-out ${
+                  active ? "text-accent-primary" : "text-text-primary/60"
                 }`}
               />
             </button>
@@ -115,14 +124,20 @@ function Sidebar({ searchOpen, onSearchToggle, isEdgeToEdge = false }: SidebarPr
             key={item.id}
             to={item.href!}
             aria-current={active ? "page" : undefined}
-            className={`group relative inline-flex items-center justify-center cursor-pointer active:scale-[0.96] transition-transform duration-100`}
+            className={`${railItemClass} ${railStateClass(active)}`}
           >
             <Icon
-              size={26}
-              className={`relative z-10 text-text-primary transition-opacity duration-150 ease-out ${
-                active ? "opacity-100" : "opacity-55 group-hover:opacity-90"
+              size={21}
+              className={`relative z-10 transition-colors duration-150 ease-out ${
+                active ? "text-accent-primary" : "text-text-primary/60"
               }`}
             />
+            {active && (
+              <span
+                aria-hidden="true"
+                className="absolute -left-[6px] top-1/2 h-[18px] w-[3px] -translate-y-1/2 rounded-full bg-accent-primary shadow-[0_0_10px_var(--accent-primary)]"
+              />
+            )}
           </Link>
         </Tooltip>
       );
@@ -143,14 +158,20 @@ function Sidebar({ searchOpen, onSearchToggle, isEdgeToEdge = false }: SidebarPr
           type="button"
           aria-pressed={settingsOpen}
           onClick={toggleSettings}
-          className={`group relative inline-flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer active:scale-[0.96] transition-transform duration-100`}
+          className={`${railItemClass} ${railStateClass(settingsOpen)}`}
         >
           <Icon
-            size={26}
-            className={`relative z-10 text-text-primary transition-opacity duration-150 ease-out ${
-              settingsOpen ? "opacity-100" : "opacity-55 group-hover:opacity-90"
+            size={21}
+            className={`relative z-10 transition-colors duration-150 ease-out ${
+              settingsOpen ? "text-accent-primary" : "text-text-primary/60"
             }`}
           />
+          {settingsOpen && (
+            <span
+              aria-hidden="true"
+              className="absolute -left-[7px] top-1/2 h-[16px] w-[3px] -translate-y-1/2 rounded-full bg-accent-primary"
+            />
+          )}
         </button>
       </Tooltip>
     );
@@ -173,13 +194,15 @@ function Sidebar({ searchOpen, onSearchToggle, isEdgeToEdge = false }: SidebarPr
     <aside className="h-full">
       <div
         className={`h-full w-[58px] ${
-          isEdgeToEdge ? "rounded-l-none" : "rounded-l-xl"
-        } rounded-r-sm ${
-          hasCustomBg ? "" : "bg-bg-primary"
-        } flex flex-col overflow-hidden`}
+          isEdgeToEdge ? "rounded-none" : "rounded-none md:rounded-[28px]"
+        } ${
+          hasCustomBg ? "" : "bg-bg-surface"
+        } flex flex-col overflow-hidden ${
+          isEdgeToEdge ? "" : "md:border md:border-border-primary/60 md:shadow-e1"
+        }`}
         style={sidebarStyle}
       >
-        <div className="flex justify-center items-center pt-[16px] pb-[16px] shrink-0">
+        <div className="flex justify-center items-center pt-[16px] pb-[10px] shrink-0">
 
           <AppImage
             src={
@@ -203,7 +226,9 @@ function Sidebar({ searchOpen, onSearchToggle, isEdgeToEdge = false }: SidebarPr
           />
         </div>
 
-        <nav className="relative flex-1 flex flex-col items-center gap-[24px] pt-[12px]">
+        <div className="mx-auto h-px w-[22px] shrink-0 bg-border-primary" aria-hidden="true" />
+
+        <nav className="relative flex-1 flex flex-col items-center gap-[6px] pt-[10px]">
           {renderNavItems()}
           <Tooltip
             content={t("common.sidebar.player") || "Player"}
@@ -216,21 +241,29 @@ function Sidebar({ searchOpen, onSearchToggle, isEdgeToEdge = false }: SidebarPr
               aria-pressed={playerFullscreen}
               disabled={!hasCurrentTrack}
               onClick={() => setPlayerFullscreen(true)}
-              className="group relative inline-flex items-center justify-center border-0 bg-transparent p-0 cursor-pointer active:scale-[0.96] transition-transform duration-100 disabled:cursor-not-allowed disabled:opacity-30"
+              className={`${railItemClass} ${railStateClass(playerFullscreen)} disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent`}
             >
               <MusicNote
-                size={26}
-                className={`relative z-10 text-text-primary transition-opacity duration-150 ease-out ${
-                  playerFullscreen
-                    ? "opacity-100"
-                    : "opacity-55 group-hover:opacity-90"
+                size={21}
+                className={`relative z-10 transition-colors duration-150 ease-out ${
+                  playerFullscreen ? "text-accent-primary" : "text-text-primary/60"
                 }`}
               />
+              {playerFullscreen && (
+                <span
+                  aria-hidden="true"
+                  className="absolute -left-[6px] top-1/2 h-[18px] w-[3px] -translate-y-1/2 rounded-full bg-accent-primary shadow-[0_0_10px_var(--accent-primary)]"
+                />
+              )}
             </button>
           </Tooltip>
         </nav>
 
-        <div className="pt-[16px] pb-[16px] shrink-0 flex justify-center items-center">
+        <div className="w-full px-[10px] shrink-0" aria-hidden="true">
+          <div className="h-px w-full bg-border-primary" />
+        </div>
+
+        <div className="pt-[10px] pb-[14px] shrink-0 flex justify-center items-center">
           {renderSettingsButton()}
         </div>
       </div>

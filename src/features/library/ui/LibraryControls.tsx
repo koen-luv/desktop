@@ -41,7 +41,7 @@ export default function LibraryControls({
         onChange={(event) => onQueryChange(event.target.value)}
         placeholder={placeholderByTab[activeTab]}
         icon={<Search2Line size={16} className={hasCustomBg ? "!text-white/60 dark:!text-white/60" : undefined} />}
-        className={`!h-[34px] w-[220px] md:w-[260px] rounded-lg ${
+        className={`!h-[36px] w-[200px] md:w-[250px] !rounded-full ${
           hasCustomBg
             ? "apple-glass-pill !border-none [&_input]:placeholder:!text-white/50 dark:[&_input]:placeholder:!text-white/50"
             : "border-border-primary bg-bg-elevated"
@@ -49,10 +49,10 @@ export default function LibraryControls({
       />
 
       <div
-        className={`inline-flex items-center rounded-lg p-[2px] ${
+        className={`inline-flex items-center gap-[2px] rounded-full p-[3px] ${
           hasCustomBg
             ? "apple-glass-pill"
-            : "bg-bg-elevated"
+            : "bg-bg-elevated shadow-[inset_0_0_0_1px_var(--border-primary)]"
         }`}
       >
         <button
@@ -60,14 +60,14 @@ export default function LibraryControls({
           data-no-tooltip="true"
           aria-label={t("library.view_grid")}
           onClick={() => onViewModeChange("grid")}
-          className={`inline-flex items-center justify-center h-[28px] w-[30px] rounded-[6px] border-0 transition-colors cursor-pointer select-none active:scale-[0.95] ${
+          className={`inline-flex items-center justify-center h-[28px] w-[34px] rounded-full border-0 transition-colors cursor-pointer select-none active:scale-[0.95] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent-soft ${
             viewMode === "grid"
               ? hasCustomBg
                 ? "apple-glass-prominent"
-                : "bg-border-alpha-14 text-text-primary"
+                : "bg-accent-soft text-accent-primary shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--accent-primary)_20%,transparent)]"
               : hasCustomBg
                 ? "bg-transparent text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
-                : "bg-transparent text-text-tertiary hover:text-text-secondary"
+                : "bg-transparent text-text-tertiary hover:text-text-secondary hover:bg-bg-hover"
           }`}
         >
           {viewMode === "grid" ? (
@@ -81,14 +81,14 @@ export default function LibraryControls({
           data-no-tooltip="true"
           aria-label={t("library.view_list")}
           onClick={() => onViewModeChange("list")}
-          className={`inline-flex items-center justify-center h-[28px] w-[30px] rounded-[6px] border-0 transition-colors cursor-pointer select-none active:scale-[0.95] ${
+          className={`inline-flex items-center justify-center h-[28px] w-[34px] rounded-full border-0 transition-colors cursor-pointer select-none active:scale-[0.95] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent-soft ${
             viewMode === "list"
               ? hasCustomBg
                 ? "apple-glass-prominent"
-                : "bg-border-alpha-14 text-text-primary"
+                : "bg-accent-soft text-accent-primary shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--accent-primary)_20%,transparent)]"
               : hasCustomBg
                 ? "bg-transparent text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
-                : "bg-transparent text-text-tertiary hover:text-text-secondary"
+                : "bg-transparent text-text-tertiary hover:text-text-secondary hover:bg-bg-hover"
           }`}
         >
           {viewMode === "list" ? (

@@ -77,9 +77,9 @@ function SongCard({
     setImageLoaded(isCoverReady(coverUrl));
   }, [coverUrl]);
 
-  const imageSizeClass = compact ? "h-[40px] w-[40px]" : "h-[48px] w-[48px]";
-  const titleSizeClass = compact ? "text-[14px]" : "text-[16px]";
-  const artistSizeClass = compact ? "text-[12px]" : "text-[15px]";
+  const imageSizeClass = compact ? "h-[40px] w-[40px]" : "h-[44px] w-[44px]";
+  const titleSizeClass = compact ? "text-[13.5px]" : "text-[14.5px]";
+  const artistSizeClass = compact ? "text-[12px]" : "text-[12.5px]";
   const gapClass = compact ? "gap-[12px]" : "gap-[16px]";
   const paddingClass = compact ? "p-[6px]" : "p-[8px]";
 
@@ -114,9 +114,9 @@ function SongCard({
 
   return (
     <div
-      className={`group w-full flex items-center justify-between rounded-md ${paddingClass} outline-none transition-colors duration-150 ease-out ${
+      className={`group w-full flex items-center justify-between rounded-[16px] ${paddingClass} outline-none transition-[background-color,box-shadow] duration-200 ease-[var(--motion-ease)] ${
         className ?? ""
-      } ${onPlay ? "cursor-pointer" : ""} ${onPlay && !className?.includes("hover:bg-") ? "hover:bg-border-alpha-14" : ""}`}
+      } ${onPlay ? "cursor-pointer" : ""} ${onPlay && !className?.includes("hover:bg-") ? "hover:bg-bg-hover" : ""} focus-visible:ring-4 focus-visible:ring-accent-soft`}
       onClick={handleClick}
       onPointerDown={(e) => {
         if (clickTimerRef.current) {
@@ -161,8 +161,8 @@ function SongCard({
         ) : (
           <div
             className={`relative ${imageSizeClass} shrink-0 overflow-hidden bg-bg-panel flex items-center justify-center ${
-              imageShape === "circle" ? "rounded-full" : "rounded-md"
-            }`}
+              imageShape === "circle" ? "rounded-full" : "rounded-[12px]"
+            } shadow-[inset_0_0_0_1px_var(--border-primary)]`}
           >
             {icon ? (
               icon
@@ -188,10 +188,9 @@ function SongCard({
         <div className="min-w-0 flex flex-col gap-[2px]">
           <div className="flex items-center gap-[8px]">
             <h3
-              className={`m-0 max-w-[min(52vw,560px)] overflow-hidden text-ellipsis whitespace-nowrap ${titleSizeClass} leading-[1.2] text-text-primary`}
+              className={`m-0 max-w-[min(52vw,560px)] overflow-hidden text-ellipsis whitespace-nowrap ${titleSizeClass} font-[550] leading-[1.25] tracking-[-0.014em] text-text-primary`}
               style={{
                 fontFamily: "var(--font-inter), sans-serif",
-                fontWeight: 400,
               }}
             >
               {highlight ? <HighlightedText text={title} query={highlight} /> : title}
@@ -258,7 +257,7 @@ function SongCard({
               <button
                 type="button"
                 aria-label={t("common.more_options")}
-                className="rounded-md bg-transparent border-0 p-0 text-text-primary transition-all duration-200 active:scale-[0.96] flex items-center justify-center cursor-pointer"
+                className="rounded-md bg-transparent border-0 p-0 text-text-tertiary transition-all duration-200 hover:text-text-primary active:scale-[0.96] flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/60"
               >
                 <More2Fill size={22} />
               </button>

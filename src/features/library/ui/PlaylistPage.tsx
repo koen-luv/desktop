@@ -46,6 +46,8 @@ import {
   sortPlaylistTracks,
 } from "../utils/playlistSort";
 import { fileToPlaylistCover, PlaylistCoverError } from "../utils/playlistCoverImage";
+import { isSharedPlaylistId } from "../services/sharedPlaylists";
+import PlaylistCollaboratorsDialog from "./modals/PlaylistCollaboratorsDialog";
 import {
   useTrackSearch,
   useTrackSearchButtonLabel,
@@ -123,12 +125,14 @@ function LibraryPlaylistContent() {
   const id = searchParams.get("id");
   const isLikesMode = id === "likes";
   const decodedId = id ? decodeURIComponent(id) : null;
+  const isSharedPlaylist = Boolean(decodedId && isSharedPlaylistId(decodedId));
   const scrollRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
   const hasCustomBg = useIsContentTransparent();
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [collaboratorsOpen, setCollaboratorsOpen] = useState(false);
   const reorderTracks = useReorderPlaylistTracks();
   const titleRef = useRef<HTMLHeadingElement>(null);
   const descriptionRef = useRef<HTMLParagraphElement>(null);
@@ -170,6 +174,8 @@ function LibraryPlaylistContent() {
         coverUrls: [] as string[],
         tracks,
         revision: 0,
+        isShared: false,
+        sharedRole: undefined,
       };
     }
     if (!playlistDetail) return null;
@@ -185,6 +191,8 @@ function LibraryPlaylistContent() {
       coverUrls: customCover ? [customCover] : generatedUrls,
       tracks: playlistDetail.tracks,
       revision: playlistDetail.revision,
+      isShared: playlistDetail.isShared,
+      sharedRole: playlistDetail.sharedRole,
     };
   })();
 
@@ -315,12 +323,14 @@ function LibraryPlaylistContent() {
   const handleShare = useCallback(() => {
     if (typeof navigator !== "undefined" && navigator.clipboard && decodedId) {
       navigator.clipboard.writeText(buildShareUrl("playlist", decodedId));
-      void api.updatePlaylist(decodedId, { isPublic: true }).catch(() => {});
+      if (!isSharedPlaylist) {
+        void api.updatePlaylist(decodedId, { isPublic: true }).catch(() => {});
+      }
       toast(t("common.link_copied"), "checkmark", {
         description: viewData?.title || undefined,
       });
     }
-  }, [decodedId, viewData?.title, toast, t]);
+  }, [decodedId, isSharedPlaylist, viewData?.title, toast, t]);
 
   const handleReorderCommit = useCallback(
     (fromIndex: number, toIndex: number, movingTrack: Track) => {
@@ -534,7 +544,7 @@ function LibraryPlaylistContent() {
         aria-label={t("common.back")}
         data-no-tooltip="true"
         data-no-window-drag
-        className={`absolute top-[calc(var(--inset-top,0px)+12px)] md:top-[12px] left-4 md:left-[32px] z-20 group inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-md px-[10px] active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto text-[13px] font-[500] border-0 !border-none ${
+        className={`absolute top-[calc(var(--inset-top,0px)+12px)] md:top-[12px] left-4 md:left-[32px] z-20 group inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-full px-[12px] active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto text-[13px] font-[500] border-0 !border-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent-soft ${
           hasCustomBg
             ? "apple-glass-pill !border-none"
             : "bg-bg-panel/85 backdrop-blur-xl text-text-primary hover:bg-bg-panel border-0 !border-none"
@@ -583,7 +593,7 @@ function LibraryPlaylistContent() {
                       (viewData.coverUrl ? [viewData.coverUrl] : []);
                     if (urls.length === 0) {
                       return isLikesMode ? (
-                        <HeartFill size={48} className={hasCustomBg ? "text-white" : "text-zinc-400 dark:text-zinc-500"} />
+                        <HeartFill size={48} className={hasCustomBg ? "text-white" : "text-text-tertiary"} />
                       ) : (
                         <PlaylistFill size={48} className={hasCustomBg ? "text-white" : "text-border-alpha-33"} />
                       );
@@ -634,7 +644,9 @@ function LibraryPlaylistContent() {
                         ? ""
                         : "cursor-text outline-none transition-colors"
                     } ${isEditingTitle ? "bg-border-alpha-14 rounded-[4px] -ml-[4px] px-[4px]" : ""}`}
-                      contentEditable={isLikesMode ? false : isEditingTitle}
+                      contentEditable={
+                        isLikesMode || isSharedPlaylist ? false : isEditingTitle
+                      }
                       suppressContentEditableWarning
                       onBlur={(e) => {
                         if (!isEditingTitle) return;
@@ -660,7 +672,9 @@ function LibraryPlaylistContent() {
                         }
                       }}
                       onClick={() => {
-                        if (!isLikesMode) setIsEditingTitle(true);
+                        if (!isLikesMode && !isSharedPlaylist) {
+                          setIsEditingTitle(true);
+                        }
                       }}
                     >
                       {viewData.title}
@@ -673,7 +687,7 @@ function LibraryPlaylistContent() {
                         className={`${SIDEBAR_SUBTITLE_CLASS} cursor-text outline-none transition-colors empty:min-h-[21px] ${
                           isEditingDescription ? "bg-border-alpha-14 rounded-[4px] -ml-[4px] px-[4px]" : ""
                         }`}
-                        contentEditable={isEditingDescription}
+                        contentEditable={!isSharedPlaylist && isEditingDescription}
                         suppressContentEditableWarning
                         onBlur={(e) => {
                           if (!isEditingDescription) return;
@@ -698,7 +712,9 @@ function LibraryPlaylistContent() {
                             setIsEditingDescription(false);
                           }
                         }}
-                        onClick={() => setIsEditingDescription(true)}
+                        onClick={() => {
+                          if (!isSharedPlaylist) setIsEditingDescription(true);
+                        }}
                       >
                         {viewData.bio}
                       </p>
@@ -862,23 +878,35 @@ function LibraryPlaylistContent() {
                             }
                             items={[
                               {
+                                id: "collaborators",
+                                icon: <PlaylistLine size={15} />,
+                                label: t("playlist.collaborators_manage"),
+                                onClick: () => setCollaboratorsOpen(true),
+                              },
+                              {
                                 id: "rename",
                                 icon: <LuPencil size={15} />,
                                 label: t("common.rename"),
+                                disabled: isSharedPlaylist,
                                 onClick: () => setIsEditingTitle(true),
                               },
                               {
                                 id: "edit-description",
                                 icon: <LuText size={15} />,
                                 label: t("common.edit_description"),
+                                disabled: isSharedPlaylist,
                                 onClick: () => setIsEditingDescription(true),
                               },
-                              {
-                                id: "share",
-                                icon: <ShareForwardLine size={15} />,
-                                label: t("common.share"),
-                                onClick: handleShare,
-                              },
+                              ...(!isSharedPlaylist
+                                ? [
+                                    {
+                                      id: "share",
+                                      icon: <ShareForwardLine size={15} />,
+                                      label: t("common.share"),
+                                      onClick: handleShare,
+                                    },
+                                  ]
+                                : []),
                               {
                                 id: "change-cover",
                                 icon: <LuImagePlus size={15} />,
@@ -911,7 +939,9 @@ function LibraryPlaylistContent() {
                                     title: viewData.title,
                                     coverUrl: viewData.coverUrl,
                                     type: "playlist",
-                                    isOwned: true,
+                                    isOwned:
+                                      !viewData.isShared ||
+                                      viewData.sharedRole === "owner",
                                   });
                                 },
                               },
@@ -1093,6 +1123,14 @@ function LibraryPlaylistContent() {
           </div>
         )}
       </div>
+      {decodedId && !isLikesMode && (
+        <PlaylistCollaboratorsDialog
+          open={collaboratorsOpen}
+          onOpenChange={setCollaboratorsOpen}
+          playlistId={decodedId}
+          isShared={isSharedPlaylist}
+        />
+      )}
     </div>
   );
 }

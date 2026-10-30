@@ -63,9 +63,9 @@ function AlbumCard({
     <div onContextMenu={handleContextMenu}>
       <Link
         to={`/collection?type=album&id=${encodeURIComponent(id)}`}
-        className={`group flex flex-col gap-[8px] no-underline cursor-pointer ${className}`}
+        className={`group flex flex-col gap-[11px] no-underline cursor-pointer ${className}`}
       >
-        <div className="relative aspect-square w-full overflow-hidden rounded-md bg-border-alpha-14">
+        <div className="relative aspect-square w-full overflow-hidden rounded-[20px] bg-bg-panel shadow-[inset_0_0_0_1px_var(--border-primary)] transition-[transform,box-shadow] duration-300 ease-[var(--motion-ease)] group-hover:-translate-y-[4px] group-hover:shadow-e2">
           {coverUrl && (
             <CoverImage
               src={coverUrl}
@@ -77,10 +77,10 @@ function AlbumCard({
           )}
         </div>
         <div className="flex flex-col">
-          <span className="truncate text-[14px] font-[500] text-text-primary">
+          <span className="truncate text-[13.5px] font-[550] tracking-[-0.014em] text-text-primary transition-colors duration-200 group-hover:text-accent-primary">
             {title}
           </span>
-          <span className="flex items-center gap-[5px] truncate text-[13px] text-text-tertiary">
+          <span className="flex items-center gap-[5px] truncate text-[12.5px] text-text-tertiary">
             {explicit && <ExplicitBadge />}
             {year && <span>{year}</span>}
             {year && trackCount && (

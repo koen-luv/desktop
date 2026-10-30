@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 import { ArrowLeftLine } from "@mingcute/react";
 
 export const SIDEBAR_TITLE_CLASS =
-  "m-0 text-[22px] leading-[1.2] tracking-[-0.02em] text-text-primary line-clamp-2";
+  "m-0 text-[26px] font-[650] leading-[1.1] tracking-[-0.038em] text-text-primary line-clamp-2";
 
 export const SIDEBAR_SUBTITLE_CLASS =
-  "m-0 text-[13px] leading-[1.55] text-text-secondary line-clamp-3";
+  "m-0 text-[12.5px] leading-[1.6] text-text-secondary line-clamp-3";
 
 export interface EntitySidebarProps {
   cover: ReactNode;
@@ -36,7 +36,7 @@ export function EntitySidebar({
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex h-[32px] cursor-pointer items-center gap-[6px] rounded-md border-0 bg-transparent px-[8px] ml-[-8px] text-[13px] font-[500] text-text-tertiary transition-colors hover:bg-border-alpha-14 hover:text-text-primary"
+          className="inline-flex h-[30px] cursor-pointer items-center gap-[6px] rounded-full border-0 bg-transparent px-[10px] ml-[-10px] text-[12.5px] font-[500] tracking-[-0.006em] text-text-tertiary transition-colors duration-200 hover:bg-bg-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent-soft"
           style={{ fontFamily: "var(--font-inter), sans-serif" }}
         >
           <ArrowLeftLine size={16} />
@@ -45,16 +45,16 @@ export function EntitySidebar({
       )}
 
       <div
-        className={`relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-md ${
-          coverClassName || "bg-border-alpha-14"
-        } ${onBack ? "mt-[16px]" : ""}`}
+        className={`relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-[24px] ring-1 ring-border-primary shadow-e2 ${
+          coverClassName || "bg-bg-panel"
+        } ${onBack ? "mt-[18px]" : ""}`}
       >
         {cover}
       </div>
 
       <div
-        className="mt-[16px] min-w-0"
-        style={{ fontFamily: "var(--font-inter), sans-serif", fontWeight: 600 }}
+        className="mt-[18px] min-w-0"
+        style={{ fontFamily: "var(--font-inter), sans-serif" }}
       >
         {title}
       </div>
@@ -77,7 +77,7 @@ export function EntitySidebar({
         </div>
       )}
 
-      {primaryAction && <div className="mt-[16px]">{primaryAction}</div>}
+      {primaryAction && <div className="mt-[18px]">{primaryAction}</div>}
 
       {actions && (
         <div className="mt-[8px] flex items-center gap-[8px]">{actions}</div>

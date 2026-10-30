@@ -48,7 +48,7 @@ const CheckIcon = () => (
     viewBox="0 0 12 12"
     fill="none"
     aria-hidden="true"
-    className="shrink-0 text-text-primary"
+    className="shrink-0 text-accent-primary"
   >
     <path
       d="M2 6.5L4.5 9L10 3"
@@ -210,7 +210,7 @@ export function Select<T extends string = string>({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex h-[36px] items-center justify-between gap-[8px] rounded-md border ${borderClass} ${bgClass} px-[12px] text-[13px] font-[400] text-text-primary transition-colors ${hoverClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary/70 focus-visible:ring-offset-1 focus-visible:ring-offset-bg-primary disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${className}`.trim()}
+        className={`inline-flex h-[36px] items-center justify-between gap-[8px] rounded-lg border ${borderClass} ${bgClass} px-[12px] text-[13px] font-[450] text-text-primary transition-[background-color,border-color,box-shadow] duration-200 ease-[var(--motion-ease)] ${hoverClass} focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent-soft focus-visible:border-accent-primary/70 focus-visible:ring-offset-1 focus-visible:ring-offset-bg-primary disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${className}`.trim()}
         style={{ fontFamily: "var(--font-inter), sans-serif" }}
       >
         <span className="inline-flex items-center gap-[7px] truncate min-w-0">
@@ -232,8 +232,8 @@ export function Select<T extends string = string>({
               initial={{ opacity: 0, scale: 0.96, y: -4 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: -4 }}
-              transition={{ duration: 0.13, ease: "easeOut" }}
-              className="fixed z-[9999] overflow-hidden rounded-md border border-border-primary bg-bg-primary p-[6px]"
+              transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+              className="fixed z-[9999] overflow-hidden rounded-xl border border-border-primary bg-bg-surface/95 p-[6px] shadow-e3 backdrop-blur-xl"
               style={menuStyle}
             >
               <div className="flex flex-col gap-[2px]">
@@ -249,10 +249,10 @@ export function Select<T extends string = string>({
                         onChange(option.value);
                         setOpen(false);
                       }}
-                      className={`flex w-full items-center justify-between gap-[8px] rounded-md px-[10px] py-[7px] text-[13px] transition-colors ${
+                      className={`flex w-full items-center justify-between gap-[8px] rounded-lg px-[10px] py-[7px] text-[13px] transition-colors duration-150 ${
                         isActive
-                          ? "bg-border-alpha-14 text-text-primary"
-                          : "bg-transparent text-text-secondary hover:bg-border-alpha-14 hover:text-text-primary"
+                          ? "bg-accent-soft text-accent-primary"
+                          : "bg-transparent text-text-secondary hover:bg-bg-hover hover:text-text-primary"
                       } border-none cursor-pointer`}
                       style={{
                         fontFamily: "var(--font-inter), sans-serif",

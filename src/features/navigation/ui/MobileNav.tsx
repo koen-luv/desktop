@@ -32,12 +32,23 @@ function MobileNav({ searchOpen, onSearchToggle }: MobileNavProps) {
   const hasTrack = Boolean(player.currentTrack);
 
   const itemClass = (active: boolean) =>
-    `flex flex-1 min-w-0 h-[48px] flex-col items-center justify-center gap-[2px] rounded-lg border-0 bg-transparent cursor-pointer transition-colors active:scale-[0.97] ${
-      active ? "text-text-primary" : "text-text-tertiary"
+    `group flex flex-1 min-w-0 h-[50px] flex-col items-center justify-center gap-[3px] rounded-2xl border-0 bg-transparent cursor-pointer transition-[color,transform] duration-200 ease-[var(--motion-ease)] active:scale-[0.95] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent-soft ${
+      active ? "text-accent-primary" : "text-text-tertiary hover:text-text-secondary"
     }`;
 
-  const iconClass = (active: boolean) =>
-    active ? "opacity-100" : "opacity-65";
+  // A single pill shape carries the active state for every destination, so
+  // touch users get the same "you are here" cue the desktop rail shows.
+  const iconWrapClass = (active: boolean) =>
+    `flex h-[28px] w-[48px] items-center justify-center rounded-full transition-[background-color,box-shadow] duration-200 ease-[var(--motion-ease)] ${
+      active
+        ? "bg-accent-soft text-accent-primary shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--accent-primary)_20%,transparent)]"
+        : "bg-transparent"
+    }`;
+
+  const labelClass = (active: boolean) =>
+    `text-[10px] leading-none tracking-[0.01em] ${
+      active ? "font-[600]" : "font-[500]"
+    }`;
 
   const homeActive = pathname === "/" || pathname === "/home";
   const libraryActive = pathname === "/library" || pathname.startsWith("/library/");
@@ -45,16 +56,18 @@ function MobileNav({ searchOpen, onSearchToggle }: MobileNavProps) {
   return (
     <nav
       aria-label={t("common.navigation") || "Navigation"}
-      className="md:hidden shrink-0 w-full border-t border-border-primary/60 bg-bg-primary/95 backdrop-blur-xl"
+      className="md:hidden shrink-0 w-[calc(100%-16px)] mx-2 mb-2 rounded-[22px] border border-border-primary/70 bg-bg-surface/88 shadow-e2 backdrop-blur-2xl"
       style={{
         paddingBottom:
           "max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))",
       }}
     >
-      <div className="flex items-stretch px-1.5 pt-1" style={{ minHeight: 52 }}>
+      <div className="flex items-stretch px-1.5 pt-1" style={{ minHeight: 58 }}>
         <Link to="/" aria-current={homeActive ? "page" : undefined} className={itemClass(homeActive)}>
-          <Home7Fill size={21} className={iconClass(homeActive)} />
-          <span className="text-[10px] leading-none font-medium">
+          <span className={iconWrapClass(homeActive)}>
+            <Home7Fill size={20} />
+          </span>
+          <span className={labelClass(homeActive)}>
             {t("common.sidebar.home") || "Home"}
           </span>
         </Link>
@@ -65,8 +78,10 @@ function MobileNav({ searchOpen, onSearchToggle }: MobileNavProps) {
           onClick={onSearchToggle}
           className={itemClass(searchOpen)}
         >
-          <Search3Fill size={21} className={iconClass(searchOpen)} />
-          <span className="text-[10px] leading-none font-medium">
+          <span className={iconWrapClass(searchOpen)}>
+            <Search3Fill size={20} />
+          </span>
+          <span className={labelClass(searchOpen)}>
             {t("common.sidebar.search") || "Search"}
           </span>
         </button>
@@ -76,8 +91,10 @@ function MobileNav({ searchOpen, onSearchToggle }: MobileNavProps) {
           aria-current={libraryActive ? "page" : undefined}
           className={itemClass(libraryActive)}
         >
-          <BookmarksFill size={21} className={iconClass(libraryActive)} />
-          <span className="text-[10px] leading-none font-medium">
+          <span className={iconWrapClass(libraryActive)}>
+            <BookmarksFill size={20} />
+          </span>
+          <span className={labelClass(libraryActive)}>
             {t("common.sidebar.library") || "Library"}
           </span>
         </Link>
@@ -92,8 +109,10 @@ function MobileNav({ searchOpen, onSearchToggle }: MobileNavProps) {
           }}
           className={`${itemClass(player.fullscreen)} ${hasTrack ? "" : "opacity-35"}`}
         >
-          <Music2Fill size={21} className={iconClass(player.fullscreen)} />
-          <span className="text-[10px] leading-none font-medium">
+          <span className={iconWrapClass(player.fullscreen)}>
+            <Music2Fill size={20} />
+          </span>
+          <span className={labelClass(player.fullscreen)}>
             {t("common.sidebar.now_playing") || "Playing"}
           </span>
         </button>
@@ -104,8 +123,10 @@ function MobileNav({ searchOpen, onSearchToggle }: MobileNavProps) {
           onClick={toggleSettings}
           className={itemClass(settingsOpen)}
         >
-          <Settings4Fill size={21} className={iconClass(settingsOpen)} />
-          <span className="text-[10px] leading-none font-medium">
+          <span className={iconWrapClass(settingsOpen)}>
+            <Settings4Fill size={20} />
+          </span>
+          <span className={labelClass(settingsOpen)}>
             {t("common.sidebar.settings") || "Settings"}
           </span>
         </button>

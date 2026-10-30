@@ -375,7 +375,7 @@ export default function SettingsModal() {
       type="button"
       aria-label={t("common.close") || "Close"}
       onClick={handleClose}
-      className="w-[28px] h-[28px] shrink-0 inline-flex items-center justify-center rounded-md text-text-tertiary hover:text-text-primary hover:bg-border-alpha-14 transition-colors border-0 bg-transparent p-0 cursor-pointer"
+      className="w-[30px] h-[30px] shrink-0 inline-flex items-center justify-center rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-hover transition-colors border-0 bg-transparent p-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/70"
     >
       <CloseLine size={17} />
     </button>
@@ -391,19 +391,24 @@ export default function SettingsModal() {
           setSearchQuery("");
           openCategory(cat.id);
         }}
-        className="w-full flex items-center gap-[12px] px-[12px] py-[11px] rounded-[10px] border-0 bg-transparent hover:bg-border-alpha-14 cursor-pointer text-left transition-colors"
+        className="group w-full flex items-center gap-[12px] px-[12px] py-[12px] rounded-xl border-0 bg-transparent hover:bg-bg-hover cursor-pointer text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/70"
         style={font}
       >
-        <Icon size={20} weight="Bold" className="text-text-tertiary shrink-0" />
+        <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg bg-bg-hover text-text-secondary transition-colors group-hover:text-text-primary">
+          <Icon size={17} weight="Bold" />
+        </span>
         <span className="flex-1 min-w-0 flex flex-col gap-[2px]">
-          <span className="text-text-primary text-[13.5px] font-[500] leading-snug">
+          <span className="text-text-primary text-[13.5px] font-[500] tracking-[-0.006em] leading-snug">
             {categoryTitles[cat.id]}
           </span>
           <span className="text-text-tertiary text-[12.5px] leading-snug">
             {categoryDescriptions[cat.id]}
           </span>
         </span>
-        <RightLine size={15} className="text-text-tertiary shrink-0" />
+        <RightLine
+          size={15}
+          className="text-text-tertiary shrink-0 transition-transform duration-150 ease-out group-hover:translate-x-[2px]"
+        />
       </button>
     );
   };
@@ -421,22 +426,27 @@ export default function SettingsModal() {
         key={`${categoryId}:${sectionId}`}
         type="button"
         onClick={() => openCategory(categoryId, sectionId)}
-        className="w-full flex items-center gap-[12px] px-[12px] py-[11px] rounded-[10px] border-0 bg-transparent hover:bg-border-alpha-14 cursor-pointer text-left transition-colors"
+        className="group w-full flex items-center gap-[12px] px-[12px] py-[12px] rounded-xl border-0 bg-transparent hover:bg-bg-hover cursor-pointer text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/70"
         style={font}
       >
-        <Icon size={20} weight="Bold" className="text-text-tertiary shrink-0" />
+        <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg bg-bg-hover text-text-secondary transition-colors group-hover:text-text-primary">
+          <Icon size={17} weight="Bold" />
+        </span>
         <span className="flex-1 min-w-0 flex flex-col gap-[2px]">
-          <span className="text-text-tertiary text-[11px] font-[500] uppercase tracking-[0.06em] leading-none">
+          <span className="text-text-tertiary text-[10.5px] font-[600] uppercase tracking-[0.08em] leading-none">
             {categoryTitles[categoryId]}
           </span>
-          <span className="text-text-primary text-[13.5px] font-[500] leading-snug">
+          <span className="text-text-primary text-[13.5px] font-[500] tracking-[-0.006em] leading-snug">
             {sectionTitles[sectionId]}
           </span>
           <span className="text-text-tertiary text-[12.5px] leading-snug">
             {sectionDescriptions[sectionId]}
           </span>
         </span>
-        <RightLine size={15} className="text-text-tertiary shrink-0" />
+        <RightLine
+          size={15}
+          className="text-text-tertiary shrink-0 transition-transform duration-150 ease-out group-hover:translate-x-[2px]"
+        />
       </button>
     );
   };
@@ -465,7 +475,7 @@ export default function SettingsModal() {
               return (
                 <div key={groupId} className="flex flex-col gap-[4px]">
                   <p
-                    className="text-text-tertiary text-[11px] font-[500] m-0 px-[6px] pb-[4px]"
+                    className="text-text-tertiary text-[10.5px] font-[600] uppercase tracking-[0.08em] m-0 px-[12px] pb-[6px]"
                     style={font}
                   >
                     {t(`settings.groups.${groupId}`)}
@@ -478,7 +488,7 @@ export default function SettingsModal() {
 
           <div className="flex flex-col gap-[4px] pt-[14px] mt-[6px] border-t border-solid border-border-primary">
             <p
-              className="text-text-tertiary text-[11px] font-[500] m-0 px-[6px] pb-[4px]"
+              className="text-text-tertiary text-[10.5px] font-[600] uppercase tracking-[0.08em] m-0 px-[12px] pb-[6px]"
               style={font}
             >
               {t("settings.groups.help")}
@@ -486,7 +496,7 @@ export default function SettingsModal() {
             <button
               type="button"
               onClick={() => openExternal("https://github.com/tryliner/desktop/blob/main/README.md")}
-              className="w-full flex items-center gap-[12px] px-[12px] py-[10px] rounded-[10px] border-0 bg-transparent text-text-secondary hover:bg-border-alpha-14 hover:text-text-primary cursor-pointer text-left transition-colors"
+              className="w-full flex items-center gap-[12px] px-[12px] py-[10px] rounded-xl border-0 bg-transparent text-text-secondary hover:bg-bg-hover hover:text-text-primary cursor-pointer text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/70"
               style={{ ...font, fontSize: "13.5px" }}
             >
               <Book2 size={17} weight="Bold" className="text-text-tertiary shrink-0" />
@@ -496,7 +506,7 @@ export default function SettingsModal() {
             <button
               type="button"
               onClick={() => openExternal("https://t.me/liner_app?direct")}
-              className="w-full flex items-center gap-[12px] px-[12px] py-[10px] rounded-[10px] border-0 bg-transparent text-text-secondary hover:bg-border-alpha-14 hover:text-text-primary cursor-pointer text-left transition-colors"
+              className="w-full flex items-center gap-[12px] px-[12px] py-[10px] rounded-xl border-0 bg-transparent text-text-secondary hover:bg-bg-hover hover:text-text-primary cursor-pointer text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/70"
               style={{ ...font, fontSize: "13.5px" }}
             >
               <QuestionCircle size={17} weight="Bold" className="text-text-tertiary shrink-0" />
@@ -532,11 +542,13 @@ export default function SettingsModal() {
               }
             >
               {withHeading ? (
-                <div className="flex items-start gap-[10px] pb-[2px]">
-                  <Icon size={18} weight="Bold" className="text-text-tertiary shrink-0 mt-[1px]" />
+                <div className="flex items-start gap-[10px] pb-[4px]">
+                  <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-md bg-bg-hover text-text-secondary">
+                    <Icon size={15} weight="Bold" />
+                  </span>
                   <div className="min-w-0">
                     <p
-                      className="text-text-primary text-[13px] font-[600] m-0 leading-snug"
+                      className="text-text-primary text-[13.5px] font-[600] tracking-[-0.008em] m-0 leading-snug"
                       style={font}
                     >
                       {sectionTitles[sectionId]}
@@ -564,24 +576,24 @@ export default function SettingsModal() {
       open={open}
       onOpenChange={(next) => (!next ? handleClose() : undefined)}
       maxWidth={720}
-      className="p-0 h-[70dvh] max-h-[70dvh] md:h-[640px] md:max-h-[86vh] !flex-col overflow-hidden !bg-bg-elevated !border-0"
+      className="p-0 h-[70dvh] max-h-[70dvh] md:h-[640px] md:max-h-[86vh] !flex-col overflow-hidden !bg-bg-surface !border-0"
     >
       <div className="flex-1 min-h-0 flex flex-col">
         {/* ── Header: search on the menu, back + title inside a category ── */}
-        <div className="shrink-0 px-4 md:px-6 pt-4 pb-[10px]">
+        <div className="shrink-0 px-4 md:px-6 pt-4 pb-[12px] border-b border-border-primary">
           {openCategoryId && activeCategory ? (
             <div className="flex items-start gap-[10px]">
               <button
                 type="button"
                 aria-label={t("common.back") || "Back"}
                 onClick={backToMenu}
-                className="w-[28px] h-[28px] mt-[1px] shrink-0 inline-flex items-center justify-center rounded-md text-text-tertiary hover:text-text-primary hover:bg-border-alpha-14 transition-colors border-0 bg-transparent p-0 cursor-pointer"
+                className="w-[30px] h-[30px] mt-[1px] shrink-0 inline-flex items-center justify-center rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-hover transition-colors border-0 bg-transparent p-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/70"
               >
                 <ArrowLeftLine size={18} />
               </button>
               <div className="flex-1 min-w-0">
                 <h3
-                  className="text-text-primary text-[15px] m-0 font-[600] tracking-[-0.01em]"
+                  className="text-text-primary text-[17px] m-0 font-[600] tracking-[-0.022em]"
                   style={font}
                 >
                   {categoryTitles[activeCategory.id]}
@@ -599,7 +611,7 @@ export default function SettingsModal() {
             <>
               <div className="flex items-center justify-between gap-[16px]">
                 <h3
-                  className="text-text-primary text-[15px] m-0 font-[600] tracking-[-0.01em]"
+                  className="text-text-primary text-[17px] m-0 font-[600] tracking-[-0.022em]"
                   style={font}
                 >
                   {t("settings.title")}
@@ -609,14 +621,14 @@ export default function SettingsModal() {
               <div className="relative flex items-center mt-[12px]">
                 <Search2Line
                   size={15}
-                  className="absolute left-[10px] text-text-tertiary pointer-events-none"
+                  className="absolute left-[11px] text-text-tertiary pointer-events-none"
                 />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t("settings.search_placeholder")}
-                  className="w-full h-[32px] pl-[30px] pr-[26px] bg-border-alpha-14 text-text-primary text-[13px] rounded-[8px] border-0 outline-none placeholder:text-text-tertiary focus:bg-border-alpha-20 transition-colors"
+                  className="w-full h-[36px] pl-[32px] pr-[28px] bg-bg-elevated text-text-primary text-[13px] rounded-full border-0 outline-none shadow-[inset_0_0_0_1px_var(--border-primary)] placeholder:text-text-tertiary focus:bg-bg-surface focus:shadow-[inset_0_0_0_1px_var(--accent-primary)] focus:ring-4 focus:ring-accent-soft transition-[background-color,box-shadow] duration-200"
                   style={font}
                 />
                 {searchQuery && (
@@ -654,7 +666,7 @@ export default function SettingsModal() {
               <span className="relative shrink-0">
                 <UserAvatar user={user ?? null} size={32} />
                 <span
-                  className="absolute right-[-1px] bottom-[-1px] w-[10px] h-[10px] rounded-full bg-[#12B76A] border-2 border-bg-primary"
+                  className="absolute right-[-1px] bottom-[-1px] w-[10px] h-[10px] rounded-full bg-[#12B76A] border-2 border-bg-elevated"
                   aria-hidden
                 />
               </span>
@@ -674,7 +686,7 @@ export default function SettingsModal() {
                 }}
                 title={t("settings.profile.sign_out") || "Log out"}
                 aria-label={t("settings.profile.sign_out") || "Log out"}
-                className="p-1.5 rounded-md text-text-tertiary hover:text-[#E81123] hover:bg-border-alpha-14 transition-colors border-0 bg-transparent cursor-pointer flex items-center justify-center shrink-0"
+                className="p-1.5 rounded-lg text-text-tertiary hover:text-[#E81123] hover:bg-bg-hover transition-colors border-0 bg-transparent cursor-pointer flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/70"
               >
                 <ExitLine size={18} className="shrink-0" />
               </button>

@@ -54,9 +54,9 @@ describe("customizationStore", () => {
     store.applyToAllBlocks("sidebar");
 
     const state = useCustomizationStore.getState();
-    expect(state.sidebar).toEqual({ opacity: 45, backgroundOpacity: 100, blur: 28, dim: 35 });
-    expect(state.contentView).toEqual({ opacity: 45, backgroundOpacity: 100, blur: 28, dim: 35 });
-    expect(state.miniplayer).toEqual({ opacity: 45, backgroundOpacity: 100, blur: 28, dim: 35 });
+    expect(state.sidebar).toEqual({ opacity: 45, blur: 28, dim: 35 });
+    expect(state.contentView).toEqual({ opacity: 45, blur: 28, dim: 35 });
+    expect(state.miniplayer).toEqual({ opacity: 45, blur: 28, dim: 35 });
   });
 
   it("calculates composite glassmorphism block style accurately", () => {
@@ -88,9 +88,28 @@ describe("customizationStore", () => {
     expect((styleLowOpacity as Record<string, string>)["--glass-pill-border"]).toBe("none");
   });
 
+  it("uses the opacity slider value for panel transparency and keeps zero fully transparent", () => {
+    const style = getBlockStyle({ opacity: 25, blur: 0, dim: 0 }, true, true);
+    expect(style.background).toBe("rgba(10, 10, 10, 0.25)");
+
+    const transparentStyle = getBlockStyle({ opacity: 0, blur: 0, dim: 85 }, true, true);
+    expect(transparentStyle.background).toBe("transparent");
+  });
+
   it("allows wallpaper opacity to be set to zero", () => {
     useCustomizationStore.getState().setBackgroundOpacity(0);
     expect(useCustomizationStore.getState().backgroundOpacity).toBe(0);
+  });
+
+  it("toggles wallpaper use in the fullscreen player and resets it", () => {
+    const store = useCustomizationStore.getState();
+    expect(useCustomizationStore.getState().useWallpaperInFullscreen).toBe(false);
+
+    store.setUseWallpaperInFullscreen(true);
+    expect(useCustomizationStore.getState().useWallpaperInFullscreen).toBe(true);
+
+    useCustomizationStore.getState().resetAll();
+    expect(useCustomizationStore.getState().useWallpaperInFullscreen).toBe(false);
   });
 
   it("moves player elements while preserving a complete unique order", () => {

@@ -6,13 +6,13 @@ const CARD_TITLE_WIDTHS = ["w-[78%]", "w-[88%]", "w-[68%]", "w-[82%]", "w-[72%]"
 
 function CardRowSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className="flex gap-[28px] overflow-hidden pb-[10px]">
+    <div className="flex gap-[20px] overflow-hidden pb-[10px]">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="w-[175px] shrink-0">
-          <div className="relative aspect-square w-full overflow-hidden rounded-md bg-border-alpha-14">
+        <div key={i} className="w-[180px] shrink-0">
+          <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-bg-panel">
             <div className="skeleton-shimmer h-full w-full" />
           </div>
-          <div className="mt-[8px] flex flex-col gap-1.5">
+          <div className="mt-[10px] flex flex-col gap-[3px]">
             <div
               className={`skeleton-shimmer h-[14px] ${CARD_TITLE_WIDTHS[i % CARD_TITLE_WIDTHS.length]} rounded-[4px]`}
             />
@@ -44,7 +44,7 @@ function ArtistPageSkeleton({ className = "" }: ArtistPageSkeletonProps) {
 
 
         <div className="relative z-10 h-[56px] flex items-center px-[32px]">
-          <div className="skeleton-shimmer h-[32px] w-[64px] rounded-md" />
+          <div className="skeleton-shimmer h-[30px] w-[68px] rounded-lg" />
         </div>
 
         <div className="relative z-10 px-[32px] pb-[16px] flex flex-col md:flex-row md:items-end justify-between gap-[24px]">
@@ -60,7 +60,7 @@ function ArtistPageSkeleton({ className = "" }: ArtistPageSkeletonProps) {
             </div>
           </div>
 
-          <div className="w-full md:w-[340px] lg:w-[380px] shrink-0 rounded-md bg-bg-panel/90 p-[16px] backdrop-blur-md flex flex-col gap-[8px]">
+          <div className="w-full md:w-[340px] lg:w-[380px] shrink-0 rounded-xl bg-bg-panel/90 p-[16px] backdrop-blur-md flex flex-col gap-[8px]">
             <div className="skeleton-shimmer h-[15px] w-[80px] rounded-[4px]" />
             <div className="skeleton-shimmer h-[13px] w-[96%] rounded-[4px] mt-[2px]" />
             <div className="skeleton-shimmer h-[13px] w-[88%] rounded-[4px]" />
@@ -71,9 +71,9 @@ function ArtistPageSkeleton({ className = "" }: ArtistPageSkeletonProps) {
       </div>
 
       <div className="relative z-10 px-[32px] pt-[24px]">
-        <div className="flex flex-col gap-[40px]">
+        <div className="flex flex-col gap-[36px]">
           <section>
-            <div className="skeleton-shimmer h-[22px] w-[160px] rounded-[5px] mb-[16px]" />
+            <div className="skeleton-shimmer h-[19px] w-[160px] rounded-[5px] mb-[14px]" />
             <div className="space-y-[4px]">
               {Array.from({ length: 5 }).map((_, i) => (
                 <div
@@ -81,7 +81,7 @@ function ArtistPageSkeleton({ className = "" }: ArtistPageSkeletonProps) {
                   className="h-[52px] rounded-md px-[12px] flex items-center gap-[14px]"
                 >
                   <div className="skeleton-shimmer h-[14px] w-[16px] rounded-[3px]" />
-                  <div className="skeleton-shimmer h-[40px] w-[40px] rounded-[6px] shrink-0" />
+                  <div className="skeleton-shimmer h-[44px] w-[44px] rounded-lg shrink-0" />
                   <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                     <div
                       className={`skeleton-shimmer h-[14px] ${TRACK_TITLE_WIDTHS[i]} rounded-[4px]`}
@@ -97,12 +97,12 @@ function ArtistPageSkeleton({ className = "" }: ArtistPageSkeletonProps) {
           </section>
 
           <section>
-            <div className="skeleton-shimmer h-[22px] w-[130px] rounded-[5px] mb-[16px]" />
+            <div className="skeleton-shimmer h-[19px] w-[130px] rounded-[5px] mb-[14px]" />
             <CardRowSkeleton count={6} />
           </section>
 
           <section>
-            <div className="skeleton-shimmer h-[22px] w-[150px] rounded-[5px] mb-[16px]" />
+            <div className="skeleton-shimmer h-[19px] w-[150px] rounded-[5px] mb-[14px]" />
             <CardRowSkeleton count={6} />
           </section>
         </div>

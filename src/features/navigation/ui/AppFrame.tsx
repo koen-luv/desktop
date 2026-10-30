@@ -764,9 +764,9 @@ export default function AppFrame({ children }: AppFrameProps) {
     <div
       ref={appFrameRef}
       data-custom-bg={hasCustomBg ? "true" : undefined}
-      className={`safe-area-shell relative flex flex-col md:flex-row h-full w-full overflow-hidden ${
-        isEdgeToEdge ? "rounded-none p-0" : "rounded-none p-0 md:rounded-5xl md:p-1.5"
-      } bg-bg-canvas gap-0 md:gap-1.5`}
+      className={`safe-area-shell isolate relative flex flex-col md:flex-row h-full w-full overflow-hidden ${
+        isEdgeToEdge ? "rounded-none p-0" : "rounded-none p-0 md:rounded-5xl md:p-2"
+      } bg-bg-canvas gap-0 md:gap-2`}
       onScroll={(e) => {
         if (e.currentTarget.scrollLeft !== 0) e.currentTarget.scrollLeft = 0;
         if (e.currentTarget.scrollTop !== 0) e.currentTarget.scrollTop = 0;
@@ -809,15 +809,15 @@ export default function AppFrame({ children }: AppFrameProps) {
         />
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full relative gap-0 md:gap-1.5 overflow-hidden">
+      <div className="relative z-[1] flex-1 flex flex-col min-w-0 min-h-0 h-full gap-0 md:gap-2 overflow-hidden">
         <main
           data-custom-bg={hasCustomBg ? "true" : undefined}
           className={`flex-1 min-w-0 flex flex-col relative h-full ${
             hasCustomBg ? "" : "bg-bg-primary"
-          } rounded-none md:rounded-sm ${
-            isFullscreenPlayer || isEdgeToEdge
-              ? "md:rounded-tr-none"
-              : "md:rounded-tr-xl"
+          } ${
+            isEdgeToEdge
+              ? "rounded-none"
+              : "rounded-none md:rounded-[28px] md:border md:border-border-primary/60 md:shadow-e1"
           } overflow-hidden`}
           style={mainStyle}
         >
@@ -842,7 +842,7 @@ export default function AppFrame({ children }: AppFrameProps) {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute inset-0 bg-black/12 backdrop-blur-[2px] pointer-events-auto z-[30]"
+                className="absolute inset-0 bg-black/25 backdrop-blur-[3px] pointer-events-auto z-[30]"
                 onClick={() => closeSearch()}
               />
             )}
@@ -928,7 +928,7 @@ export default function AppFrame({ children }: AppFrameProps) {
           >
             {/* 1. Search Input Island */}
             <div
-              className="w-[min(660px,calc(100vw-72px))] max-md:w-[calc(100vw-16px)] h-[54px] rounded-[8px] pointer-events-auto flex items-center px-[18px] gap-[14px] bg-bg-panel/95 border border-border-primary/50 backdrop-blur-2xl"
+              className="w-[min(620px,calc(100vw-72px))] max-md:w-[calc(100vw-16px)] h-[54px] rounded-full pointer-events-auto flex items-center px-[20px] gap-[12px] bg-bg-surface/85 border border-border-primary/70 shadow-e2 backdrop-blur-2xl"
             >
               <span className="shrink-0 flex items-center justify-center text-text-tertiary">
                 <AnimatePresence mode="wait" initial={false}>
@@ -971,7 +971,7 @@ export default function AppFrame({ children }: AppFrameProps) {
                     runSearchNow();
                   }
                 }}
-                className="w-full flex-1 bg-transparent border-none outline-none text-text-primary text-[16px] placeholder:text-text-tertiary font-[400] tracking-tight"
+                className="w-full flex-1 bg-transparent border-none outline-none text-text-primary text-[15px] placeholder:text-text-tertiary font-[400] tracking-[-0.01em]"
                 style={{
                   fontFamily: "var(--font-inter), sans-serif",
                   lineHeight: "1.2",
@@ -993,7 +993,7 @@ export default function AppFrame({ children }: AppFrameProps) {
                       setSearchQuery("");
                       searchInputRef.current?.focus();
                     }}
-                    className="shrink-0 text-text-tertiary hover:text-text-primary transition-colors border-none bg-transparent p-0 flex items-center justify-center cursor-pointer"
+                    className="shrink-0 text-text-tertiary hover:text-text-primary transition-colors border-none bg-transparent p-0 flex items-center justify-center cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/60"
                   >
                     <CloseCircleFill size={18} />
                   </motion.button>
@@ -1009,7 +1009,7 @@ export default function AppFrame({ children }: AppFrameProps) {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.99 }}
                   transition={{ duration: 0.1, ease: [0.16, 1, 0.3, 1] }}
-                  className="w-[min(660px,calc(100vw-72px))] max-md:w-[calc(100vw-16px)] mt-[8px] h-[500px] max-h-[500px] max-md:h-[calc(100dvh-120px)] max-md:max-h-[calc(100dvh-120px)] rounded-[8px] pointer-events-auto flex flex-col overflow-hidden bg-bg-panel/95 border border-border-primary/50 backdrop-blur-2xl"
+                  className="w-[min(620px,calc(100vw-72px))] max-md:w-[calc(100vw-16px)] mt-[10px] h-[500px] max-h-[500px] max-md:h-[calc(100dvh-120px)] max-md:max-h-[calc(100dvh-120px)] rounded-[24px] pointer-events-auto flex flex-col overflow-hidden bg-bg-surface/90 border border-border-primary/70 shadow-e3 backdrop-blur-2xl"
                 >
                   <div className="flex gap-[6px] px-[14px] pt-[12px] pb-[6px] shrink-0 overflow-x-auto">
                     {filterKeys.map((key) => {
@@ -1027,11 +1027,11 @@ export default function AppFrame({ children }: AppFrameProps) {
                           type="button"
                           onClick={() => setActiveFilter(key)}
                           className={`
-                            relative flex items-center gap-[7px] px-[13px] py-[7px] rounded-[6px] text-[13.5px] font-normal transition-colors border-none bg-transparent cursor-pointer select-none shrink-0
+                            relative flex items-center gap-[6px] px-[13px] py-[6px] rounded-full text-[12.5px] transition-colors border-none bg-transparent cursor-pointer select-none shrink-0 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent-soft
                             ${
                               isActive
-                                ? "text-text-primary font-medium"
-                                : "text-text-secondary hover:text-text-primary hover:bg-border-alpha-14"
+                                ? "text-accent-primary font-[600]"
+                                : "text-text-secondary font-[500] hover:text-text-primary hover:bg-bg-hover"
                             }
                           `}
                           style={{
@@ -1042,7 +1042,7 @@ export default function AppFrame({ children }: AppFrameProps) {
                           {isActive && (
                             <motion.div
                               layoutId="activeFilterPill"
-                              className="absolute inset-0 rounded-[6px] bg-border-alpha-14 pointer-events-none z-0"
+                              className="absolute inset-0 rounded-full bg-accent-soft shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--accent-primary)_18%,transparent)] pointer-events-none z-0"
                               transition={{
                                 type: "spring",
                                 stiffness: 450,
@@ -1126,8 +1126,7 @@ export default function AppFrame({ children }: AppFrameProps) {
                   initial={{ opacity: 0, y: -6, scale: 0.99 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.99 }}
-                  transition={{ duration: 0.1, ease: [0.16, 1, 0.3, 1] }}
-                  className="w-[min(660px,calc(100vw-72px))] max-md:w-[calc(100vw-16px)] mt-[8px] max-h-[480px] max-md:max-h-[calc(100dvh-120px)] h-auto rounded-[8px] pointer-events-auto flex flex-col overflow-hidden bg-bg-panel/95 border border-border-primary/50 backdrop-blur-2xl"
+                  transition={{ duration: 0.1, ease: [0.16, 1, 0.3, 1] }}                    className="w-[min(620px,calc(100vw-72px))] max-md:w-[calc(100vw-16px)] mt-[10px] max-h-[480px] max-md:max-h-[calc(100dvh-120px)] h-auto rounded-[24px] pointer-events-auto flex flex-col overflow-hidden bg-bg-surface/90 border border-border-primary/70 shadow-e3 backdrop-blur-2xl"
                 >
                   <SearchHistoryList
                     onSelectQuery={handleSelectHistoryQuery}

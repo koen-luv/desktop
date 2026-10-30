@@ -10,8 +10,8 @@ export interface TextInputProps
 }
 
 const sizeClasses: Record<NonNullable<TextInputProps["size"]>, string> = {
-  default: "h-[44px] px-[14px] text-[14px]",
-  sm: "h-[36px] px-[12px] text-[13px]",
+  default: "h-[42px] px-[13px] text-[13.5px]",
+  sm: "h-[34px] px-[11px] text-[12.5px]",
 };
 
 const TextInput = forwardRef<HTMLInputElement, TextInputProps>(
@@ -34,23 +34,27 @@ const TextInput = forwardRef<HTMLInputElement, TextInputProps>(
         ? ""
         : isTransparent
           ? "bg-transparent"
-          : "bg-bg-primary";
+          : "bg-bg-elevated";
 
     const borderClass = hasError
-      ? "border-accent-primary ring-1 ring-accent-primary"
+      ? "border-accent-primary ring-1 ring-accent-primary/40"
       : isTransparent
-        ? "border-black/15 dark:border-white/20 hover:border-black/25 dark:hover:border-white/35 focus-within:border-black/25 dark:focus-within:border-white/30"
-        : "border-border-primary focus-within:border-border-alpha-33";
+        ? "border-transparent hover:border-border-secondary focus-within:border-accent-primary/60"
+        : "border-border-primary hover:border-border-secondary focus-within:border-accent-primary/70 focus-within:ring-4 focus-within:ring-accent-soft focus-within:bg-bg-surface";
 
     return (
       <div
-        className={`group flex items-center gap-[10px] rounded-md border ${bgClass} ${borderClass} transition-[border-color,box-shadow] duration-150 ${disabled ? "opacity-50 pointer-events-none" : ""} ${sizeClasses[size]} ${className}`.trim()}
+        className={`group flex items-center gap-[9px] rounded-xl border ${bgClass} ${borderClass} transition-[border-color,box-shadow,background-color,transform] duration-200 ease-[var(--motion-ease)] ${disabled ? "opacity-50 pointer-events-none" : ""} ${sizeClasses[size]} ${className}`.trim()}
       >
-      {icon && <span className="shrink-0 text-text-secondary">{icon}</span>}
+      {icon && (
+        <span className="shrink-0 text-text-tertiary transition-colors duration-150 group-focus-within:text-text-secondary">
+          {icon}
+        </span>
+      )}
       <input
         ref={ref}
         disabled={disabled}
-        className="w-full bg-transparent border-none p-0 text-[inherit] font-[400] text-text-primary placeholder:text-text-tertiary outline-none disabled:cursor-not-allowed [&::-ms-reveal]:hidden [&::-ms-clear]:hidden [&:-webkit-autofill]:shadow-[0_0_0_1000px_var(--bg-primary)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--text-primary)]"
+        className="w-full bg-transparent border-none p-0 text-[inherit] font-[400] tracking-[-0.006em] text-text-primary placeholder:text-text-tertiary outline-none disabled:cursor-not-allowed [&::-ms-reveal]:hidden [&::-ms-clear]:hidden [&:-webkit-autofill]:shadow-[0_0_0_1000px_var(--bg-elevated)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--text-primary)]"
         style={{
           fontFamily: "var(--font-inter), sans-serif",
           letterSpacing: "0",

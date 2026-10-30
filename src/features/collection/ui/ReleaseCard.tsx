@@ -60,9 +60,9 @@ export default function ReleaseCard({
     <div onContextMenu={handleContextMenu} className="relative">
       <Link
         to={`/collection?type=release&id=${encodeURIComponent(id)}`}
-        className={`group flex flex-col gap-[8px] no-underline cursor-pointer ${className}`}
+        className={`group flex flex-col gap-[10px] no-underline cursor-pointer ${className}`}
       >
-        <div className="relative aspect-square w-full overflow-hidden rounded-md bg-border-alpha-14">
+        <div className="relative aspect-square w-full overflow-hidden rounded-[20px] bg-bg-panel shadow-[inset_0_0_0_1px_var(--border-primary)] transition-[transform,box-shadow] duration-300 ease-[var(--motion-ease)] group-hover:-translate-y-[4px] group-hover:shadow-e2">
           {coverUrl ? (
             <CoverImage
               src={coverUrl}
@@ -74,10 +74,10 @@ export default function ReleaseCard({
           ) : null}
         </div>
         <div className="flex flex-col">
-          <span className="truncate text-[14px] font-[500] text-text-primary">
+          <span className="truncate text-[13.5px] font-[500] tracking-[-0.008em] text-text-primary">
             {title}
           </span>
-          <span className="flex items-center gap-[5px] truncate text-[13px] text-text-tertiary">
+          <span className="flex items-center gap-[5px] truncate text-[12.5px] text-text-tertiary">
             {explicit && <ExplicitBadge />}
             <span>{label}</span>
             {year && (

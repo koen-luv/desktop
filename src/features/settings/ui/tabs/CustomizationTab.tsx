@@ -40,6 +40,9 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
   const backgroundBlur = useCustomizationStore((s) => s.backgroundBlur);
   const backgroundDim = useCustomizationStore((s) => s.backgroundDim);
   const backgroundOpacity = useCustomizationStore((s) => s.backgroundOpacity);
+  const useWallpaperInFullscreen = useCustomizationStore(
+    (s) => s.useWallpaperInFullscreen,
+  );
   const sidebar = useCustomizationStore((s) => s.sidebar);
   const contentView = useCustomizationStore((s) => s.contentView);
   const miniplayer = useCustomizationStore((s) => s.miniplayer);
@@ -48,6 +51,9 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
   const setBackgroundBlur = useCustomizationStore((s) => s.setBackgroundBlur);
   const setBackgroundDim = useCustomizationStore((s) => s.setBackgroundDim);
   const setBackgroundOpacity = useCustomizationStore((s) => s.setBackgroundOpacity);
+  const setUseWallpaperInFullscreen = useCustomizationStore(
+    (s) => s.setUseWallpaperInFullscreen,
+  );
   const setBlockConfig = useCustomizationStore((s) => s.setBlockConfig);
   const applyToAllBlocks = useCustomizationStore((s) => s.applyToAllBlocks);
   const resetBlock = useCustomizationStore((s) => s.resetBlock);
@@ -257,6 +263,29 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
               </div>
             </label>
           )}
+          <SettingRow
+            title={
+              t("settings.customization.wallpaper_fullscreen_title") ||
+              "Use wallpaper in fullscreen player"
+            }
+            description={
+              t("settings.customization.wallpaper_fullscreen_description") ||
+              "Show your custom wallpaper behind the player instead of the animated track background."
+            }
+            titleKey="settings.customization.wallpaper_fullscreen_title"
+            descKey="settings.customization.wallpaper_fullscreen_description"
+            searchQuery={searchQuery}
+            control={
+              <ToggleSwitch
+                checked={useWallpaperInFullscreen}
+                onChange={setUseWallpaperInFullscreen}
+                ariaLabel={
+                  t("settings.customization.wallpaper_fullscreen_title") ||
+                  "Use wallpaper in fullscreen player"
+                }
+              />
+            }
+          />
         </SettingBlock>
       </SettingSection>
 

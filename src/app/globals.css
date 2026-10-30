@@ -1,140 +1,199 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *, .dark, .dark *));
-
-:root {
-  --bg-canvas: #e4e4e7;
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *, .dark, .dark *));:root {
+  /* ── Liner · "Studio" design language ───────────────────────────────
+     Warm stone neutrals + a violet signal colour, generous radii,
+     soft oversized elevation and one shared motion curve. */
+  --bg-canvas: #e3e1dc;
   --bg-surface: #ffffff;
-  --bg-primary: #f5f5f7; 
-  --bg-elevated: #e6e6eb; 
-  --bg-panel: #dedee3; 
-  --bg-overlay: rgba(245, 245, 247, 0.96);
-  --bg-toolbox: rgba(0, 0, 0, 0.04);
-  --bg-toolbox-active: rgba(0, 0, 0, 0.08);
-  --border-toolbox-divider: rgba(0, 0, 0, 0.10);
-  
-  --border-primary: #e4e4e7; 
-  --border-secondary: #d4d4d8; 
-  --border-tertiary: #a1a1aa; 
-  --border-white-alpha-14: rgba(0, 0, 0, 0.06); 
-  --border-white-alpha-33: rgba(0, 0, 0, 0.14); 
+  --bg-primary: #faf9f7;
+  --bg-elevated: #f1efeb;
+  --bg-panel: #e9e7e2;
+  --bg-overlay: rgba(250, 249, 247, 0.94);
+  --bg-toolbox: rgba(26, 24, 32, 0.05);
+  --bg-toolbox-active: rgba(26, 24, 32, 0.095);
+  --border-toolbox-divider: rgba(26, 24, 32, 0.1);
 
-  --text-primary: #18181b; 
-  --text-secondary: rgba(0, 0, 0, 0.65); 
-  --text-tertiary: rgba(0, 0, 0, 0.45); 
+  /* State layer: hover is neutral, pressed/selected carries the accent tint. */
+  --bg-hover: rgba(26, 24, 32, 0.055);
+  --bg-active: rgba(26, 24, 32, 0.1);
+  --bg-selected: rgba(109, 74, 255, 0.11);
 
-  --accent-primary: #ff3b3b; 
-  --accent-secondary: #ff5c5c;
-  --accent-tertiary: #ff7d7d;
-  --accent-warning: #d97706; 
-  
-  --btn-primary-bg: #18181b; 
-  --btn-primary-text: #ffffff; 
+  --border-primary: #e6e2db;
+  --border-secondary: #d6d1c8;
+  --border-tertiary: #b6b0a4;
+  --border-white-alpha-10: rgba(26, 24, 32, 0.05);
+  --border-white-alpha-14: rgba(26, 24, 32, 0.08);
+  --border-white-alpha-20: rgba(26, 24, 32, 0.12);
+  --border-white-alpha-33: rgba(26, 24, 32, 0.18);
 
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 12px;
-  --radius-2xl: 14px;
-  --radius-3xl: 16px;
-  --radius-4xl: 10px;
-  --radius-5xl: 12px;
+  --text-primary: #17151d;
+  --text-secondary: rgba(23, 21, 29, 0.66);
+  --text-tertiary: rgba(23, 21, 29, 0.44);
+
+  --accent-primary: #6d4aff;
+  --accent-secondary: #8b6bff;
+  --accent-tertiary: #b6a2ff;
+  --accent-soft: rgba(109, 74, 255, 0.12);
+  --accent-ink: #ffffff;
+  --accent-warning: #b25e09;
+
+  --btn-primary-bg: #6d4aff;
+  --btn-primary-text: #ffffff;
+
+  --elevation-1: 0 1px 2px rgba(31, 27, 46, 0.07), 0 2px 6px -2px rgba(31, 27, 46, 0.06);
+  --elevation-2: 0 18px 40px -20px rgba(31, 27, 46, 0.35), 0 4px 12px -6px rgba(31, 27, 46, 0.14);
+  --elevation-3: 0 44px 90px -40px rgba(31, 27, 46, 0.5), 0 12px 28px -14px rgba(31, 27, 46, 0.22);
+
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 32px;
+  --radius-4xl: 28px;
+  --radius-5xl: 40px;
+
+  /* One motion curve for the whole app. */
+  --motion-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --motion-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 :root[data-theme="light"], :root.light {
-  --bg-canvas: #e4e4e7;
+  --bg-canvas: #e3e1dc;
   --bg-surface: #ffffff;
-  --bg-primary: #f5f5f7; 
-  --bg-elevated: #e6e6eb; 
-  --bg-panel: #dedee3; 
-  --bg-overlay: rgba(245, 245, 247, 0.96);
-  --bg-toolbox: rgba(0, 0, 0, 0.04);
-  --bg-toolbox-active: rgba(0, 0, 0, 0.08);
-  --border-toolbox-divider: rgba(0, 0, 0, 0.10);
-  
-  --border-primary: #e4e4e7; 
-  --border-secondary: #d4d4d8; 
-  --border-tertiary: #a1a1aa; 
-  --border-white-alpha-14: rgba(0, 0, 0, 0.06); 
-  --border-white-alpha-33: rgba(0, 0, 0, 0.14); 
+  --bg-primary: #faf9f7;
+  --bg-elevated: #f1efeb;
+  --bg-panel: #e9e7e2;
+  --bg-overlay: rgba(250, 249, 247, 0.94);
+  --bg-toolbox: rgba(26, 24, 32, 0.05);
+  --bg-toolbox-active: rgba(26, 24, 32, 0.095);
+  --border-toolbox-divider: rgba(26, 24, 32, 0.1);
 
-  --text-primary: #18181b; 
-  --text-secondary: rgba(0, 0, 0, 0.65); 
-  --text-tertiary: rgba(0, 0, 0, 0.45); 
+  --bg-hover: rgba(26, 24, 32, 0.055);
+  --bg-active: rgba(26, 24, 32, 0.1);
+  --bg-selected: rgba(109, 74, 255, 0.11);
 
-  --accent-primary: #ff3b3b; 
-  --accent-secondary: #ff5c5c;
-  --accent-tertiary: #ff7d7d;
-  --accent-warning: #d97706; 
-  
-  --btn-primary-bg: #18181b; 
-  --btn-primary-text: #ffffff; 
+  --border-primary: #e6e2db;
+  --border-secondary: #d6d1c8;
+  --border-tertiary: #b6b0a4;
+  --border-white-alpha-10: rgba(26, 24, 32, 0.05);
+  --border-white-alpha-14: rgba(26, 24, 32, 0.08);
+  --border-white-alpha-20: rgba(26, 24, 32, 0.12);
+  --border-white-alpha-33: rgba(26, 24, 32, 0.18);
+
+  --text-primary: #17151d;
+  --text-secondary: rgba(23, 21, 29, 0.66);
+  --text-tertiary: rgba(23, 21, 29, 0.44);
+
+  --accent-primary: #6d4aff;
+  --accent-secondary: #8b6bff;
+  --accent-tertiary: #b6a2ff;
+  --accent-soft: rgba(109, 74, 255, 0.12);
+  --accent-ink: #ffffff;
+  --accent-warning: #b25e09;
+
+  --btn-primary-bg: #6d4aff;
+  --btn-primary-text: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not(.light) {
-    --bg-canvas: #000000;
-    --bg-surface: #0a0a0a;
-    --bg-primary: #0a0a0a;
-    --bg-elevated: #141414;
-    --bg-panel: #1A1A1A;
-    --bg-overlay: rgba(10, 10, 10, 0.96);
-    --bg-toolbox: rgba(255, 255, 255, 0.04);
-    --bg-toolbox-active: rgba(255, 255, 255, 0.09);
-    --border-toolbox-divider: rgba(255, 255, 255, 0.10);
+    --bg-canvas: #050509;
+    --bg-surface: #0d0d14;
+    --bg-primary: #101017;
+    --bg-elevated: #171723;
+    --bg-panel: #1b1b29;
+    --bg-overlay: rgba(16, 16, 23, 0.94);
+    --bg-toolbox: rgba(255, 255, 255, 0.05);
+    --bg-toolbox-active: rgba(255, 255, 255, 0.1);
+    --border-toolbox-divider: rgba(255, 255, 255, 0.1);
 
-    --border-primary: #1A1A1A;
-    --border-secondary: #1d1f23;
-    --border-tertiary: #1e2024;
-    --border-white-alpha-14: rgba(255, 255, 255, 0.08); /* #FFFFFF14 mapping approximated to rgba */
-    --border-white-alpha-33: rgba(255, 255, 255, 0.2);  /* #FFFFFF33 */
+    --bg-hover: rgba(255, 255, 255, 0.06);
+    --bg-active: rgba(255, 255, 255, 0.1);
+    --bg-selected: rgba(143, 121, 255, 0.18);
 
-    --text-primary: #ffffff;
-    --text-secondary: rgba(255, 255, 255, 0.7);
-    --text-tertiary: rgba(255, 255, 255, 0.45);
+    --border-primary: #21212f;
+    --border-secondary: #2d2d40;
+    --border-tertiary: #44445e;
+    --border-white-alpha-10: rgba(255, 255, 255, 0.06);
+    --border-white-alpha-14: rgba(255, 255, 255, 0.09);
+    --border-white-alpha-20: rgba(255, 255, 255, 0.14);
+    --border-white-alpha-33: rgba(255, 255, 255, 0.22);
 
-    --accent-primary: #ff4d4d;
-    --accent-secondary: #ff8a8a;
-    --accent-tertiary: #ff9b9b;
-    --accent-warning: #ffde9e;
+    --text-primary: #f2f1f7;
+    --text-secondary: rgba(242, 241, 247, 0.64);
+    --text-tertiary: rgba(242, 241, 247, 0.42);
 
-    --btn-primary-bg: #F4F4F4;
-    --btn-primary-text: #000000;
+    --accent-primary: #8f79ff;
+    --accent-secondary: #a894ff;
+    --accent-tertiary: #c6b8ff;
+    --accent-soft: rgba(143, 121, 255, 0.2);
+    --accent-ink: #0a0a12;
+    --accent-warning: #ffc978;
+
+    --btn-primary-bg: #8f79ff;
+    --btn-primary-text: #0a0a12;
+
+    --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.55);
+    --elevation-2: 0 20px 44px -22px rgba(0, 0, 0, 0.85), 0 4px 14px -6px rgba(0, 0, 0, 0.55);
+    --elevation-3: 0 50px 100px -44px rgba(0, 0, 0, 0.95), 0 14px 32px -16px rgba(0, 0, 0, 0.75);
   }
 }
 
 :root[data-theme="dark"], :root.dark, [data-theme="dark"], .dark {
-  --bg-canvas: #000000;
-  --bg-surface: #0a0a0a;
-  --bg-primary: #0a0a0a;
-  --bg-elevated: #141414;
-  --bg-panel: #1A1A1A;
-  --bg-overlay: rgba(10, 10, 10, 0.96);
-  --bg-toolbox: rgba(255, 255, 255, 0.04);
-  --bg-toolbox-active: rgba(255, 255, 255, 0.09);
-  --border-toolbox-divider: rgba(255, 255, 255, 0.10);
+  --bg-canvas: #050509;
+  --bg-surface: #0d0d14;
+  --bg-primary: #101017;
+  --bg-elevated: #171723;
+  --bg-panel: #1b1b29;
+  --bg-overlay: rgba(16, 16, 23, 0.94);
+  --bg-toolbox: rgba(255, 255, 255, 0.05);
+  --bg-toolbox-active: rgba(255, 255, 255, 0.1);
+  --border-toolbox-divider: rgba(255, 255, 255, 0.1);
 
-  --border-primary: #1A1A1A;
-  --border-secondary: #1d1f23;
-  --border-tertiary: #1e2024;
-  --border-white-alpha-14: rgba(255, 255, 255, 0.08);
-  --border-white-alpha-33: rgba(255, 255, 255, 0.2);
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(255, 255, 255, 0.1);
+  --bg-selected: rgba(143, 121, 255, 0.18);
 
-  --text-primary: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.7);
-  --text-tertiary: rgba(255, 255, 255, 0.45);
+  --border-primary: #21212f;
+  --border-secondary: #2d2d40;
+  --border-tertiary: #44445e;
+  --border-white-alpha-10: rgba(255, 255, 255, 0.06);
+  --border-white-alpha-14: rgba(255, 255, 255, 0.09);
+  --border-white-alpha-20: rgba(255, 255, 255, 0.14);
+  --border-white-alpha-33: rgba(255, 255, 255, 0.22);
 
-  --accent-primary: #ff4d4d;
-  --accent-secondary: #ff8a8a;
-  --accent-tertiary: #ff9b9b;
-  --accent-warning: #ffde9e;
+  --text-primary: #f2f1f7;
+  --text-secondary: rgba(242, 241, 247, 0.64);
+  --text-tertiary: rgba(242, 241, 247, 0.42);
 
-  --btn-primary-bg: #F4F4F4;
-  --btn-primary-text: #000000;
+  --accent-primary: #8f79ff;
+  --accent-secondary: #a894ff;
+  --accent-tertiary: #c6b8ff;
+  --accent-soft: rgba(143, 121, 255, 0.2);
+  --accent-ink: #0a0a12;
+  --accent-warning: #ffc978;
+
+  --btn-primary-bg: #8f79ff;
+  --btn-primary-text: #0a0a12;
+
+  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.55);
+  --elevation-2: 0 20px 44px -22px rgba(0, 0, 0, 0.85), 0 4px 14px -6px rgba(0, 0, 0, 0.55);
+  --elevation-3: 0 50px 100px -44px rgba(0, 0, 0, 0.95), 0 14px 32px -16px rgba(0, 0, 0, 0.75);
+}
+
+/* Type: the app loads Geist alongside Inter and every inline font stack in the
+   codebase reads --font-inter, so retargeting it retypes the whole UI. */
+html:root {
+  --font-inter: "Geist", "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
 @theme inline {
+  --ease-app: var(--motion-ease);
+  --ease-emphasized: var(--motion-ease-emphasized);
+
   --color-bg-canvas: var(--bg-canvas);
   --color-bg-surface: var(--bg-surface);
   --color-bg-primary: var(--bg-primary);
@@ -143,12 +202,17 @@
   --color-bg-overlay: var(--bg-overlay);
   --color-bg-toolbox: var(--bg-toolbox);
   --color-bg-toolbox-active: var(--bg-toolbox-active);
+  --color-bg-hover: var(--bg-hover);
+  --color-bg-active: var(--bg-active);
+  --color-bg-selected: var(--bg-selected);
   --color-border-toolbox-divider: var(--border-toolbox-divider);
 
   --color-border-primary: var(--border-primary);
   --color-border-secondary: var(--border-secondary);
   --color-border-tertiary: var(--border-tertiary);
+  --color-border-alpha-10: var(--border-white-alpha-10);
   --color-border-alpha-14: var(--border-white-alpha-14);
+  --color-border-alpha-20: var(--border-white-alpha-20);
   --color-border-alpha-33: var(--border-white-alpha-33);
 
   --color-text-primary: var(--text-primary);
@@ -158,7 +222,13 @@
   --color-accent-primary: var(--accent-primary);
   --color-accent-secondary: var(--accent-secondary);
   --color-accent-tertiary: var(--accent-tertiary);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
   --color-accent-warning: var(--accent-warning);
+
+  --shadow-e1: var(--elevation-1);
+  --shadow-e2: var(--elevation-2);
+  --shadow-e3: var(--elevation-3);
 
   --color-btn-primary-bg: var(--btn-primary-bg);
   --color-btn-primary-text: var(--btn-primary-text);
@@ -176,6 +246,7 @@
   --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
 }
+
 
 html, body {
   background: transparent;
@@ -257,7 +328,7 @@ img {
 }
 
 .page-transition {
-  animation: page-enter 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: page-enter 320ms var(--motion-ease);
   transform-origin: top center;
   backface-visibility: hidden;
   -webkit-font-smoothing: antialiased;
@@ -269,12 +340,19 @@ img {
 @keyframes page-enter {
   from {
     opacity: 0;
-    transform: translate3d(0, 6px, 0);
+    transform: translate3d(0, 14px, 0) scale(0.994);
+    filter: blur(3px);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
   }
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--text-primary);
 }
 
 .theme-logo {
@@ -360,12 +438,12 @@ button.apple-glass-action:hover,
   cursor: default;
 }
 
-@keyframes skeleton-breathe {
-  0%, 100% {
-    opacity: 0.95;
+@keyframes skeleton-sweep {
+  0% {
+    background-position: 200% 0;
   }
-  50% {
-    opacity: 0.42;
+  100% {
+    background-position: -200% 0;
   }
 }
 
@@ -373,7 +451,14 @@ button.apple-glass-action:hover,
   position: relative;
   overflow: hidden;
   background-color: var(--border-white-alpha-14);
-  animation: skeleton-breathe 2.4s ease-in-out infinite;
+  background-image: linear-gradient(
+    100deg,
+    transparent 20%,
+    var(--bg-hover) 50%,
+    transparent 80%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.6s linear infinite;
 }
 
 /* ── Android / responsive shell ─────────────────────────────────────────── */

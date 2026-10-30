@@ -38,24 +38,24 @@ export function PillTabs<T extends string = string>({
   );
 
   const sizeStyles = {
-    sm: "h-[30px] px-[12px] text-[12px] gap-[6px] rounded-lg",
-    md: "h-[36px] px-[16px] text-[13px] gap-[8px] rounded-xl",
-    lg: "h-[42px] px-[20px] text-[14px] gap-[10px] rounded-2xl",
+    sm: "h-[27px] px-[12px] text-[11.5px] gap-[6px] rounded-full",
+    md: "h-[32px] px-[15px] text-[12.5px] gap-[7px] rounded-full",
+    lg: "h-[38px] px-[19px] text-[13.5px] gap-[8px] rounded-full",
   }[size];
 
-  const containerPadding = size === "sm" ? "p-[3px] gap-[2px]" : "p-[4px] gap-[4px]";
+  const containerPadding = size === "sm" ? "p-[3px] gap-[2px]" : "p-[3px] gap-[3px]";
 
   const containerStyles =
     variant === "glass"
-      ? "bg-black/20 dark:bg-white/[0.06] backdrop-blur-xl border border-white/[0.08]"
+      ? "bg-black/25 dark:bg-white/[0.06] backdrop-blur-xl shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]"
       : variant === "expressive"
-      ? "bg-black/10 dark:bg-black/30 backdrop-blur-lg border border-white/[0.05]"
-      : "bg-bg-elevated";
+        ? "bg-bg-panel/80 backdrop-blur-md shadow-[inset_0_0_0_1px_var(--border-primary)]"
+        : "bg-bg-elevated shadow-[inset_0_0_0_1px_var(--border-primary)]";
 
   return (
     <div
       role="tablist"
-      className={`inline-flex items-center rounded-2xl select-none ${containerPadding} ${containerStyles} ${className}`}
+      className={`inline-flex items-center rounded-full select-none ${containerPadding} ${containerStyles} ${className}`}
     >
       {normalizedTabs.map((tab) => {
         const isActive = tab.id === activeTab;
@@ -70,18 +70,18 @@ export function PillTabs<T extends string = string>({
             disabled={isDisabled}
             type="button"
             onClick={() => !isDisabled && onChange(tab.id)}
-            className={`relative inline-flex items-center justify-center font-[500] leading-none transition-colors duration-200 border-0 bg-transparent outline-none cursor-pointer ${
-              isDisabled ? "opacity-40 cursor-not-allowed" : "active:scale-[0.97]"
+            className={`relative inline-flex items-center justify-center font-[500] leading-none tracking-[-0.006em] transition-colors duration-200 border-0 bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/70 focus-visible:ring-offset-1 focus-visible:ring-offset-bg-panel cursor-pointer ${
+              isDisabled ? "opacity-40 cursor-not-allowed" : "active:scale-[0.975]"
             } ${sizeStyles} ${
               isActive
-                ? "text-black dark:text-[#0b101b] font-[600]"
-                : "text-text-secondary hover:text-text-primary dark:text-white/50 dark:hover:text-white/90"
+                ? "text-btn-primary-text"
+                : "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
             } ${tabClassName}`}
           >
             {isActive && (
               <motion.div
                 layoutId={layoutId}
-                className="absolute inset-0 rounded-[inherit] bg-[#adc6ff] dark:bg-[#b4c5ff] shadow-[0_2px_12px_rgba(180,198,255,0.25)]"
+                className="absolute inset-0 rounded-[inherit] bg-btn-primary-bg shadow-e1 shadow-[0_6px_16px_-8px_var(--btn-primary-bg)]"
                 transition={{
                   type: "spring",
                   stiffness: 450,

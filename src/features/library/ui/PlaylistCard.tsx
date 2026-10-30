@@ -106,8 +106,8 @@ function PlaylistCard({
   const cardContent = (
     <>
       <div
-        className={`relative aspect-square w-full overflow-hidden bg-border-alpha-14 ${
-          variant === "artist" ? "rounded-full" : "rounded-md"
+        className={`relative aspect-square w-full overflow-hidden bg-bg-panel shadow-[inset_0_0_0_1px_var(--border-primary)] transition-[transform,box-shadow] duration-300 ease-[var(--motion-ease)] group-hover:-translate-y-[4px] group-hover:shadow-e2 ${
+          variant === "artist" ? "rounded-full" : "rounded-[20px]"
         } flex items-center justify-center`}
       >
         {effectiveUrls.length > 0 ? (
@@ -139,10 +139,10 @@ function PlaylistCard({
           variant === "artist" ? "items-center text-center" : ""
         }`}
       >
-        <span className="truncate text-[14px] font-[500] text-text-primary">
+        <span className="truncate text-[13.5px] font-[550] tracking-[-0.014em] text-text-primary transition-colors duration-200 group-hover:text-accent-primary">
           {title}
         </span>
-        <span className="truncate text-[13px] text-text-tertiary">
+        <span className="truncate text-[12.5px] text-text-tertiary">
           {author}
         </span>
       </div>
@@ -165,7 +165,7 @@ function PlaylistCard({
       <div onContextMenu={handleContextMenu}>
         <Link
           to={href}
-          className={`group flex flex-col gap-[8px] no-underline ${className}`}
+          className={`group flex flex-col gap-[10px] no-underline ${className}`}
           draggable={false}
           onDragStart={(e) => e.preventDefault()}
         >
@@ -182,7 +182,7 @@ function PlaylistCard({
         <button
           type="button"
           onClick={onClick}
-          className={`group flex flex-col gap-[8px] text-left border-0 bg-transparent p-0 w-full cursor-pointer transition-transform active:scale-[0.98] ${className}`}
+          className={`group flex flex-col gap-[10px] text-left border-0 bg-transparent p-0 w-full cursor-pointer transition-transform active:scale-[0.98] focus-visible:outline-none ${className}`}
           draggable={false}
           onDragStart={(e) => e.preventDefault()}
         >
@@ -196,7 +196,7 @@ function PlaylistCard({
   return (
     <div onContextMenu={handleContextMenu}>
       <div
-        className={`group flex flex-col gap-[8px] ${className}`}
+        className={`group flex flex-col gap-[10px] ${className}`}
         draggable={false}
         onDragStart={(e) => e.preventDefault()}
       >

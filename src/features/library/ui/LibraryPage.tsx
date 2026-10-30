@@ -71,35 +71,33 @@ function LikesPlaylistCard({
     return (
       <div
         onClick={onClick}
-        className="w-full flex items-center justify-between rounded-md p-[8px] outline-none transition-colors duration-150 ease-out cursor-pointer hover:bg-border-alpha-14 select-none"
+        className="w-full flex items-center justify-between rounded-lg p-[8px] outline-none transition-colors duration-150 ease-out cursor-pointer hover:bg-bg-hover select-none focus-visible:ring-2 focus-visible:ring-accent-primary/60"
       >
-        <div className="flex items-center gap-[16px] min-w-0">
+        <div className="flex items-center gap-[14px] min-w-0">
           <div
-            className={`relative h-[48px] w-[48px] shrink-0 overflow-hidden rounded-md flex items-center justify-center ${
+            className={`relative h-[44px] w-[44px] shrink-0 overflow-hidden rounded-lg flex items-center justify-center ${
               hasCustomBg ? "apple-glass-static" : "bg-bg-panel"
-            }`}
+            } shadow-[inset_0_0_0_1px_var(--border-primary)]`}
           >
             <HeartFill
               size={26}
-              className={hasCustomBg ? "text-white" : "text-zinc-400 dark:text-zinc-500"}
+              className={hasCustomBg ? "text-white" : "text-text-tertiary"}
             />
           </div>
 
           <div className="min-w-0 flex flex-col gap-[2px]">
             <h3
-              className="m-0 max-w-[min(52vw,560px)] overflow-hidden text-ellipsis whitespace-nowrap text-[16px] leading-[1.2] text-text-primary"
+              className="m-0 max-w-[min(52vw,560px)] overflow-hidden text-ellipsis whitespace-nowrap text-[14.5px] leading-[1.25] font-[500] tracking-[-0.008em] text-text-primary"
               style={{
                 fontFamily: "var(--font-inter), sans-serif",
-                fontWeight: 400,
               }}
             >
               {t("library.liked_songs")}
             </h3>
             <p
-              className="m-0 flex min-w-0 items-center text-[15px] leading-[1.2] overflow-hidden text-text-secondary"
+              className="m-0 flex min-w-0 items-center text-[12.5px] leading-[1.25] overflow-hidden text-text-tertiary"
               style={{
                 fontFamily: "var(--font-inter), sans-serif",
-                fontWeight: 350,
               }}
             >
               {isLoading || count === undefined ? (
@@ -121,23 +119,23 @@ function LikesPlaylistCard({
       draggable={false}
     >
       <div
-        className={`relative aspect-square w-full overflow-hidden rounded-md flex items-center justify-center ${
+        className={`relative aspect-square w-full overflow-hidden rounded-xl flex items-center justify-center shadow-[inset_0_0_0_1px_var(--border-primary)] transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-[2px] group-hover:shadow-e2 ${
           hasCustomBg ? "apple-glass-static" : "bg-bg-panel"
         }`}
       >
         <HeartFill
           size={52}
-          className={hasCustomBg ? "text-white" : "text-zinc-400 dark:text-zinc-500"}
+          className={hasCustomBg ? "text-white" : "text-text-tertiary"}
         />
       </div>
-      <div className="flex flex-col gap-[4px]">
-        <span className="truncate text-[14px] font-[500] text-text-primary">
+      <div className="flex flex-col gap-[3px]">
+        <span className="truncate text-[13.5px] font-[500] tracking-[-0.008em] text-text-primary">
           {t("library.liked_songs")}
         </span>
         {isLoading || count === undefined ? (
           <div className="h-[13px] w-[56%] animate-pulse rounded bg-border-alpha-14" />
         ) : (
-          <span className="truncate text-[13px] text-text-tertiary">
+          <span className="truncate text-[12.5px] text-text-tertiary">
             {t("common.songs", { count })}
           </span>
         )}
@@ -204,7 +202,7 @@ export default function LibraryPage() {
         imageUrl: customCover || playlist.coverUrl || "",
         coverUrls: customCover ? [customCover] : playlist.coverUrls,
         kind: "playlist" as const,
-        isOwned: true,
+        isOwned: !playlist.isShared || playlist.sharedRole === "owner",
         href: `/library/playlist?id=${encodeURIComponent(playlist.id)}`,
         addedAt:
           playlist.updatedAt || playlist.createdAt || new Date().toISOString(),
@@ -364,20 +362,26 @@ export default function LibraryPage() {
           const next = event.currentTarget.scrollTop > 2;
           setShowTopFog((prev) => (prev === next ? prev : next));
         }}
-        className="h-full w-full overflow-y-auto bg-transparent pb-[80px]"
+        className="h-full w-full overflow-y-auto bg-transparent pb-[96px]"
       >
-        <div className="sticky top-0 z-20 bg-transparent">
+        <div
+          className={`sticky top-0 z-20 transition-[background-color,box-shadow] duration-200 ${
+            showTopFog
+              ? "bg-bg-surface/80 backdrop-blur-2xl shadow-[0_1px_0_var(--border-primary)]"
+              : "bg-transparent"
+          }`}
+        >
 
-          <div className="px-4 md:px-[32px] pt-[calc(var(--inset-top,0px)+16px)] md:pt-[20px] pb-[10px]">
+          <div className="px-4 md:px-[32px] pt-[calc(var(--inset-top,0px)+20px)] md:pt-[28px] pb-[14px]">
             <h1
-              className="text-[26px] font-bold text-text-primary tracking-tight m-0 leading-tight"
+              className="text-[32px] md:text-[36px] font-[650] text-text-primary tracking-[-0.042em] m-0 leading-[1.05]"
               style={{ fontFamily: "var(--font-inter), sans-serif" }}
             >
               {t("library.title")}
             </h1>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-[10px] px-4 md:px-[32px] pb-[10px]">
+          <div className="flex flex-wrap items-center justify-between gap-[10px] px-4 md:px-[32px] pb-[12px]">
             <LibraryTabs activeTab={activeTab} onChange={setActiveTab} />
             <LibraryControls
               activeTab={activeTab}
@@ -396,7 +400,7 @@ export default function LibraryPage() {
         </div>
 
 
-        <div className="px-4 md:px-[32px] pt-[4px] pb-[20px]">
+        <div className="px-4 md:px-[32px] pt-[6px] pb-[20px]">
           {activeTab === "playlists" && playlistsError ? (
             <div className="mb-[10px] text-[12px] text-accent-secondary">
               {t("playlist.error_loading")}
@@ -460,11 +464,11 @@ export default function LibraryPage() {
           onClick={() => openCreatePlaylist()}
           title={t("library.create_playlist")}
           aria-label={t("library.create_playlist")}
-          className={`absolute bottom-[20px] right-[24px] z-30 flex h-[44px] w-[44px] items-center justify-center rounded-[14px] ${
+          className={`absolute bottom-[24px] right-[24px] z-30 flex h-[52px] w-[52px] items-center justify-center rounded-full ${
             hasCustomBg
-              ? "apple-glass-prominent"
-              : "bg-btn-primary-bg text-btn-primary-text"
-          } hover:opacity-95 active:scale-[0.92] transition-all border-0 cursor-pointer select-none`}
+              ? "apple-glass-prominent shadow-e2"
+              : "bg-btn-primary-bg text-btn-primary-text shadow-[0_14px_30px_-14px_var(--btn-primary-bg)]"
+          } hover:-translate-y-[1px] hover:brightness-[1.06] active:scale-[0.94] transition-[transform,box-shadow,filter,opacity] duration-200 ease-[var(--motion-ease)] border-0 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent-soft`}
         >
           <AddLine size={22} />
         </button>

@@ -1,8 +1,16 @@
 import { useCallback, useState } from "react";
-import { api } from "@/shared/api";
+import { api, getAuthSession } from "@/shared/api";
 import { notifyLibraryChanged, evictPlaylistFromCache } from "./usePlaylists";
 import { usePlaylistViewStore } from "../store/playlistViewStore";
 import { applyOptimisticLike, applyOptimisticUnlike } from "./useLikedTracks";
+import {
+  addSharedPlaylistTrack,
+  deleteSharedPlaylist,
+  isSharedPlaylistId,
+  leaveSharedPlaylist,
+  moveSharedPlaylistTrack,
+  removeSharedPlaylistTrack,
+} from "../services/sharedPlaylists";
 
 type Options = {
   onSuccess?: (...args: any[]) => void;
@@ -38,20 +46,28 @@ function useMutation<T, R = unknown>(action: (input: T) => Promise<R>) {
 }
 
 export function useAddPlaylistTracks() {
-  return useMutation(({ playlistId, trackId }: { playlistId: string; trackId: string }) =>
-    api.addPlaylistTrack(playlistId, trackId)
+  return useMutation(
+    async ({ playlistId, trackId }: { playlistId: string; trackId: string }) => {
+      if (isSharedPlaylistId(playlistId)) {
+        await addSharedPlaylistTrack(playlistId, trackId);
+      } else {
+        await api.addPlaylistTrack(playlistId, trackId);
+      }
+    },
   );
 }
 
 export function useRemovePlaylistTracks() {
   return useMutation(({ playlistId, itemId }: { playlistId: string; itemId: string }) =>
-    api.removePlaylistItem(playlistId, itemId)
+    isSharedPlaylistId(playlistId)
+      ? removeSharedPlaylistTrack(playlistId, itemId)
+      : api.removePlaylistItem(playlistId, itemId),
   );
 }
 
 export function useReorderPlaylistTracks() {
   return useMutation(
-    ({
+    async ({
       playlistId,
       itemId,
       beforeItemId,
@@ -61,7 +77,13 @@ export function useReorderPlaylistTracks() {
       itemId: string;
       beforeItemId: string | null;
       revision: number;
-    }) => api.movePlaylistItem(playlistId, itemId, beforeItemId, revision)
+    }) => {
+      if (isSharedPlaylistId(playlistId)) {
+        await moveSharedPlaylistTrack(playlistId, itemId, beforeItemId);
+      } else {
+        await api.movePlaylistItem(playlistId, itemId, beforeItemId, revision);
+      }
+    },
   );
 }
 
@@ -75,7 +97,9 @@ export function useDeletePlaylist() {
   return useMutation(async ({ playlistId }: { playlistId: string }) => {
     evictPlaylistFromCache(playlistId);
     usePlaylistViewStore.getState().forgetPlaylist(playlistId);
-    return api.deletePlaylist(playlistId);
+    return isSharedPlaylistId(playlistId)
+      ? deleteSharedPlaylist(playlistId)
+      : api.deletePlaylist(playlistId);
   });
 }
 
@@ -106,6 +130,14 @@ export function useRemoveExternalItem() {
     }) => {
       if (type === "playlist") {
         evictPlaylistFromCache(id);
+        if (isSharedPlaylistId(id)) {
+          if (isOwned === false) {
+            const userId = getAuthSession()?.user.id;
+            if (!userId) throw new Error("Sign in to leave this shared playlist.");
+            return leaveSharedPlaylist(id, userId);
+          }
+          return deleteSharedPlaylist(id);
+        }
         if (isOwned === false) {
           return api.removeCollection("playlists", id);
         }

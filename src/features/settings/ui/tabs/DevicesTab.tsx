@@ -1,18 +1,11 @@
 import { useTranslation } from "@/languages";
 import Button from "@/shared/ui/Button";
-import { nativeCopy } from "@/platform";
-import { showToast } from "@/shared/ui";
-import { CheckLine, Copy2Line } from "@mingcute/react";
+import { CheckLine } from "@mingcute/react";
 import { useDeviceControlStore } from "@/features/deviceControl";
 import { discoverLocalDevices, connectToLocalHost } from "@/features/deviceControl";
-import { connectToHost, disconnectController, sendControl } from "@/features/deviceControl";
+import { disconnectController, sendControl } from "@/features/deviceControl";
 import { startHosting, stopHosting } from "@/features/deviceControl";
 import type { ControlAction } from "@/features/deviceControl";
-
-const codeBoxClass =
-  "w-full resize-none rounded-md border border-border-primary bg-bg-primary px-[12px] py-[10px] font-mono text-[12px] leading-[1.5] text-text-primary outline-none select-all";
-const inputClass =
-  "w-full resize-none rounded-md border border-border-primary bg-bg-primary px-[14px] py-[10px] font-mono text-[13px] text-text-primary placeholder:text-text-tertiary outline-none transition-[border-color] duration-150 focus:border-text-secondary";
 
 function Spinner() {
   return (
@@ -28,14 +21,11 @@ function Spinner() {
  */
 export function DevicesTab({ searchQuery }: { searchQuery?: string }) {
   const { t } = useTranslation();
-  const codeInput = useDeviceControlStore((s) => s.codeInput);
-  const setCodeInput = useDeviceControlStore((s) => s.setCodeInput);
   const controllerPhase = useDeviceControlStore((s) => s.controllerPhase);
   const controllerError = useDeviceControlStore((s) => s.controllerError);
   const hostName = useDeviceControlStore((s) => s.hostName);
   const remote = useDeviceControlStore((s) => s.remote);
   const hostPhase = useDeviceControlStore((s) => s.hostPhase);
-  const hostCode = useDeviceControlStore((s) => s.hostCode);
   const hostError = useDeviceControlStore((s) => s.hostError);
   const controllers = useDeviceControlStore((s) => s.controllers);
   const nearbyHosts = useDeviceControlStore((s) => s.nearbyHosts);
@@ -46,26 +36,19 @@ export function DevicesTab({ searchQuery }: { searchQuery?: string }) {
   const matches = (...texts: string[]) =>
     !query || texts.some((text) => text.toLowerCase().includes(query));
 
+  const canHostLocally =
+    typeof window !== "undefined" &&
+    Boolean(window.linerElectron?.startLanHost && window.linerElectron?.onLanAnswer);
   const showController = matches(
     t("settings.devices.controller_title"),
     t("settings.devices.controller_desc"),
     "pair phone remote code",
   );
-  const showHost = matches(
+  const showHost = canHostLocally && matches(
     t("settings.devices.host_title"),
     t("settings.devices.host_desc"),
-    "show code control from phone",
+    "local wifi control from phone without a code",
   );
-
-  const start = async () => {
-    await connectToHost(codeInput);
-  };
-
-  const copyHostCode = () => {
-    if (!hostCode) return;
-    const ok = nativeCopy(hostCode);
-    showToast(ok ? t("party.copied") : t("party.copy_failed"), ok ? "checkmark" : "error");
-  };
 
   const runControl = (action: ControlAction) => {
     sendControl(action);
@@ -157,31 +140,7 @@ export function DevicesTab({ searchQuery }: { searchQuery?: string }) {
                     {t("devices.connecting_code")}
                   </span>
                 </div>
-              ) : (
-                <>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="off"
-                    maxLength={6}
-                    value={codeInput}
-                    placeholder={t("devices.code_placeholder")}
-                    onChange={(e) => {
-                      const digits = e.target.value.replace(/\D/g, "").slice(0, 6);
-                      setCodeInput(digits);
-                    }}
-                    className={`${inputClass} tracking-[0.3em] text-center`}
-                  />
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => void start()}
-                  >
-                    {t("devices.connect")}
-                  </Button>
-                </>
-              )}
+              ) : null}
               {controllerError ? (
                 <span className="text-[12px] text-[#E81123]">{controllerError}</span>
               ) : null}
@@ -206,36 +165,8 @@ export function DevicesTab({ searchQuery }: { searchQuery?: string }) {
               {hostPhase === "waiting" ? (
                 <>
                   <span className="text-[12px] font-[500] text-text-secondary">
-                    {hostCode?.startsWith("http://")
-                      ? t("devices.waiting_local") || "Waiting for a device on your Wi-Fi network"
-                      : t("devices.waiting")}
+                    {t("devices.waiting_local") || "Waiting for a device on your Wi-Fi network"}
                   </span>
-                  <textarea
-                    readOnly
-                    rows={2}
-                    value={hostCode ?? ""}
-                    onFocus={(e) => e.currentTarget.select()}
-                    className={codeBoxClass}
-                  />
-                  <div className="flex gap-[8px]">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => copyHostCode()}
-                    >
-                      <Copy2Line size={14} />
-                      {t("party.copy")}
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => startHosting()}
-                    >
-                      {t("settings.devices.new_code")}
-                    </Button>
-                  </div>
                 </>
               ) : null}
               {hostPhase === "connected" ? (
@@ -265,7 +196,7 @@ export function DevicesTab({ searchQuery }: { searchQuery?: string }) {
           ) : (
             <div>
               <Button variant="secondary" size="sm" onClick={() => startHosting()}>
-                {t("settings.devices.show_code")}
+                {t("devices.allow_wifi") || "Enable local control"}
               </Button>
             </div>
           )}

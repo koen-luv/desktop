@@ -140,7 +140,7 @@ export const Slider = memo(function Slider({
       onMouseLeave={() => setIsHovered(false)}
     >
       {label && (
-        <span className="text-[12px] font-medium text-text-secondary select-none">
+        <span className="text-[12px] font-[500] tracking-[-0.006em] text-text-secondary select-none">
           {label}
         </span>
       )}
@@ -154,24 +154,27 @@ export const Slider = memo(function Slider({
         tabIndex={disabled ? -1 : 0}
         onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
-        className="relative flex h-full flex-1 items-center outline-none"
+        className="relative flex h-full flex-1 items-center rounded-full outline-none focus-visible:ring-4 focus-visible:ring-accent-soft"
       >
         <motion.div
           ref={trackRef}
           initial={false}
-          animate={{ scaleY: isActive ? 1.3 : 1 }}
+          animate={{ scaleY: isActive ? 1.35 : 1 }}
           transition={{ type: "spring", stiffness: 400, damping: 30, mass: 0.8 }}
-          className={`relative h-[6px] w-full rounded-full overflow-hidden origin-center transition-colors duration-150 ${
-            isActive
-              ? "bg-black/[0.20] dark:bg-white/[0.24]"
-              : "bg-black/[0.10] dark:bg-white/[0.14]"
-          }`}
+          className={`relative h-[6px] w-full rounded-full origin-center bg-bg-active shadow-[inset_0_0_0_1px_var(--border-primary)] transition-colors duration-150`}
         >
           <div
-            className={`absolute inset-y-0 left-0 rounded-full bg-text-primary transition-[width] ease-out ${
+            className={`absolute inset-y-0 left-0 rounded-full bg-accent-primary shadow-[0_0_12px_-2px_var(--accent-primary)] transition-[width] ease-out ${
               isDragging ? "duration-0" : "duration-100"
             }`}
             style={{ width: `${percentage}%` }}
+          />
+          <div
+            className={`pointer-events-none absolute top-1/2 h-[14px] w-[14px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_2px_8px_rgba(23,21,29,0.35)] ring-1 ring-black/10 transition-transform duration-200 ease-[var(--motion-ease-emphasized)] ${
+              isActive ? "scale-125" : "scale-100"
+            }`}
+            style={{ left: `${percentage}%` }}
+            aria-hidden="true"
           />
         </motion.div>
       </div>

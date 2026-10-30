@@ -821,9 +821,9 @@ function NotificationCard({
         onDeckHover?.(false);
       }}
       data-no-window-drag
-      className={`relative flex items-center gap-[8px] rounded-[12px] bg-bg-elevated pl-[12px] ${
+      className={`relative flex items-center gap-[8px] rounded-2xl border border-border-primary/80 bg-bg-surface/92 pl-[12px] ${
         resolvedAction ? "pr-[5px]" : "pr-[12px]"
-      } py-[5px] min-h-[38px] box-border ${
+      } py-[5px] min-h-[38px] box-border shadow-e2 backdrop-blur-2xl ${
         index === 0
           ? "pointer-events-auto cursor-grab active:cursor-grabbing"
           : "pointer-events-none select-none"
@@ -890,7 +890,7 @@ function NotificationCard({
             resolvedAction.onClick?.();
             dismiss();
           }}
-          className="inline-flex shrink-0 items-center justify-center gap-[4px] px-[10px] h-[28px] rounded-lg text-[12.5px] font-[600] bg-border-alpha-14 hover:bg-border-alpha-33 text-text-primary active:scale-[0.96] transition-all border-0 cursor-pointer"
+          className="inline-flex shrink-0 items-center justify-center gap-[4px] px-[11px] h-[28px] rounded-full text-[12.5px] font-[600] bg-bg-hover hover:bg-bg-active text-text-primary active:scale-[0.96] transition-all duration-200 border-0 cursor-pointer"
         >
           {resolvedAction.icon && <span>{resolvedAction.icon}</span>}
           <span>{resolvedAction.label}</span>
@@ -943,13 +943,13 @@ function getNotificationIconColor(
     case "success":
     case "checkmark":
     case "check":
-      return "#34A853";
+      return "#3f9e78";
     case "error":
-      return "#EA4335";
+      return "#e5484d";
     case "loading":
     case "loader":
     case "spinner":
-      return "#4285F4";
+      return "var(--accent-primary)";
     case "info":
     default:
       return undefined;

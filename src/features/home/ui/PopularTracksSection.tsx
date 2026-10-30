@@ -12,6 +12,7 @@ import ArtistLink from "@/features/artist/ui/ArtistLink";
 import CoverImage from "@/features/covers/ui/CoverImage";
 import ExplicitBadge from "@/shared/ui/ExplicitBadge";
 import { useTranslation } from "@/languages";
+import SectionHeading from "@/shared/ui/SectionHeading";
 
 export interface PopularTracksSectionProps {
   title: string;
@@ -124,7 +125,7 @@ function TrackCard({
       onClick={handleClick}
       onContextMenu={handleContextMenu}
     >
-      <div className="relative aspect-square w-full overflow-hidden rounded-md bg-border-alpha-14">
+      <div className="relative aspect-square w-full overflow-hidden rounded-[20px] bg-bg-panel shadow-[inset_0_0_0_1px_var(--border-primary)] transition-[transform,box-shadow] duration-300 ease-[var(--motion-ease)] group-hover:-translate-y-[4px] group-hover:shadow-e2">
         {showRanks && (
           <div
             className={`absolute top-2 left-2 z-10 flex items-center justify-center min-w-[22px] h-[20px] px-1 rounded-[3px] text-[10px] font-bold tracking-tight ${
@@ -155,17 +156,16 @@ function TrackCard({
         )}
       </div>
 
-      <div className="flex flex-col mt-[8px]">
-        <span className="truncate text-[14px] font-[500] text-text-primary">
+      <div className="flex flex-col mt-[8px]">          <span className="truncate text-[13.5px] font-[500] tracking-[-0.008em] text-text-primary">
           {item.item.title}
         </span>
-        <div className="flex min-w-0 items-center overflow-hidden text-[13px] text-text-tertiary">
+        <div className="flex min-w-0 items-center overflow-hidden text-[12.5px] text-text-tertiary">
           {item.item.explicit && <ExplicitBadge size="md" className="mr-[6px] shrink-0" />}
           <ArtistLink
             name={item.item.artists}
             artistId={item.item.artistId}
             artistList={item.item.artistList}
-            className="text-[13px] text-text-tertiary"
+            className="text-[12.5px] text-text-tertiary"
           />
         </div>
       </div>
@@ -237,7 +237,7 @@ function AlbumCard({
       onClick={handleClick}
       onContextMenu={handleContextMenu}
     >
-      <div className="relative aspect-square w-full overflow-hidden rounded-md bg-border-alpha-14">
+      <div className="relative aspect-square w-full overflow-hidden rounded-[20px] bg-bg-panel shadow-[inset_0_0_0_1px_var(--border-primary)] transition-[transform,box-shadow] duration-300 ease-[var(--motion-ease)] group-hover:-translate-y-[4px] group-hover:shadow-e2">
         {showRanks && (
           <div className="absolute top-2 left-2 z-10 flex items-center justify-center min-w-[22px] h-[20px] px-1 rounded-[3px] text-[10px] font-bold tracking-tight bg-bg-panel text-text-secondary">
             #{index + 1}
@@ -256,13 +256,12 @@ function AlbumCard({
           />
         )}
       </div>
-      <div className="flex flex-col mt-[8px]">
-        <span className="truncate text-[14px] font-[500] text-text-primary">
+      <div className="flex flex-col mt-[8px]">          <span className="truncate text-[13.5px] font-[500] tracking-[-0.008em] text-text-primary">
           {item.item.title}
         </span>
-        <div className="flex min-w-0 items-center overflow-hidden text-[13px] text-text-tertiary">
+        <div className="flex min-w-0 items-center overflow-hidden text-[12.5px] text-text-tertiary">
           {item.item.explicit && <ExplicitBadge size="md" className="mr-[6px] shrink-0" />}
-          <span className="truncate text-[13px] text-text-tertiary">
+          <span className="truncate text-[12.5px] text-text-tertiary">
             {item.item.artist}
           </span>
         </div>
@@ -335,7 +334,7 @@ function PlaylistCard({
       onClick={handleClick}
       onContextMenu={handleContextMenu}
     >
-      <div className="relative aspect-square w-full overflow-hidden rounded-md bg-border-alpha-14">
+      <div className="relative aspect-square w-full overflow-hidden rounded-[20px] bg-bg-panel shadow-[inset_0_0_0_1px_var(--border-primary)] transition-[transform,box-shadow] duration-300 ease-[var(--motion-ease)] group-hover:-translate-y-[4px] group-hover:shadow-e2">
         {showRanks && (
           <div className="absolute top-2 left-2 z-10 flex items-center justify-center min-w-[22px] h-[20px] px-1 rounded-[3px] text-[10px] font-bold tracking-tight bg-bg-panel text-text-secondary">
             #{index + 1}
@@ -354,11 +353,10 @@ function PlaylistCard({
           />
         )}
       </div>
-      <div className="flex flex-col mt-[8px]">
-        <span className="truncate text-[14px] font-[500] text-text-primary">
+      <div className="flex flex-col mt-[8px]">          <span className="truncate text-[13.5px] font-[500] tracking-[-0.008em] text-text-primary">
           {item.item.title}
         </span>
-        <span className="truncate text-[13px] text-text-tertiary">
+        <span className="truncate text-[12.5px] text-text-tertiary">
           {item.item.owner}
         </span>
       </div>
@@ -439,7 +437,7 @@ function ArtistCard({ item }: { item: PopularItem & { type: "artist" } }) {
         <span className="truncate w-full text-[14px] font-[500] text-text-primary">
           {item.item.name}
         </span>
-        <span className="truncate w-full text-[13px] text-text-tertiary">
+        <span className="truncate w-full text-[12.5px] text-text-tertiary">
           {t("artist.listeners", { count: item.item.followers })}
         </span>
       </div>
@@ -491,33 +489,21 @@ function PopularTracksSection({
   badge,
   items,
   showRanks = false,
-  headingMarginTop = "mt-[22px]",
+  headingMarginTop = "mt-[30px]",
   rowClassName = "",
 }: PopularTracksSectionProps) {
   return (
     <div className="flex flex-col">
-      <div className={`${headingMarginTop} px-4 md:px-8 flex items-center justify-between`}>
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-2.5">
-            {icon && <div className="flex items-center shrink-0">{icon}</div>}
-            <h2
-              className="text-text-primary text-[21px] font-semibold m-0 leading-tight tracking-tight"
-              style={{ fontFamily: "var(--font-inter), sans-serif" }}
-            >
-              {title}
-            </h2>
-            {badge}
-          </div>
-          {subtitle && (
-            <p className="text-[13px] text-text-tertiary m-0 mt-0.5 font-normal">
-              {subtitle}
-            </p>
-          )}
-        </div>
-      </div>
+      <SectionHeading
+        title={title}
+        subtitle={subtitle}
+        icon={icon}
+        badge={badge}
+        className={`${headingMarginTop} px-4 md:px-8`}
+      />
 
       <ScrollableRow
-        className={`flex gap-[28px] pl-8 pr-8 mt-[12px] overflow-x-auto pb-[2px] ${rowClassName}`}
+        className={`flex gap-[20px] pl-4 pr-4 md:pl-8 md:pr-8 mt-[14px] overflow-x-auto pb-[6px] ${rowClassName}`}
       >
         {items.map((item, index) => (
           <PopularItemCard

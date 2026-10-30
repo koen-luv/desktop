@@ -56,10 +56,10 @@ export function StickyHeader({
               aria-label={t("common.back")}
               data-no-tooltip="true"
               data-no-window-drag
-              className={`group inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-md px-[10px] active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto text-[13px] font-[500] border-0 !border-none ${
+              className={`group inline-flex h-[30px] shrink-0 items-center gap-[6px] rounded-lg px-[10px] active:scale-[0.95] transition-all cursor-pointer select-none pointer-events-auto text-[12.5px] font-[500] tracking-[-0.006em] border-0 !border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/70 ${
                 hasCustomBg
                   ? "apple-glass-pill !border-none"
-                  : "bg-bg-panel/85 backdrop-blur-xl text-text-primary hover:bg-bg-panel border-0 !border-none"
+                  : "bg-bg-panel/80 backdrop-blur-xl text-text-secondary hover:bg-bg-panel hover:text-text-primary border-0 !border-none"
               }`}
               style={{ fontFamily: "var(--font-inter), sans-serif" }}
             >
@@ -74,10 +74,10 @@ export function StickyHeader({
           {hasMetadata && (
             <div
               data-no-window-drag
-              className={`inline-flex items-center gap-[8px] h-[32px] pl-[4px] pr-[12px] rounded-md min-w-0 max-w-[calc(100vw-360px)] select-none transition-all duration-200 ease-out ${
+              className={`inline-flex items-center gap-[8px] h-[30px] pl-[4px] pr-[12px] rounded-lg min-w-0 max-w-[calc(100vw-360px)] select-none transition-all duration-200 ease-out ${
                 hasCustomBg
                   ? "apple-glass-pill"
-                  : "bg-bg-panel/85 backdrop-blur-xl text-text-primary"
+                  : "bg-bg-panel/85 backdrop-blur-xl text-text-primary shadow-[inset_0_0_0_1px_var(--border-primary)]"
               } ${
                 isScrolled
                   ? "opacity-100 translate-x-0 scale-100 pointer-events-auto"
@@ -88,7 +88,7 @@ export function StickyHeader({
 
               {title && (
                 <span
-                  className="text-[13px] font-[600] tracking-[-0.01em] text-text-primary truncate"
+                  className="text-[12.5px] font-[600] tracking-[-0.012em] text-text-primary truncate"
                   style={{
                     fontFamily: "var(--font-inter), sans-serif",
                   }}

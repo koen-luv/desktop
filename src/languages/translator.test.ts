@@ -105,4 +105,37 @@ describe("createTranslatorSync with plurals", () => {
       );
     }
   });
+
+  it("translates fullscreen wallpaper controls in every supported locale", () => {
+    for (const locale of SUPPORTED_LOCALES) {
+      const translate = createTranslatorSync(locale);
+      expect(translate("settings.customization.wallpaper_fullscreen_title")).not.toBe(
+        "settings.customization.wallpaper_fullscreen_title",
+      );
+      expect(
+        translate("settings.customization.wallpaper_fullscreen_description"),
+      ).not.toBe("settings.customization.wallpaper_fullscreen_description");
+    }
+  });
+
+  it("translates collaborator controls in every supported locale", () => {
+    const keys = [
+      "playlist.collaborators_manage",
+      "playlist.collaborators_title",
+      "playlist.collaborators_description",
+      "playlist.collaborators_create",
+      "playlist.collaborators_search",
+      "playlist.collaborators_search_placeholder",
+      "playlist.collaborators_add",
+      "playlist.collaborators_remove",
+      "playlist.collaborator_role_owner",
+      "playlist.collaborator_role_editor",
+    ];
+    for (const locale of SUPPORTED_LOCALES) {
+      const translate = createTranslatorSync(locale);
+      for (const key of keys) {
+        expect(translate(key)).not.toBe(key);
+      }
+    }
+  });
 });

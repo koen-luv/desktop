@@ -1,0 +1,12 @@
+name = "liner-shared-playlists"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+
+[vars]
+PRIMARY_API_URL = "https://api.tryliner.fun"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "liner"
+database_id = "3e8cf84c-da67-4c76-bda6-851ab92ff7a2"
+migrations_dir = "migrations"

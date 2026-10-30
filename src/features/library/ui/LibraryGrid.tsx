@@ -38,7 +38,7 @@ function LoadingSkeletonGrid({ circle = false }: { circle?: boolean }) {
     <div className="flex flex-col gap-[8px]">
       <div
         className={`aspect-square w-full animate-pulse bg-border-alpha-14 ${
-          circle ? "rounded-full" : "rounded-md"
+          circle ? "rounded-full" : "rounded-xl"
         }`}
       />
       <div className="h-[13px] w-[78%] animate-pulse rounded bg-border-alpha-33" />
@@ -50,7 +50,7 @@ function LoadingSkeletonGrid({ circle = false }: { circle?: boolean }) {
 function LoadingSkeletonList() {
   return (
     <div className="flex items-center gap-[14px] p-[8px] rounded-lg">
-      <div className="h-[48px] w-[48px] shrink-0 animate-pulse rounded-md bg-border-alpha-14" />
+      <div className="h-[44px] w-[44px] shrink-0 animate-pulse rounded-lg bg-border-alpha-14" />
       <div className="flex flex-col gap-[6px] flex-1">
         <div className="h-[14px] w-[35%] animate-pulse rounded bg-border-alpha-33" />
         <div className="h-[12px] w-[20%] animate-pulse rounded bg-border-alpha-14" />
@@ -142,12 +142,12 @@ function LibraryItemRow({ item }: { item: LibraryItemViewModel }) {
     <div
       onContextMenu={handleContextMenu}
       onClick={() => navigate(item.href)}
-      className="w-full flex items-center justify-between rounded-md p-[8px] outline-none transition-colors duration-150 ease-out cursor-pointer hover:bg-border-alpha-14 select-none"
+      className="w-full flex items-center justify-between rounded-lg p-[8px] outline-none transition-colors duration-150 ease-out cursor-pointer hover:bg-bg-hover select-none focus-visible:ring-2 focus-visible:ring-accent-primary/60"
     >
-      <div className="flex items-center gap-[16px] min-w-0">
+      <div className="flex items-center gap-[14px] min-w-0">
         <div
-          className={`relative h-[48px] w-[48px] shrink-0 overflow-hidden bg-border-alpha-14 ${
-            item.kind === "artist" ? "rounded-full" : "rounded-md"
+          className={`relative h-[44px] w-[44px] shrink-0 overflow-hidden bg-bg-panel shadow-[inset_0_0_0_1px_var(--border-primary)] ${
+            item.kind === "artist" ? "rounded-full" : "rounded-lg"
           }`}
         >
           {item.imageUrl ? (
@@ -169,20 +169,18 @@ function LibraryItemRow({ item }: { item: LibraryItemViewModel }) {
 
         <div className="min-w-0 flex flex-col gap-[2px]">
           <h3
-            className="m-0 max-w-[min(52vw,560px)] overflow-hidden text-ellipsis whitespace-nowrap text-[16px] leading-[1.2] text-text-primary"
+            className="m-0 max-w-[min(52vw,560px)] overflow-hidden text-ellipsis whitespace-nowrap text-[14.5px] font-[500] leading-[1.25] tracking-[-0.008em] text-text-primary"
             style={{
               fontFamily: "var(--font-inter), sans-serif",
-              fontWeight: 400,
             }}
             title={item.title}
           >
             {item.title}
           </h3>
           <p
-            className="m-0 flex min-w-0 items-center text-[15px] leading-[1.2] overflow-hidden text-text-secondary"
+            className="m-0 flex min-w-0 items-center text-[12.5px] leading-[1.25] overflow-hidden text-text-tertiary"
             style={{
               fontFamily: "var(--font-inter), sans-serif",
-              fontWeight: 350,
             }}
           >
             {item.subtitle}
@@ -211,7 +209,7 @@ function LibraryItemRow({ item }: { item: LibraryItemViewModel }) {
               <button
                 type="button"
                 aria-label={t("common.more_options")}
-                className="rounded-md bg-transparent border-0 p-0 text-text-primary transition-all duration-200 active:scale-[0.96] flex items-center justify-center cursor-pointer opacity-70 hover:opacity-100"
+                className="rounded-md bg-transparent border-0 p-0 text-text-tertiary transition-all duration-200 hover:text-text-primary active:scale-[0.96] flex items-center justify-center cursor-pointer opacity-70 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/60"
                 onClick={(e) => {
                   e.stopPropagation();
                   setMenuOpen(!menuOpen);
@@ -364,7 +362,7 @@ export default function LibraryGrid({
 
   if (viewMode === "list") {
     return (
-      <div className="flex flex-col gap-[4px] pb-[24px] -mx-[8px]">
+      <div className="flex flex-col gap-[2px] pb-[24px] -mx-[8px]">
         {prepends.map((node, index) => (
           <div key={`prepend-${index}`} className="w-full">
             {node}
@@ -388,7 +386,7 @@ export default function LibraryGrid({
   }
 
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(165px,1fr))] gap-[24px] pb-[24px]">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-x-[20px] gap-y-[26px] pb-[24px]">
       {prepends.map((node, index) => (
         <div
           key={`prepend-${index}`}

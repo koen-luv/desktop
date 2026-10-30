@@ -137,10 +137,10 @@ const QueueList = memo(function QueueList({
                   ? (e) => handleCardGrab(index, item, e)
                   : undefined
               }
-              className={`p-[8px] rounded-[10px] transition-colors duration-150 ${
+              className={`p-[8px] rounded-lg transition-colors duration-150 ${
                 isCurrent
-                  ? "bg-black/[0.065] dark:bg-white/[0.08]"
-                  : "bg-transparent hover:bg-black/[0.035] dark:hover:bg-white/[0.04]"
+                  ? "bg-bg-selected shadow-[inset_0_0_0_1px_var(--border-secondary)]"
+                  : "bg-transparent hover:bg-bg-hover"
               }`}
               imageShape="square"
               onPlay={() => {
@@ -180,7 +180,7 @@ const QueueList = memo(function QueueList({
               (draggedItem as { cover_url?: string }).cover_url ??
               ""
             }
-            className="p-[8px] rounded-[10px] bg-bg-elevated border border-white/10"
+            className="p-[8px] rounded-lg bg-bg-elevated border border-border-secondary shadow-e3"
             imageShape="square"
           />
         </FloatingDragCard>
@@ -660,10 +660,10 @@ function RightDrawer({ activeTab, onTabChange, onClose }: RightDrawerProps) {
 
   return (
     <div
-      className={`relative flex flex-col h-full w-full overflow-hidden select-none shadow-[-16px_0_36px_rgba(0,0,0,0.3)] ${
+      className={`relative flex flex-col h-full w-full overflow-hidden select-none rounded-none sm:rounded-l-[28px] shadow-[-32px_0_64px_-32px_rgba(23,21,29,0.45)] ${
         hasCustomBg
           ? ""
-          : "bg-bg-primary"
+          : "bg-bg-surface sm:border-l sm:border-border-primary/70"
       }`}
       style={drawerVarsStyle}
     >
@@ -706,7 +706,7 @@ function RightDrawer({ activeTab, onTabChange, onClose }: RightDrawerProps) {
       <div className="relative shrink-0 z-20">
         <div
           data-window-drag
-          className="relative flex items-center justify-between px-[16px] h-[56px] select-none"
+          className="relative flex items-center justify-between px-[14px] h-[52px] select-none"
         >
           <div className="flex items-center min-w-0">
             {onClose && (
@@ -716,10 +716,10 @@ function RightDrawer({ activeTab, onTabChange, onClose }: RightDrawerProps) {
                 aria-label={t("common.back") || "Back"}
                 data-no-tooltip="true"
                 data-no-window-drag
-                className={`group inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-md px-[10px] active:scale-[0.94] transition-all cursor-pointer select-none pointer-events-auto text-[13px] font-[500] border-0 !border-none ${
+                className={`group inline-flex h-[30px] shrink-0 items-center gap-[6px] rounded-lg px-[10px] active:scale-[0.95] transition-all cursor-pointer select-none pointer-events-auto text-[12.5px] font-[500] tracking-[-0.006em] border-0 !border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/70 ${
                   hasCustomBg
                     ? "apple-glass-pill !border-none"
-                    : "bg-bg-panel/85 backdrop-blur-xl text-text-primary hover:bg-bg-panel border-0 !border-none"
+                    : "bg-bg-hover text-text-secondary hover:bg-bg-active hover:text-text-primary border-0 !border-none"
                 }`}
                 style={{ fontFamily: "var(--font-inter), sans-serif" }}
               >
@@ -734,38 +734,39 @@ function RightDrawer({ activeTab, onTabChange, onClose }: RightDrawerProps) {
           <div className="w-[120px] h-[32px] shrink-0" />
         </div>
 
-        <div className="px-[16px] pb-[10px]">
+        <div className="px-[14px] pb-[12px]">
           <div
-            className={`grid grid-cols-2 w-full items-center gap-[4px] rounded-xl p-[4px] ${
+            className={`grid grid-cols-2 w-full items-center gap-[2px] rounded-full p-[3px] ${
               hasCustomBg
                 ? "apple-glass-pill"
-                : "bg-bg-elevated"
+                : "bg-bg-elevated shadow-[inset_0_0_0_1px_var(--border-primary)]"
             }`}
           >
             <button
               type="button"
               onClick={() => onTabChange("queue")}
-              className={`relative inline-flex items-center justify-center rounded-lg px-[16px] py-[7px] text-[13px] leading-none transition-colors duration-150 border-0 bg-transparent cursor-pointer select-none active:scale-[0.97] ${
+              className={`relative inline-flex items-center justify-center rounded-full h-[30px] px-[14px] text-[12.5px] leading-none transition-colors duration-150 border-0 bg-transparent cursor-pointer select-none active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/60 ${
                 activeTab === "queue"
                   ? hasCustomBg
                     ? "text-white dark:text-black font-semibold"
-                    : "text-text-primary"
+                    : "text-btn-primary-text"
                   : hasCustomBg
                     ? "text-black/70 dark:text-white/70 hover:text-black dark:hover:text-white"
-                    : "text-text-secondary hover:text-text-primary"
+                    : "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
               }`}
               style={{
                 fontFamily: "var(--font-inter), sans-serif",
-                fontWeight: activeTab === "queue" ? 500 : 400,
+                fontWeight: activeTab === "queue" ? 500 : 450,
+                letterSpacing: "-0.006em",
               }}
             >
               {activeTab === "queue" && (
                 <motion.div
                   layoutId="activeRightDrawerTab"
-                  className={`absolute inset-0 rounded-lg ${
+                  className={`absolute inset-0 rounded-full ${
                     hasCustomBg
                       ? "apple-glass-prominent"
-                      : "bg-border-alpha-14"
+                      : "bg-btn-primary-bg shadow-[0_6px_16px_-8px_var(--btn-primary-bg)]"
                   }`}
                   transition={{
                     type: "spring",
@@ -779,27 +780,28 @@ function RightDrawer({ activeTab, onTabChange, onClose }: RightDrawerProps) {
             <button
               type="button"
               onClick={() => onTabChange("lyrics")}
-              className={`relative inline-flex items-center justify-center rounded-lg px-[16px] py-[7px] text-[13px] leading-none transition-colors duration-150 border-0 bg-transparent cursor-pointer select-none active:scale-[0.97] ${
+              className={`relative inline-flex items-center justify-center rounded-full h-[30px] px-[14px] text-[12.5px] leading-none transition-colors duration-150 border-0 bg-transparent cursor-pointer select-none active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/60 ${
                 activeTab === "lyrics"
                   ? hasCustomBg
                     ? "text-white dark:text-black font-semibold"
-                    : "text-text-primary"
+                    : "text-btn-primary-text"
                   : hasCustomBg
                     ? "text-black/70 dark:text-white/70 hover:text-black dark:hover:text-white"
-                    : "text-text-secondary hover:text-text-primary"
+                    : "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
               }`}
               style={{
                 fontFamily: "var(--font-inter), sans-serif",
-                fontWeight: activeTab === "lyrics" ? 500 : 400,
+                fontWeight: activeTab === "lyrics" ? 500 : 450,
+                letterSpacing: "-0.006em",
               }}
             >
               {activeTab === "lyrics" && (
                 <motion.div
                   layoutId="activeRightDrawerTab"
-                  className={`absolute inset-0 rounded-lg ${
+                  className={`absolute inset-0 rounded-full ${
                     hasCustomBg
                       ? "apple-glass-prominent"
-                      : "bg-border-alpha-14"
+                      : "bg-btn-primary-bg shadow-[0_6px_16px_-8px_var(--btn-primary-bg)]"
                   }`}
                   transition={{
                     type: "spring",
@@ -814,11 +816,11 @@ function RightDrawer({ activeTab, onTabChange, onClose }: RightDrawerProps) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden relative z-10">
+      <div className="flex-1 overflow-hidden relative z-10" data-with-secondary-controls>
         {activeTab === "queue" && (
           <div
             ref={queueScrollCallbackRef}
-            className="absolute inset-0 overflow-y-auto px-[10px] pt-[6px] pb-[16px]"
+            className="absolute inset-0 overflow-y-auto px-[10px] pt-[6px] pb-[16px]" data-with-secondary-controls
             style={
               isQueueScrolled
                 ? {
@@ -856,8 +858,13 @@ function RightDrawer({ activeTab, onTabChange, onClose }: RightDrawerProps) {
                 scrollContainerRef={queueScrollRef}
               />
             ) : (
-              <div className="h-full flex items-center justify-center text-text-tertiary text-[14px]">
-                {t("player.queue_empty")}
+              <div className="h-full flex flex-col items-center justify-center gap-[10px] px-6 text-center select-none">
+                <span className="flex h-[46px] w-[46px] items-center justify-center rounded-full bg-bg-hover text-text-tertiary">
+                  <FiMusic className="h-[20px] w-[20px]" />
+                </span>
+                <span className="text-text-secondary text-[13px] font-[500]">
+                  {t("player.queue_empty")}
+                </span>
               </div>
             )}
           </div>
@@ -876,7 +883,7 @@ function RightDrawer({ activeTab, onTabChange, onClose }: RightDrawerProps) {
             </div>
           ) : (
             <div
-              className="absolute inset-0 overflow-y-auto p-[32px]"
+              className="absolute inset-0 overflow-y-auto px-[28px] py-[32px]" data-with-secondary-controls
               style={{
                 maskImage:
                   "linear-gradient(to bottom, transparent, black 5%, black 95%, transparent)",

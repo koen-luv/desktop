@@ -93,7 +93,7 @@ export default function ListeningRecap() {
         <button
           type="button"
           onClick={openRecap}
-          className="group relative flex min-h-[104px] w-full items-center justify-between overflow-hidden rounded-xl border border-white/10 bg-gradient-to-r from-violet-950 via-indigo-950 to-slate-950 px-5 py-4 text-left text-white transition-[transform,filter] duration-200 ease-out hover:brightness-110 active:scale-[0.995] motion-reduce:transition-none motion-reduce:active:scale-100"
+          className="group relative flex min-h-[112px] w-full items-center justify-between overflow-hidden rounded-[24px] border border-white/10 bg-gradient-to-r from-[#2a1b5e] via-[#3a2470] to-[#1c1436] px-6 py-5 text-left text-white transition-[transform,filter,box-shadow] duration-300 ease-[var(--motion-ease)] hover:-translate-y-[2px] hover:brightness-110 hover:shadow-e2 active:scale-[0.995] motion-reduce:transition-none motion-reduce:active:scale-100"
         >
           <span className="pointer-events-none absolute -right-8 -top-16 h-48 w-48 rounded-full bg-violet-400/15 blur-3xl" />
           <span className="relative">

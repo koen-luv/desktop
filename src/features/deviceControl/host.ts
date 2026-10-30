@@ -10,13 +10,6 @@ import { usePlayerStore } from "@/features/player/store/playerStore";
 import { playerEngine } from "@/features/player/engine/playerEngine";
 import { PartyConnection } from "@/features/party/partySession";
 import {
-  closeRelayRoom,
-  createRelayRoom,
-  isAbortError,
-  isPartyRelayEnabled,
-  waitForRelayAnswer,
-} from "@/features/party/partyRelay";
-import {
   DEVICE_CHANNEL_LABEL,
   type ControlAction,
   type DeviceMessage,
@@ -28,8 +21,6 @@ const HEARTBEAT_MS = 5000;
 const CONNECT_TIMEOUT_MS = 25_000;
 
 let pendingId: string | null = null;
-let relayCode: string | null = null;
-let relayAbort: AbortController | null = null;
 let openTimer: number | null = null;
 let stopBroadcast: (() => void) | null = null;
 let stopLocalAnswerListener: (() => void) | null = null;
@@ -46,15 +37,6 @@ function ownName(): string {
 function clearOpenTimer(): void {
   if (openTimer !== null) window.clearTimeout(openTimer);
   openTimer = null;
-}
-
-function clearRelay(): void {
-  relayAbort?.abort();
-  relayAbort = null;
-  if (relayCode) {
-    void closeRelayRoom(relayCode);
-    relayCode = null;
-  }
 }
 
 /** Full authoritative state — sent on connect, on change, and as a heartbeat. */
@@ -128,7 +110,6 @@ function startBroadcast(): void {
 /** Stop the host: tear the P2P link down and clear host state. */
 export function stopHosting(): void {
   clearOpenTimer();
-  clearRelay();
   stopLocalAnswerListener?.();
   stopLocalAnswerListener = null;
   void window.linerElectron?.stopLanHost?.();
@@ -147,7 +128,6 @@ export function startHosting(): void {
   }
 
   clearOpenTimer();
-  clearRelay();
   pendingId = null;
   stopBroadcast?.();
   for (const conn of store.hostConnections.values()) conn.close();
@@ -160,9 +140,13 @@ export function startHosting(): void {
   });
 
   const electron = window.linerElectron;
-  const hasLocalLanHost = Boolean(electron?.startLanHost && electron.onLanAnswer);
-  if (!hasLocalLanHost && !isPartyRelayEnabled()) {
-    useDeviceControlStore.setState({ hostPhase: "error", hostError: tr("devices.error_relay_disabled") });
+  const startLanHost = electron?.startLanHost;
+  const onLanAnswer = electron?.onLanAnswer;
+  if (!electron || !startLanHost || !onLanAnswer) {
+    useDeviceControlStore.setState({
+      hostPhase: "error",
+      hostError: tr("devices.error_local_unsupported"),
+    });
     return;
   }
 
@@ -191,9 +175,9 @@ export function startHosting(): void {
       const invite = await conn.createInviteCode();
       if (pendingId !== id) return;
 
-      if (electron?.startLanHost && electron.onLanAnswer) {
+      if (electron && startLanHost && onLanAnswer) {
         stopLocalAnswerListener?.();
-        stopLocalAnswerListener = electron.onLanAnswer((answer) => {
+        stopLocalAnswerListener = onLanAnswer.call(electron, (answer) => {
           if (pendingId !== id) return;
           useDeviceControlStore.setState({ hostPhase: "connecting" });
           void conn.acceptAnswerCode(answer).then(() => {
@@ -220,7 +204,7 @@ export function startHosting(): void {
           });
         });
 
-        const info = await electron.startLanHost(ownName(), invite);
+        const info = await startLanHost.call(electron, ownName(), invite);
         if (pendingId !== id) {
           stopLocalAnswerListener?.();
           stopLocalAnswerListener = null;
@@ -233,41 +217,15 @@ export function startHosting(): void {
         });
         return;
       }
-
-      const joinCode = await createRelayRoom(invite);
-      if (pendingId !== id) {
-        void closeRelayRoom(joinCode);
-        return;
-      }
-
-      relayCode = joinCode;
-      useDeviceControlStore.setState({ hostPhase: "waiting", hostCode: joinCode });
-
-      const abort = new AbortController();
-      relayAbort = abort;
-      const answer = await waitForRelayAnswer(joinCode, abort.signal);
-      if (pendingId !== id) return;
-
-      useDeviceControlStore.setState({ hostPhase: "connecting" });
-      await conn.acceptAnswerCode(answer);
-      // The room has done its job — free it instead of waiting for expiry.
-      clearRelay();
-
-      openTimer = window.setTimeout(() => {
-        if (conn.isOpen) return;
-        if (pendingId === id) pendingId = null;
-        const st = useDeviceControlStore.getState();
-        st.hostConnections.delete(id);
-        conn.close();
-        useDeviceControlStore.setState({ hostPhase: "error", hostError: tr("devices.error_timeout") });
-      }, CONNECT_TIMEOUT_MS);
-    } catch (error) {
-      if (isAbortError(error)) return;
+      throw new Error("Local device hosting is unavailable");
+    } catch {
       if (pendingId !== id) return;
       pendingId = null;
       useDeviceControlStore.getState().hostConnections.delete(id);
       conn.close();
-      clearRelay();
+      stopLocalAnswerListener?.();
+      stopLocalAnswerListener = null;
+      void electron.stopLanHost?.();
       useDeviceControlStore.setState({ hostPhase: "error", hostError: tr("devices.error_invite_failed") });
     }
   })();
