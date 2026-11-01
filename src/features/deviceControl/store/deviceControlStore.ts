@@ -29,6 +29,7 @@ interface DeviceControlState {
 
   // ---- Controller role (this device drives another player) ----
   controllerPhase: ControllerPhase;
+  codeInput: string;
   controllerError: string | null;
   hostName: string | null;
   remote: RemotePlayback | null;
@@ -43,6 +44,7 @@ interface DeviceControlState {
   nearbyError: string | null;
 
   setOpen: (open: boolean) => void;
+  setCodeInput: (value: string) => void;
   resetController: () => void;
   resetHost: () => void;
   setRemotePosition: (positionMs: number, sentAt?: number) => void;
@@ -60,6 +62,7 @@ interface DeviceControlState {
 const initial = {
   open: false,
   controllerPhase: "idle" as ControllerPhase,
+  codeInput: "",
   controllerError: null,
   hostName: null,
   remote: null,
@@ -81,6 +84,8 @@ export const useDeviceControlStore = create<DeviceControlState>((set, get) => ({
   setNearbyHosts: (nearbyHosts) => set({ nearbyHosts }),
   setDiscovering: (isDiscovering) => set({ isDiscovering }),
   setNearbyError: (nearbyError) => set({ nearbyError }),
+
+  setCodeInput: (value) => set({ codeInput: value }),
 
   setRemotePosition: (positionMs, sentAt) =>
     set((state) => {
