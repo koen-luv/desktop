@@ -12,7 +12,6 @@ import { useRecentlyPlayed } from "../hooks/useRecentlyPlayed";
 import { useDailyMixes } from "../hooks/useDailyMixes";
 import { useForgottenMemories, useNewReleases } from "../hooks/useHomeExtras";
 import { useLikedTracks } from "@/features/library/hooks/useLikedTracks";
-import ListeningRecap from "./ListeningRecap";
 import { playerEngine } from "@/features/player";
 import SongCard from "@/features/player/ui/SongCard";
 import SongCardWithMenu from "@/features/player/ui/SongCardWithMenu";
@@ -221,8 +220,6 @@ export default function HomePage() {
                 headingMarginTop="mt-[30px]"
               />
             )}
-
-            <ListeningRecap />
 
           {/* Listening Right Now (Trending Chart) */}
           {popularTracksOnly && popularTracksOnly.length > 0 && (

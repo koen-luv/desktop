@@ -224,6 +224,8 @@
       "withMusic": "with your music.",
       "plays": "plays",
       "tracks": "tracks",
+      "timeLabel": "listening time",
+      "unknownArtist": "Unknown artist",
       "daysListened": "days listened",
       "onRepeat": "On repeat",
       "topTracks": "Your most-played tracks",
@@ -284,6 +286,12 @@
     "search_music": "Search music"
   },
   "login": {
+    "forgot_password": "Forgot password?",
+    "recover_title": "Reset your password",
+    "recover_subtitle": "Liner support emails a one-time link to your account address.",
+    "recover_body": "Password resets are handled with a single-use link sent by Liner support. Opening that link on this device brings you straight to the new password screen; it works whether you are signed in or out.",
+    "recover_contact": "Email Liner support",
+    "recover_hint": "For your security we never say whether an address has an account.",
     "welcome_back": "Welcome back",
     "sign_in_to_account": "Sign in to your account",
     "auth_title_login": "Your music, your way",
@@ -360,6 +368,7 @@
       "password_min_8": "Password must contain at least 8 characters.",
       "server_unavailable": "Unable to reach the server. Please check your connection.",
       "server_error": "Liner's servers are having trouble right now. Please try again in a few minutes.",
+      "rate_limited": "Too many attempts. Wait a few minutes and try again.",
       "invalid_credentials": "Email or password is incorrect.",
       "email_already_used": "This email is already in use.",
       "username_invalid": "Username must be 3-30 lowercase letters, numbers, or underscores.",
@@ -382,7 +391,9 @@
       "account_not_found": "Account not found or session expired. Try registering.",
       "failed_start_auth": "Failed to start Telegram auth",
       "registration_failed": "Registration failed: {status}",
-      "verification_canceled": "Verification canceled."
+      "verification_canceled": "Verification canceled.",
+      "human_check_cancelled": "Finish the human check to continue.",
+      "human_check_failed": "The human check didn't go through. Please try again."
     },
     "toasts": {
       "login_successful": "Login successful",
@@ -424,6 +435,7 @@
     "instrumental": "♪ instrumental",
     "no_lyrics_found": "Looks like we don't have lyrics for this one yet.",
     "close_fullscreen": "Close fullscreen",
+    "cinematic_mode": "Cinematic mode",
     "failed_load_lyrics": "Failed to load lyrics.",
     "lyrics_offset": "Lyrics offset",
     "earlier": "Earlier",
@@ -507,6 +519,13 @@
     "collaborator_role_owner": "Owner",
     "collaborator_role_editor": "Editor",
     "liked_songs": "Liked songs",
+    "save_as_playlist": "Save as playlist",
+    "saved_as_playlist": "Saved your liked songs",
+    "save_as_playlist_failed": "Couldn't save your liked songs",
+    "like_all_songs": "Like all songs",
+    "like_all_done": "Liked {count} songs",
+    "like_all_partial": "Liked {count} songs, {failed} failed",
+    "like_all_failed": "Couldn't like these songs",
     "untitled_playlist": "Untitled Playlist",
     "play_all": "Play all",
     "add_to_queue": "Add playlist to a queue",
@@ -586,7 +605,24 @@
     "allow_wifi_desc": "No code needed. Phones on the same network find this computer automatically while this is on.",
     "waiting_wifi": "Waiting for a phone on this Wi-Fi…",
     "code_fallback": "Or connect with a six-digit code",
-    "error_local_unsupported": "Local Wi-Fi control is available in the desktop app."
+    "pairing_code": "Pair with a code",
+    "pairing_code_hint": "On your computer open Settings → Device control, then type the six digits it shows here.",
+    "pairing_code_host_hint": "Enter this code on your phone",
+    "pairing_code_host_wifi": "Or find this computer automatically on the same Wi-Fi.",
+    "error_invalid_code": "Enter the six-digit code from your computer.",
+    "error_code_not_found": "That code has expired. Ask your computer for a new one.",
+    "error_relay_disabled": "Pairing codes are not available on this build.",
+    "error_local_unsupported": "Local Wi-Fi control is available in the desktop app.",
+    "error_connect_failed": "Couldn't finish pairing. Check that both devices are online and try again.",
+    "error_invite_failed": "Couldn't start pairing. Try again.",
+    "error_timeout": "Timed out waiting for the other device.",
+    "error_host_left": "The computer closed the remote session.",
+    "error_unsupported": "This device can't open a peer-to-peer connection.",
+    "default_name": "Liner device",
+    "discover": "Find devices",
+    "searching": "Searching…",
+    "local_network": "Same Wi-Fi network",
+    "waiting_local": "Waiting for a device on your Wi-Fi network"
   },
   "settings": {
     "title": "Settings",
@@ -619,7 +655,18 @@
       "about": {
         "title": "About & Help",
         "description": "Version, branding, updates and support links."
+      },
+      "listening": {
+        "title": "Listening & Stats",
+        "description": "Your listening time, plays, top tracks and artists."
       }
+    },
+    "listening": {
+      "title": "Listening",
+      "description": "Everything you have listened to this year, in one place.",
+      "stats_title": "Your listening this year",
+      "stats_description": "Totals, top tracks and artists for {year}.",
+      "by_month": "Listening time by month"
     },
     "docs": "Docs",
     "support": "Support",
@@ -861,6 +908,12 @@
       "wallpaper_opacity": "Wallpaper opacity",
       "wallpaper_fullscreen_title": "Use wallpaper in fullscreen player",
       "wallpaper_fullscreen_description": "Show your custom wallpaper behind the player instead of the animated track background.",
+      "now_playing_title": "Now Playing",
+      "now_playing_description": "What the fullscreen player shows behind your music.",
+      "plain_background_title": "Plain background in Now Playing",
+      "plain_background_description": "Show your wallpaper at full strength — no blur, no dimming, no overlay.",
+      "cinematic_title": "Cinematic mode",
+      "cinematic_description": "Now Playing shows only the cover, song and artist, with lyrics.",
       "blocks_title": "Interface Blocks Glassmorphism",
       "blocks_description": "Adjust transparency, backdrop blur and dimming for each interface area.",
       "block_sidebar": "Sidebar",
@@ -1321,5 +1374,41 @@
     "count": "{count} of {total}",
     "no_results": "No tracks match “{query}”",
     "clear": "Clear search"
+  },
+  "human_check": {
+    "title": "Confirm you're not a bot",
+    "description": "A quick Cloudflare check keeps bots away from Liner accounts. It usually passes on its own in a second.",
+    "expired": "The check timed out and is starting again.",
+    "failed": "The check didn't load. Check your connection and try again.",
+    "waiting": "Checking…",
+    "retry": "Try again",
+    "cancel": "Cancel",
+    "skip": "Skip"
+  }
+,
+  "reset_password": {
+    "title": "Reset password",
+    "subtitle": "Choose a new password for your Liner account.",
+    "brand_done_title": "All set",
+    "brand_done_subtitle": "Your Liner password was changed.",
+    "brand_invalid_title": "Link expired",
+    "brand_invalid_subtitle": "Reset links work once and only for a limited time.",
+    "account": "Account",
+    "label_new": "New password",
+    "hint_length": "At least 8 characters.",
+    "btn_change": "Change password",
+    "btn_saving": "Saving…",
+    "btn_cancel": "Cancel",
+    "done_title": "Password changed",
+    "done_text": "You can sign in with your new password now. For your security, every device that was signed in has been signed out.",
+    "invalid_title": "This link can't be used",
+    "invalid_text": "It has expired or was already used. Ask Liner support to send you a new reset link.",
+    "offline_title": "Can't reach Liner",
+    "offline_text": "Check your connection and try again.",
+    "btn_retry": "Try again",
+    "btn_back_to_sign_in": "Back to sign in",
+    "errors": {
+      "too_many": "Too many attempts. Wait a few minutes and try again."
+    }
   }
 }

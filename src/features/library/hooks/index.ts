@@ -27,4 +27,6 @@ export {
   useRemoveExternalItem,
   useLikeTrack,
   useUnlikeTrack,
+  useSaveLikedSongsToPlaylist,
+  useLikePlaylistTracks,
 } from "./useLibraryMutations";

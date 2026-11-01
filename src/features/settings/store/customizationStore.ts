@@ -49,6 +49,10 @@ export interface CustomizationState {
   backgroundDim: number;
   backgroundOpacity: number;
   useWallpaperInFullscreen: boolean;
+  /** Show the wallpaper in Now Playing untouched — no blur, dim or overlay. */
+  fullscreenPlainBackground: boolean;
+  /** Now Playing shows only the cover, track text and lyrics. */
+  cinematicMode: boolean;
   sidebar: BlockCustomization;
   contentView: BlockCustomization;
   miniplayer: BlockCustomization;
@@ -59,6 +63,8 @@ export interface CustomizationState {
   setBackgroundDim: (dim: number) => void;
   setBackgroundOpacity: (opacity: number) => void;
   setUseWallpaperInFullscreen: (enabled: boolean) => void;
+  setFullscreenPlainBackground: (enabled: boolean) => void;
+  setCinematicMode: (enabled: boolean) => void;
   setBlockConfig: (
     block: "sidebar" | "contentView" | "miniplayer",
     patch: Partial<BlockCustomization>,
@@ -190,6 +196,8 @@ export const useCustomizationStore = create<CustomizationState>()(
       backgroundDim: 0,
       backgroundOpacity: 100,
       useWallpaperInFullscreen: false,
+      fullscreenPlainBackground: false,
+      cinematicMode: false,
       sidebar: { ...DEFAULT_BLOCK_CONFIG },
       contentView: { ...DEFAULT_BLOCK_CONFIG },
       miniplayer: { ...DEFAULT_BLOCK_CONFIG },
@@ -251,6 +259,11 @@ export const useCustomizationStore = create<CustomizationState>()(
       setUseWallpaperInFullscreen: (enabled) =>
         set({ useWallpaperInFullscreen: enabled }),
 
+      setFullscreenPlainBackground: (enabled) =>
+        set({ fullscreenPlainBackground: enabled }),
+
+      setCinematicMode: (enabled) => set({ cinematicMode: enabled }),
+
       setBlockConfig: (block, patch) => {
         set((state) => ({
           [block]: {
@@ -307,6 +320,8 @@ export const useCustomizationStore = create<CustomizationState>()(
           backgroundDim: 0,
           backgroundOpacity: 100,
           useWallpaperInFullscreen: false,
+          fullscreenPlainBackground: false,
+          cinematicMode: false,
           sidebar: { ...DEFAULT_BLOCK_CONFIG },
           contentView: { ...DEFAULT_BLOCK_CONFIG },
           miniplayer: { ...DEFAULT_BLOCK_CONFIG },

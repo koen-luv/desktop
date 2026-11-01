@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef, type ComponentType } from "react";
 import { motion } from "framer-motion";
-import { CloseLine, Search2Line, CloseCircleFill, ExitLine, ArrowLeftLine, RightLine, DiscordFill, KeyboardLine, MusicLine, RemoteControlLine } from "@mingcute/react";
+import { CloseLine, Search2Line, CloseCircleFill, ExitLine, ArrowLeftLine, RightLine, DiscordFill, KeyboardLine, MusicLine, RemoteControlLine, ChartBarLine } from "@mingcute/react";
 import {
   Play,
   Palette,
@@ -30,6 +30,7 @@ import {
   DiscordTab,
   LastFmTab,
   DevicesTab,
+  ListeningTab,
 } from "./tabs";
 
 /**
@@ -51,8 +52,9 @@ type SectionId =
   | "Audio"
   | "Storage"
   | "About"
-  | "Devices";
-type CategoryId = "playback" | "appearance" | "overlay" | "storage" | "about";
+  | "Devices"
+  | "Listening";
+type CategoryId = "playback" | "appearance" | "overlay" | "storage" | "about" | "listening";
 type GroupId = "preferences" | "application";
 
 const SECTION_ICONS: Record<SectionId, typeof Play> = {
@@ -67,6 +69,7 @@ const SECTION_ICONS: Record<SectionId, typeof Play> = {
   Storage: Database,
   About: InfoCircle,
   Devices: RemoteControlLine,
+  Listening: ChartBarLine,
 };
 
 const SECTION_COMPONENTS: Record<SectionId, ComponentType<{ searchQuery?: string }>> = {
@@ -81,6 +84,7 @@ const SECTION_COMPONENTS: Record<SectionId, ComponentType<{ searchQuery?: string
   Storage: StorageTab,
   About: AboutTab,
   Devices: DevicesTab,
+  Listening: ListeningTab,
 };
 
 const CATEGORIES: { id: CategoryId; group: GroupId; sections: SectionId[] }[] = [
@@ -88,6 +92,7 @@ const CATEGORIES: { id: CategoryId; group: GroupId; sections: SectionId[] }[] = 
   { id: "appearance", group: "preferences", sections: ["Appearance", "Customization"] },
   { id: "overlay", group: "preferences", sections: ["Overlay", "Discord"] },
   { id: "storage", group: "application", sections: ["Storage"] },
+  { id: "listening", group: "application", sections: ["Listening"] },
   { id: "about", group: "application", sections: ["About"] },
 ];
 
@@ -155,6 +160,12 @@ const SETTING_ITEMS: { sectionId: SectionId; titleKey: string; descKey?: string;
   { sectionId: "Storage", titleKey: "settings.storage.usage_title" },
   { sectionId: "Storage", titleKey: "settings.storage.open_folder", descKey: "settings.storage.open_folder_description" },
 
+  // Listening
+  { sectionId: "Listening", titleKey: "settings.listening.stats_title", descKey: "settings.listening.stats_description" },
+  { sectionId: "Listening", titleKey: "settings.listening.by_month" },
+  { sectionId: "Listening", titleKey: "home.recap.topTracks" },
+  { sectionId: "Listening", titleKey: "home.recap.topArtist" },
+
   // About
   { sectionId: "About", titleKey: "settings.about.liner", descKey: "common.app.version" },
   { sectionId: "About", titleKey: "settings.notifications.test_button" },
@@ -172,6 +183,7 @@ const SECTION_LABEL_KEYS: Record<SectionId, string> = {
   Storage: "settings.tabs.storage",
   About: "settings.tabs.about",
   Devices: "settings.devices.section_title",
+  Listening: "settings.listening.title",
 };
 
 const SECTION_DESC_KEYS: Record<SectionId, string> = {
@@ -186,6 +198,7 @@ const SECTION_DESC_KEYS: Record<SectionId, string> = {
   Storage: "settings.storage.description",
   About: "settings.about.tagline",
   Devices: "settings.devices.section_desc",
+  Listening: "settings.listening.description",
 };
 
 const font = { fontFamily: "var(--font-inter), sans-serif" } as const;
@@ -227,6 +240,7 @@ export default function SettingsModal() {
       : t("settings.categories.overlay.title"),
     storage: t("settings.categories.storage.title"),
     about: t("settings.categories.about.title"),
+    listening: t("settings.categories.listening.title"),
   };
 
   const categoryDescriptions: Record<CategoryId, string> = {
@@ -235,6 +249,7 @@ export default function SettingsModal() {
     overlay: t("settings.categories.overlay.description"),
     storage: t("settings.categories.storage.description"),
     about: t("settings.categories.about.description"),
+    listening: t("settings.categories.listening.description"),
   };
 
   const sectionTitles: Record<SectionId, string> = {
@@ -249,6 +264,7 @@ export default function SettingsModal() {
     Storage: t("settings.tabs.storage"),
     About: t("settings.tabs.about"),
     Devices: t("settings.devices.section_title") || "Device control",
+    Listening: t("settings.listening.title") || "Listening",
   };
 
   const sectionDescriptions: Record<SectionId, string> = {
@@ -263,6 +279,7 @@ export default function SettingsModal() {
     Storage: t("settings.storage.description"),
     About: t("settings.about.tagline"),
     Devices: t("settings.devices.section_desc") || "Control playback on another device from here, or let your devices control this one.",
+    Listening: t("settings.listening.description") || "Your listening history for the year.",
   };
 
   const isSearching = searchQuery.trim().length > 0;

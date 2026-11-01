@@ -54,6 +54,14 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
   const setUseWallpaperInFullscreen = useCustomizationStore(
     (s) => s.setUseWallpaperInFullscreen,
   );
+  const fullscreenPlainBackground = useCustomizationStore(
+    (s) => s.fullscreenPlainBackground,
+  );
+  const setFullscreenPlainBackground = useCustomizationStore(
+    (s) => s.setFullscreenPlainBackground,
+  );
+  const cinematicMode = useCustomizationStore((s) => s.cinematicMode);
+  const setCinematicMode = useCustomizationStore((s) => s.setCinematicMode);
   const setBlockConfig = useCustomizationStore((s) => s.setBlockConfig);
   const applyToAllBlocks = useCustomizationStore((s) => s.applyToAllBlocks);
   const resetBlock = useCustomizationStore((s) => s.resetBlock);
@@ -283,6 +291,58 @@ export function CustomizationTab({ searchQuery }: { searchQuery?: string }) {
                   t("settings.customization.wallpaper_fullscreen_title") ||
                   "Use wallpaper in fullscreen player"
                 }
+              />
+            }
+          />
+        </SettingBlock>
+
+        <SettingBlock
+          title={t("settings.customization.now_playing_title") || "Now Playing"}
+          description={
+            t("settings.customization.now_playing_description") ||
+            "What the fullscreen player shows behind your music."
+          }
+          titleKey="settings.customization.now_playing_title"
+          descKey="settings.customization.now_playing_description"
+          searchQuery={searchQuery}
+        >
+          <SettingRow
+            title={
+              t("settings.customization.plain_background_title") ||
+              "Plain background in Now Playing"
+            }
+            description={
+              t("settings.customization.plain_background_description") ||
+              "Show your wallpaper at full strength — no blur, no dimming, no overlay."
+            }
+            titleKey="settings.customization.plain_background_title"
+            descKey="settings.customization.plain_background_description"
+            searchQuery={searchQuery}
+            control={
+              <ToggleSwitch
+                checked={fullscreenPlainBackground}
+                onChange={setFullscreenPlainBackground}
+                ariaLabel={
+                  t("settings.customization.plain_background_title") ||
+                  "Plain background in Now Playing"
+                }
+              />
+            }
+          />
+          <SettingRow
+            title={t("settings.customization.cinematic_title") || "Cinematic mode"}
+            description={
+              t("settings.customization.cinematic_description") ||
+              "Now Playing shows only the cover, song and artist, with lyrics."
+            }
+            titleKey="settings.customization.cinematic_title"
+            descKey="settings.customization.cinematic_description"
+            searchQuery={searchQuery}
+            control={
+              <ToggleSwitch
+                checked={cinematicMode}
+                onChange={setCinematicMode}
+                ariaLabel={t("settings.customization.cinematic_title") || "Cinematic mode"}
               />
             }
           />

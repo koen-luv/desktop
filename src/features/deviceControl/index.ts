@@ -1,6 +1,6 @@
 export { useDeviceControlStore } from "./store/deviceControlStore";
 export { startHosting, stopHosting, applyControl, buildDeviceState } from "./host";
-export { disconnectController, sendControl } from "./controller";
+export { connectToHostCode, disconnectController, sendControl } from "./controller";
 export { discoverLocalDevices, connectToLocalHost } from "./local";
 export { DEVICE_CHANNEL_LABEL } from "./protocol";
 export { remoteFromState, remotePositionMs } from "./protocol";

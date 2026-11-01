@@ -163,6 +163,78 @@ type TrackMutationInput = string | { trackId: string; [key: string]: unknown };
 const trackIdFrom = (input: TrackMutationInput) =>
   typeof input === "string" ? input : input.trackId;
 
+/** The API has no batch endpoint for either direction, so bulk work is grouped
+ * in small parallel batches to keep the requests honest without flooding it. */
+const BULK_BATCH_SIZE = 4;
+
+function batches<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+export function useSaveLikedSongsToPlaylist() {
+  const [isPending, setIsPending] = useState(false);
+  const [saved, setSaved] = useState(0);
+
+  const mutateAsync = useCallback(
+    async ({ trackIds, title }: { trackIds: string[]; title: string }) => {
+      if (trackIds.length === 0) throw new Error("There are no liked songs to save yet.");
+      setIsPending(true);
+      setSaved(0);
+      try {
+        const playlist = await api.createPlaylist({ title });
+        let done = 0;
+        for (const batch of batches(trackIds, BULK_BATCH_SIZE)) {
+          const results = await Promise.allSettled(
+            batch.map((trackId) => api.addPlaylistTrack(playlist.id, trackId)),
+          );
+          done += results.filter((result) => result.status === "fulfilled").length;
+          setSaved(done);
+        }
+        notifyLibraryChanged();
+        if (done === 0) {
+          await api.deletePlaylist(playlist.id).catch(() => {});
+          throw new Error("None of the liked songs could be added to the playlist.");
+        }
+        return { playlist, added: done, skipped: trackIds.length - done };
+      } finally {
+        setIsPending(false);
+      }
+    },
+    [],
+  );
+
+  return { mutateAsync, isPending, saved };
+}
+
+export function useLikePlaylistTracks() {
+  const [isPending, setIsPending] = useState(false);
+  const [liked, setLiked] = useState(0);
+
+  const mutateAsync = useCallback(async ({ trackIds }: { trackIds: string[] }) => {
+    if (trackIds.length === 0) return { liked: 0, failed: 0 };
+    setIsPending(true);
+    setLiked(0);
+    try {
+      let done = 0;
+      let failed = 0;
+      for (const batch of batches(trackIds, BULK_BATCH_SIZE)) {
+        const results = await Promise.allSettled(batch.map((trackId) => api.likeTrack(trackId)));
+        done += results.filter((result) => result.status === "fulfilled").length;
+        failed += results.filter((result) => result.status === "rejected").length;
+        setLiked(done);
+      }
+      notifyLibraryChanged();
+      return { liked: done, failed };
+    } finally {
+      setIsPending(false);
+    }
+  }, []);
+
+  return { mutateAsync, isPending, liked };
+}
+
 export function useLikeTrack() {
   const [isPending, setIsPending] = useState(false);
 

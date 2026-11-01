@@ -28,6 +28,8 @@ import {
   usePlaylist,
   useLikedTracks,
   useReorderPlaylistTracks,
+  useSaveLikedSongsToPlaylist,
+  useLikePlaylistTracks,
 } from "../hooks";
 import { useListReorder } from "@/shared/hooks";
 import { playerEngine } from "@/features/player";
@@ -299,6 +301,50 @@ function LibraryPlaylistContent() {
     }, 1200);
     return () => clearTimeout(timer);
   }, [sortedTracks, viewData, toast, t]);
+
+  const saveLikesAsPlaylist = useSaveLikedSongsToPlaylist();
+  const likePlaylistTracks = useLikePlaylistTracks();
+
+  const handleSaveLikesAsPlaylist = useCallback(async () => {
+    if (saveLikesAsPlaylist.isPending || sortedTracks.length === 0) return;
+    try {
+      const result = await saveLikesAsPlaylist.mutateAsync({
+        trackIds: sortedTracks.map((track) => track.id),
+        title: t("playlist.liked_songs"),
+      });
+      toast(t("playlist.saved_as_playlist"), "checkmark", {
+        description: result.playlist.title,
+      });
+      navigate(`/library/playlist?id=${encodeURIComponent(result.playlist.id)}`);
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : t("playlist.save_as_playlist_failed"),
+        "error",
+      );
+    }
+  }, [navigate, saveLikesAsPlaylist, sortedTracks, t, toast]);
+
+  const handleLikeAll = useCallback(async () => {
+    if (likePlaylistTracks.isPending || sortedTracks.length === 0) return;
+    const trackIds = sortedTracks.map((track) => track.id);
+    try {
+      const { liked, failed } = await likePlaylistTracks.mutateAsync({ trackIds });
+      if (failed > 0) {
+        toast(t("playlist.like_all_partial", { count: liked, failed }), "info", {
+          description: viewData?.title || undefined,
+        });
+      } else {
+        toast(t("playlist.like_all_done", { count: liked }), "checkmark", {
+          description: viewData?.title || undefined,
+        });
+      }
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : t("playlist.like_all_failed"),
+        "error",
+      );
+    }
+  }, [likePlaylistTracks, sortedTracks, t, toast, viewData?.title]);
 
   const handleCoverFile = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -865,6 +911,33 @@ function LibraryPlaylistContent() {
                           }))}
                         />
 
+                        {isLikesMode && (
+                          <DropdownMenu
+                            trigger={
+                              <Button
+                                variant={hasCustomBg ? "glass-action" : "outline"}
+                                className="!h-[36px] !w-[36px] shrink-0 !p-0 flex items-center justify-center text-text-primary"
+                                title={t("common.more")}
+                                disabled={currentTracks.length === 0 || saveLikesAsPlaylist.isPending}
+                              >
+                                {saveLikesAsPlaylist.isPending ? (
+                                  <span className="h-[14px] w-[14px] animate-spin rounded-full border-2 border-text-tertiary border-t-transparent" />
+                                ) : (
+                                  <More2Line size={18} />
+                                )}
+                              </Button>
+                            }
+                            items={[
+                              {
+                                id: "save-likes-as-playlist",
+                                icon: <PlaylistLine size={15} />,
+                                label: t("playlist.save_as_playlist"),
+                                onClick: () => void handleSaveLikesAsPlaylist(),
+                              },
+                            ]}
+                          />
+                        )}
+
                         {!isLikesMode && (
                           <DropdownMenu
                             trigger={
@@ -877,6 +950,12 @@ function LibraryPlaylistContent() {
                               </Button>
                             }
                             items={[
+                              {
+                                id: "like-all",
+                                icon: <HeartFill size={15} />,
+                                label: t("playlist.like_all_songs"),
+                                onClick: () => void handleLikeAll(),
+                              },
                               {
                                 id: "collaborators",
                                 icon: <PlaylistLine size={15} />,

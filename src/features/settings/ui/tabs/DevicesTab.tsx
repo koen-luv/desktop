@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useTranslation } from "@/languages";
 import Button from "@/shared/ui/Button";
+import TextInput from "@/shared/ui/TextInput";
 import { CheckLine } from "@mingcute/react";
 import { useDeviceControlStore } from "@/features/deviceControl";
 import { discoverLocalDevices, connectToLocalHost } from "@/features/deviceControl";
-import { disconnectController, sendControl } from "@/features/deviceControl";
+import { connectToHostCode, disconnectController, sendControl } from "@/features/deviceControl";
 import { startHosting, stopHosting } from "@/features/deviceControl";
 import type { ControlAction } from "@/features/deviceControl";
 
@@ -26,11 +28,14 @@ export function DevicesTab({ searchQuery }: { searchQuery?: string }) {
   const hostName = useDeviceControlStore((s) => s.hostName);
   const remote = useDeviceControlStore((s) => s.remote);
   const hostPhase = useDeviceControlStore((s) => s.hostPhase);
+  const hostCode = useDeviceControlStore((s) => s.hostCode);
   const hostError = useDeviceControlStore((s) => s.hostError);
   const controllers = useDeviceControlStore((s) => s.controllers);
   const nearbyHosts = useDeviceControlStore((s) => s.nearbyHosts);
   const isDiscovering = useDeviceControlStore((s) => s.isDiscovering);
   const nearbyError = useDeviceControlStore((s) => s.nearbyError);
+
+  const [pairingCode, setPairingCode] = useState("");
 
   const query = (searchQuery ?? "").trim().toLowerCase();
   const matches = (...texts: string[]) =>
@@ -102,6 +107,40 @@ export function DevicesTab({ searchQuery }: { searchQuery?: string }) {
           ) : (
             <div className="flex flex-col gap-[8px]">
               <div className="flex flex-col gap-[7px] rounded-lg border border-border-primary bg-bg-primary p-[10px]">
+                <span className="text-[12.5px] font-[500] text-text-secondary">
+                  {t("devices.pairing_code")}
+                </span>
+                <div className="flex items-center gap-[8px]">
+                  <TextInput
+                    value={pairingCode}
+                    onChange={(event) =>
+                      setPairingCode(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void connectToHostCode(pairingCode);
+                    }}
+                    placeholder={t("devices.code_placeholder")}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    size="sm"
+                    className="!rounded-md tracking-[0.3em]"
+                  />
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={pairingCode.length !== 6 || controllerPhase === "connecting"}
+                    onClick={() => void connectToHostCode(pairingCode)}
+                  >
+                    {t("devices.connect")}
+                  </Button>
+                </div>
+                <span className="text-[11.5px] text-text-tertiary">
+                  {t("devices.pairing_code_hint")}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-[7px] rounded-lg border border-border-primary bg-bg-primary p-[10px]">
                 <div className="flex items-center justify-between gap-[8px]">
                   <span className="text-[12.5px] font-[500] text-text-secondary">
                     {t("devices.local_network") || "Same Wi-Fi network"}
@@ -163,11 +202,34 @@ export function DevicesTab({ searchQuery }: { searchQuery?: string }) {
           {hostActive ? (
             <div className="flex flex-col gap-[10px]">
               {hostPhase === "waiting" ? (
-                <>
-                  <span className="text-[12px] font-[500] text-text-secondary">
-                    {t("devices.waiting_local") || "Waiting for a device on your Wi-Fi network"}
-                  </span>
-                </>
+                <div className="flex flex-col gap-[6px] rounded-lg border border-border-primary bg-bg-primary p-[12px]">
+                  {hostCode ? (
+                    <>
+                      <span className="text-[11.5px] text-text-tertiary">
+                        {t("devices.pairing_code_host_hint")}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!hostCode) return;
+                          void navigator.clipboard?.writeText(hostCode).catch(() => {});
+                        }}
+                        title={t("common.copy")}
+                        className="w-fit cursor-pointer border-0 bg-transparent p-0 text-left text-[30px] font-[600] leading-none tracking-[0.28em] text-text-primary"
+                        style={{ fontFamily: "var(--font-inter), sans-serif" }}
+                      >
+                        {hostCode}
+                      </button>
+                      <span className="text-[11.5px] text-text-tertiary">
+                        {t("devices.pairing_code_host_wifi")}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-[12px] font-[500] text-text-secondary">
+                      {t("devices.waiting_local") || "Waiting for a device on your Wi-Fi network"}
+                    </span>
+                  )}
+                </div>
               ) : null}
               {hostPhase === "connected" ? (
                 <div className="flex items-center gap-[8px] rounded-lg border border-border-primary bg-bg-primary px-[12px] py-[10px]">

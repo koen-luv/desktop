@@ -17,7 +17,7 @@ import {
 } from "@/features/lyrics";
 import { AnimatePresence, motion } from "framer-motion";
 import { PlayerUiElements } from "./PlayerUiElements";
-import { DownLine } from "@mingcute/react";
+import { DownLine, FilmLine } from "@mingcute/react";
 import { preloadCoverArt, useCoverSrc } from "@/features/covers";
 import "@braccato/core/element";
 import "@braccato/core/styles/variables.css";
@@ -381,7 +381,12 @@ export function FullscreenPlayer({
   const useWallpaperInFullscreen = useCustomizationStore(
     (state) => state.useWallpaperInFullscreen,
   );
-  const showWallpaper = Boolean(useWallpaperInFullscreen && wallpaper);
+  const plainBackground = useCustomizationStore((state) => state.fullscreenPlainBackground);
+  // "Plain background" also opts the wallpaper in, so the toggle alone is
+  // enough to see your own image behind the player at full strength.
+  const showWallpaper = Boolean((useWallpaperInFullscreen || plainBackground) && wallpaper);
+  const cinematicMode = useCustomizationStore((state) => state.cinematicMode);
+  const setCinematicMode = useCustomizationStore((state) => state.setCinematicMode);
   useEffect(() => {
     if (!player.currentTrack) {
       onClose();
@@ -448,9 +453,9 @@ export function FullscreenPlayer({
             alt=""
             className="absolute inset-0 h-full w-full object-cover"
             style={{
-              filter: wallpaperBlur > 0 ? `blur(${wallpaperBlur}px)` : undefined,
-              opacity: wallpaperOpacity / 100,
-              transform: wallpaperBlur > 0 ? "scale(1.05)" : undefined,
+              filter: !plainBackground && wallpaperBlur > 0 ? `blur(${wallpaperBlur}px)` : undefined,
+              opacity: plainBackground ? 1 : wallpaperOpacity / 100,
+              transform: !plainBackground && wallpaperBlur > 0 ? "scale(1.05)" : undefined,
             }}
           />
         ) : kawarpSrc && !kawarpShown ? (
@@ -459,7 +464,7 @@ export function FullscreenPlayer({
             style={{ backgroundImage: `url(${kawarpSrc})` }}
           />
         ) : null}
-        {showWallpaper && wallpaper && wallpaperDim > 0 && (
+        {showWallpaper && wallpaper && wallpaperDim > 0 && !plainBackground && (
           <div
             aria-hidden="true"
             className="absolute inset-0 bg-black"
@@ -473,13 +478,44 @@ export function FullscreenPlayer({
 
       <div
         className={`absolute inset-0 z-[1] ${
-          showWallpaper ? "bg-black/25" : "bg-black/40"
+          plainBackground && showWallpaper
+            ? "bg-transparent"
+            : showWallpaper
+              ? "bg-black/25"
+              : "bg-black/40"
         }`}
       />
 
       <div className="absolute inset-0 z-10 flex flex-col landscape:flex-row md:flex-row pt-[var(--inset-top,0px)] pb-[var(--inset-bottom,0px)]">
         <div className="w-full landscape:w-[42%] landscape:flex-none shrink-0 md:flex-1 flex flex-col items-center justify-center gap-3 landscape:gap-2 md:gap-5 px-4 landscape:px-2 pt-12 landscape:pt-0 pb-2 md:p-0">
-          <PlayerUiElements onClose={onClose} />
+          {cinematicMode ? (
+            <div className="flex w-full max-w-[380px] flex-col items-center gap-[18px] px-2 text-center">
+              {coverUrl ? (
+                <img
+                  src={kawarpSrc || coverUrl}
+                  alt=""
+                  className="aspect-square w-full max-w-[min(52vh,320px)] rounded-2xl object-cover shadow-e2"
+                  draggable={false}
+                />
+              ) : null}
+              <div className="flex w-full flex-col items-center gap-[4px]">
+                <span
+                  className="w-full truncate text-[19px] font-[600] leading-tight text-white"
+                  style={{ fontFamily: "var(--font-inter), sans-serif" }}
+                >
+                  {player.currentTrack?.title}
+                </span>
+                <span
+                  className="w-full truncate text-[13.5px] text-white/65"
+                  style={{ fontFamily: "var(--font-inter), sans-serif" }}
+                >
+                  {player.currentTrack?.artists}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <PlayerUiElements onClose={onClose} />
+          )}
         </div>
 
         <div className="flex-1 w-full landscape:w-[58%] min-h-0 pl-0 pr-0 md:pl-2 md:pr-6 flex flex-col relative">
@@ -583,6 +619,21 @@ export function FullscreenPlayer({
           </AnimatePresence>
         </div>
       </div>
+
+      <button
+        type="button"
+        aria-label={t("player.cinematic_mode")}
+        aria-pressed={cinematicMode}
+        onClick={() => setCinematicMode(!cinematicMode)}
+        data-no-window-drag
+        className={`absolute top-[calc(var(--inset-top,0px)+12px)] right-[12px] z-30 inline-flex h-[36px] w-[36px] items-center justify-center rounded-full border backdrop-blur-xl active:scale-[0.94] transition-all duration-200 ease-[var(--motion-ease)] cursor-pointer select-none pointer-events-auto ${
+          cinematicMode
+            ? "border-accent-primary/60 bg-accent-primary/30 text-white"
+            : "border-white/10 bg-white/8 text-white/80 hover:bg-white/16 hover:text-white"
+        }`}
+      >
+        <FilmLine size={18} />
+      </button>
 
       <button
         type="button"
