@@ -77,14 +77,6 @@ function broadcastPartyParticipants(): void {
   }
 }
 
-function broadcastPartyParticipants(): void {
-  const store = usePartyStore.getState();
-  const people = [{ id: "host", name: ownName() }, ...store.guests];
-  for (const conn of store.hostConnections.values()) {
-    if (conn.isOpen) conn.send({ t: "participants", people });
-  }
-}
-
 /** Guest failure: end the attempt outright so the control lock can't stick. */
 function failGuest(message: string): void {
   const store = usePartyStore.getState();
