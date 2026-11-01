@@ -6,6 +6,7 @@ import { useWindowDrag } from "@/shared/hooks";
 import { useAppIconSync } from "@/features/player";
 import { I18nProvider } from "@/languages";
 import { AuthLock } from "@/features/auth";
+import { HumanCheckNotice } from "@/features/human-check";
 import { CoverSwRegistrar } from "@/features/covers";
 import { usePresenceSync } from "@/shared/presence";
 import { useThemeCustomizationSync } from "@/features/settings/hooks/useThemeCustomizationSync";
@@ -102,6 +103,7 @@ export default function App() {
                   <EnvironmentWarning />
                   <PartySheet />
                   <DeviceControlSheet />
+                  <HumanCheckNotice />
                   <ConnectivityWall />
                   <AuthLock>
                     <AppRoutes />

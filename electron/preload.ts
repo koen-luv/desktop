@@ -5,7 +5,7 @@ import type { MainNetResult } from "./netdiag";
 import type { LanDiscoveredHost, LanHostInfo } from "./lan";
 
 export interface DeeplinkTarget {
-  type: "artist" | "album" | "playlist" | "track";
+  type: "artist" | "album" | "playlist" | "track" | "reset-password";
   id: string;
 }
 

@@ -51,6 +51,18 @@ function translate(key: string, vars?: Record<string, string | number>) {
 }
 
 import { getApiBaseUrl } from "./baseUrl";
+import {
+  PowTimeoutError,
+  SUPPORTED_POW_ALGORITHM,
+  type PowChallenge,
+  type PowSolution,
+} from "./proofOfWork";
+import { solvePow } from "./proofOfWorkRunner";
+import {
+  isHumanCheckMode,
+  runHumanCheck,
+  type HumanCheckAction,
+} from "./humanCheck";
 import { platformFetch } from "@/platform/http";
 
 const CLIENT_VERSION =
@@ -533,12 +545,100 @@ import type {
 
 // ---- Endpoints --------------------------------------------------------------
 
+const RETRYABLE_POW_CODES = new Set(["POW_EXPIRED", "POW_REUSED"]);
+
+interface AuthProof {
+  pow?: PowSolution;
+  turnstile?: string;
+  edge?: boolean;
+}
+
+function authBody(proof: AuthProof) {
+  return { pow: proof.pow, turnstile: proof.turnstile };
+}
+
+function authInit(proof: AuthProof, body: unknown): RequestInit {
+  return {
+    method: "POST",
+    body: JSON.stringify(body),
+    ...(proof.edge ? { credentials: "include" as const } : {}),
+  };
+}
+
+// a request that never reached our API (blocked by the edge, offline, CORS)
+function blockedBeforeOurServer(error: unknown): boolean {
+  return error instanceof TypeError || statusOf(error) === 0;
+}
+
+async function humanCheck(
+  challenge: PowChallenge,
+  purpose: HumanCheckAction,
+): Promise<string | undefined> {
+  const requested = challenge.turnstile?.mode;
+  const mode = isHumanCheckMode(requested) ? requested : "off";
+  if (mode === "off" && !challenge.turnstile?.edge) return undefined;
+  return runHumanCheck(purpose, mode === "off" ? "optional" : mode);
+}
+
+// solves the argon2id challenge and collects the human check token; the proof is
+// optional so an older server that answers 404 still signs users in
+async function authProofFor(
+  purpose: HumanCheckAction,
+  email: string,
+): Promise<AuthProof> {
+  let challenge: PowChallenge;
+  try {
+    challenge = await request<PowChallenge>(
+      "/v1/auth/challenge",
+      { method: "POST", body: JSON.stringify({ purpose, email }) },
+      false,
+    );
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return {};
+    throw error;
+  }
+  const work =
+    challenge.mode === "off" || challenge.algorithm !== SUPPORTED_POW_ALGORITHM
+      ? undefined
+      : solvePow(challenge);
+  void work?.catch(() => undefined);
+  const turnstile = await humanCheck(challenge, purpose);
+  return {
+    pow: await work,
+    turnstile,
+    edge: challenge.turnstile?.edge === true,
+  };
+}
+
+async function withAuthProof<T>(
+  purpose: HumanCheckAction,
+  email: string,
+  send: (proof: AuthProof) => Promise<T>,
+): Promise<T> {
+  let proof: AuthProof | undefined;
+  try {
+    proof = await authProofFor(purpose, email);
+    return await send(proof);
+  } catch (error) {
+    const retryable =
+      error instanceof PowTimeoutError ||
+      (error instanceof ApiError &&
+        !!error.code &&
+        RETRYABLE_POW_CODES.has(error.code)) ||
+      (proof?.edge === true && blockedBeforeOurServer(error));
+    if (!retryable) throw error;
+    return send(await authProofFor(purpose, email));
+  }
+}
+
 export const api = {
   async login(email: string, password: string): Promise<AuthTokens> {
-    const result = await request<AuthTokens>(
-      "/v1/auth/login",
-      { method: "POST", body: JSON.stringify({ email, password }) },
-      false,
+    const result = await withAuthProof("login", email, (proof) =>
+      request<AuthTokens>(
+        "/v1/auth/login",
+        authInit(proof, { email, password, ...authBody(proof) }),
+        false,
+      ),
     );
     setAuthSession(result);
     return result;
@@ -550,21 +650,43 @@ export const api = {
     username: string,
     displayName: string,
   ): Promise<AuthTokens> {
-    const result = await request<AuthTokens>(
-      "/v1/auth/register",
-      {
-        method: "POST",
-        body: JSON.stringify({
+    const result = await withAuthProof("register", email, (proof) =>
+      request<AuthTokens>(
+        "/v1/auth/register",
+        authInit(proof, {
           email,
           password,
           username: username.trim().toLowerCase(),
           displayName: displayName.trim(),
+          ...authBody(proof),
         }),
-      },
-      false,
+        false,
+      ),
     );
     setAuthSession(result);
     return result;
+  },
+
+  // one-time links Liner support emails (liner://reset-password?id=<token>)
+  getPasswordReset(
+    token: string,
+  ): Promise<{ maskedEmail: string; expiresAt: string }> {
+    return request(
+      `/v1/auth/password-reset/${encodeURIComponent(token)}`,
+      undefined,
+      false,
+    );
+  },
+
+  completePasswordReset(
+    token: string,
+    password: string,
+  ): Promise<{ success: true }> {
+    return request(
+      `/v1/auth/password-reset/${encodeURIComponent(token)}`,
+      { method: "POST", body: JSON.stringify({ password }) },
+      false,
+    );
   },
 
   getMe(): Promise<AuthUser> {

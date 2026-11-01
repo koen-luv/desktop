@@ -713,6 +713,17 @@ if (!gotTheLock) {
 
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
       const responseHeaders = { ...(details.responseHeaders || {}) };
+      // a response that opts into credentials (the api's edge cookie on sign-in)
+      // must keep its own origin, a wildcard makes the browser drop the cookie
+      const allowsCredentials = Object.entries(responseHeaders).some(
+        ([name, value]) =>
+          name.toLowerCase() === "access-control-allow-credentials" &&
+          value.some((entry) => entry.trim().toLowerCase() === "true"),
+      );
+      if (allowsCredentials) {
+        callback({ responseHeaders });
+        return;
+      }
       responseHeaders["access-control-allow-origin"] = ["*"];
       responseHeaders["access-control-allow-headers"] = ["*"];
       responseHeaders["access-control-allow-methods"] = ["GET, HEAD, OPTIONS"];

@@ -10,6 +10,9 @@ const PlaylistPage = lazy(() => import("@/features/library/ui/PlaylistPage"));
 const ArtistPage = lazy(() => import("@/features/artist/ui/ArtistPage"));
 const CollectionPage = lazy(() => import("@/features/collection/ui/CollectionPage"));
 const LoginPage = lazy(() => import("@/features/auth/ui/LoginPage"));
+const ResetPasswordPage = lazy(
+  () => import("@/features/auth/ui/ResetPasswordPage"),
+);
 const PlayerPage = lazy(() => import("@/features/player/ui/FullscreenPlayer"));
 
 const ROUTE_LOADERS: Array<() => Promise<unknown>> = [
@@ -18,6 +21,7 @@ const ROUTE_LOADERS: Array<() => Promise<unknown>> = [
   () => import("@/features/artist/ui/ArtistPage"),
   () => import("@/features/collection/ui/CollectionPage"),
   () => import("@/features/auth/ui/LoginPage"),
+  () => import("@/features/auth/ui/ResetPasswordPage"),
   () => import("@/features/player/ui/FullscreenPlayer"),
 ];
 
@@ -52,6 +56,7 @@ export function AppRoutes() {
         <Route path="/artist" element={<ArtistPage />} />
         <Route path="/collection" element={<CollectionPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/settings" element={<Navigate to="/" replace />} />
         <Route path="/player" element={<PlayerPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

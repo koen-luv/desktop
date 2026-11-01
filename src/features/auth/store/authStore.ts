@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { api, ApiError } from "@/shared/api";
+import { api, ApiError, HumanCheckCancelledError } from "@/shared/api";
 import {
   clearAuthSession,
   getAuthSession,
@@ -11,38 +11,6 @@ import {
 } from "@/shared/api";
 import { playerEngine } from "@/features/player";
 import { queryCache } from "@/shared/cache/queryCache";
-
-// ---------------------------------------------------------------------------
-// Dev-only auth escape hatch.
-//
-// Set `localStorage.linerDevAuth = "1"` to skip the login gate when running
-// `pnpm dev`, for local UI testing without a backend account. This is guarded
-// by `import.meta.env.DEV`, which Vite statically inlines as `false` in
-// production builds — so the whole block is dead-code-removed and can never
-// ship as an auth hole in the release APK/web bundle. Note the app's data
-// (library, playback, party) is still fetched from the API and needs a real
-// token; this only removes the login screen.
-const DEV_AUTH_FLAG_KEY = "linerDevAuth";
-
-function devAuthBypassActive(): boolean {
-  if (!import.meta.env.DEV) return false;
-  try {
-    return (
-      typeof localStorage !== "undefined" &&
-      localStorage.getItem(DEV_AUTH_FLAG_KEY) === "1"
-    );
-  } catch {
-    return false;
-  }
-}
-
-const DEV_AUTH_STUB_USER: AuthUser = {
-  id: "dev-auth-bypass",
-  email: "dev@localhost",
-  username: "dev",
-  displayName: "Dev (auth bypass)",
-};
-// ---------------------------------------------------------------------------
 
 export type AuthStatus = "initializing" | "authenticated" | "anonymous";
 export type AuthState = {
@@ -64,10 +32,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   status: "initializing",
   user: null,
   initialize: async () => {
-    if (devAuthBypassActive()) {
-      set({ status: "authenticated", user: DEV_AUTH_STUB_USER });
-      return;
-    }
     const stored = getAuthSession();
     if (!stored) {
       set({ status: "anonymous", user: null });
@@ -192,15 +156,18 @@ useAuthStore.subscribe((state, previous) => {
 });
 
 export function getAuthErrorCode(error: unknown): string {
+  if (error instanceof HumanCheckCancelledError) return "human_check_cancelled";
   if (!(error instanceof ApiError)) return "server_unavailable";
   if (error.status === 0) return "server_unavailable";
   // 5xx and cloudflare 52x: the server is down, not the user's input or connection
   if (error.status >= 500) return "server_error";
+  if (error.status === 429) return "rate_limited";
   if (error.code === "INVALID_CREDENTIALS") return "invalid_credentials";
   if (error.code === "EMAIL_ALREADY_USED") return "email_already_used";
   if (error.code === "USERNAME_TAKEN") return "username_taken";
   if (error.code === "INVALID_USERNAME") return "invalid_username";
   if (error.code === "INVALID_INPUT") return "invalid_input";
+  if (error.code?.startsWith("TURNSTILE_")) return "human_check_failed";
   return "unknown_error";
 }
 

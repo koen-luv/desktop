@@ -56,6 +56,21 @@ export {
   type AuthTokens,
 } from "./auth-session";
 
+export {
+  HumanCheckCancelledError,
+  setHumanCheckPrompt,
+  humanCheckOrigin,
+  humanCheckPageUrl,
+  isHumanCheckMode,
+  runHumanCheck,
+  type HumanCheckAction,
+  type HumanCheckMode,
+  type HumanCheckRequest,
+  type HumanCheckPrompt,
+} from "./humanCheck";
+
+export { PowTimeoutError, type PowChallenge, type PowSolution } from "./proofOfWork";
+
 export { toClientTrack } from "./track";
 
 export {
