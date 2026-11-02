@@ -57,6 +57,8 @@ export default function LoginPage() {
       return t("login.errors.server_unavailable");
     if (code === "server_error") return t("login.errors.server_error");
     if (code === "rate_limited") return t("login.errors.rate_limited");
+    if (code === "edge_challenge")
+      return t("login.errors.edge_challenge");
     if (code === "invalid_credentials")
       return t("login.errors.invalid_credentials");
     if (code === "email_already_used")

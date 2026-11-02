@@ -6,6 +6,12 @@ export type HumanCheckMode = "off" | "optional" | "required";
 export interface HumanCheckRequest {
   action: HumanCheckAction;
   mode: Exclude<HumanCheckMode, "off">;
+  /**
+   * The api's edge also wants its own clearance cookie. Only a check page served
+   * from the api origin can mint that, so the client asks for that page instead
+   * of rendering the widget itself.
+   */
+  edge?: boolean;
 }
 
 export type HumanCheckPrompt = (
@@ -40,9 +46,10 @@ export function isHumanCheckMode(value: unknown): value is HumanCheckMode {
 export async function runHumanCheck(
   action: HumanCheckAction,
   mode: HumanCheckMode,
+  edge = false,
 ): Promise<string | undefined> {
   if (mode === "off") return undefined;
-  const token = prompt ? await prompt({ action, mode }) : null;
+  const token = prompt ? await prompt({ action, mode, edge }) : null;
   if (token) return token;
   if (mode === "required") throw new HumanCheckCancelledError();
   return undefined;

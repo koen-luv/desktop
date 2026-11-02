@@ -196,6 +196,13 @@ export function toMaxQualityAvatarUrl(url: string | undefined): string {
 
 const inFlightGetRequests = new Map<string, Promise<unknown>>();
 
+// an edge challenge never reaches the api: cloudflare answers with its own page,
+// so a failed request can come back as html instead of json
+function isEdgeChallengePage(text: string): boolean {
+  if (!text.trimStart().startsWith("<")) return false;
+  return /just a moment|attention required|cf-error-details|cloudflare/i.test(text);
+}
+
 async function executeRequest<T>(
   path: string,
   init?: RequestInit,
@@ -358,10 +365,13 @@ async function executeRequest<T>(
   telemetry.trackNetwork(method, path, res.status, durationMs, requestId);
 
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as Record<
-      string,
-      unknown
-    >;
+    const raw = await res.text().catch(() => "");
+    let body: Record<string, unknown> = {};
+    try {
+      body = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    } catch {
+      body = {};
+    }
     const resRequestId =
       res.headers?.get?.("x-request-id") ||
       (typeof body.reqId === "string"
@@ -378,10 +388,19 @@ async function executeRequest<T>(
       });
     }
 
+    const edgeChallenge = isEdgeChallengePage(raw);
     const apiErr = new ApiError(
       res.status,
-      typeof body.message === "string" ? body.message : res.statusText,
-      typeof body.code === "string" ? body.code : undefined,
+      edgeChallenge
+        ? "Cloudflare blocked the request before it reached Liner."
+        : typeof body.message === "string"
+          ? body.message
+          : res.statusText,
+      edgeChallenge
+        ? "EDGE_CHALLENGE"
+        : typeof body.code === "string"
+          ? body.code
+          : undefined,
       resRequestId,
     );
     if (isConnectivityFailure(apiErr) && !isPlaybackPath(path)) {
@@ -573,11 +592,16 @@ function blockedBeforeOurServer(error: unknown): boolean {
 async function humanCheck(
   challenge: PowChallenge,
   purpose: HumanCheckAction,
+  hosted: boolean,
 ): Promise<string | undefined> {
   const requested = challenge.turnstile?.mode;
   const mode = isHumanCheckMode(requested) ? requested : "off";
-  if (mode === "off" && !challenge.turnstile?.edge) return undefined;
-  return runHumanCheck(purpose, mode === "off" ? "optional" : mode);
+  if (mode === "off" && !challenge.turnstile?.edge && !hosted) return undefined;
+  return runHumanCheck(
+    purpose,
+    mode === "off" ? "optional" : mode,
+    hosted,
+  );
 }
 
 // solves the argon2id challenge and collects the human check token; the proof is
@@ -585,6 +609,7 @@ async function humanCheck(
 async function authProofFor(
   purpose: HumanCheckAction,
   email: string,
+  hosted = false,
 ): Promise<AuthProof> {
   let challenge: PowChallenge;
   try {
@@ -602,7 +627,7 @@ async function authProofFor(
       ? undefined
       : solvePow(challenge);
   void work?.catch(() => undefined);
-  const turnstile = await humanCheck(challenge, purpose);
+  const turnstile = await humanCheck(challenge, purpose, hosted);
   return {
     pow: await work,
     turnstile,
@@ -616,18 +641,24 @@ async function withAuthProof<T>(
   send: (proof: AuthProof) => Promise<T>,
 ): Promise<T> {
   let proof: AuthProof | undefined;
+  let hosted = false;
   try {
-    proof = await authProofFor(purpose, email);
+    proof = await authProofFor(purpose, email, hosted);
     return await send(proof);
   } catch (error) {
+    const blockedByEdge = error instanceof ApiError && error.code === "EDGE_CHALLENGE";
     const retryable =
       error instanceof PowTimeoutError ||
       (error instanceof ApiError &&
         !!error.code &&
         RETRYABLE_POW_CODES.has(error.code)) ||
-      (proof?.edge === true && blockedBeforeOurServer(error));
+      (proof?.edge === true && blockedBeforeOurServer(error)) ||
+      (blockedByEdge && !hosted);
     if (!retryable) throw error;
-    return send(await authProofFor(purpose, email));
+    // the edge rejected the request, so the next round has to go through the api's
+    // own check page: only that origin can be issued the clearance cookie
+    const nextHosted = hosted || blockedByEdge;
+    return send(await authProofFor(purpose, email, nextHosted));
   }
 }
 

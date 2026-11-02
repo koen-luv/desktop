@@ -393,7 +393,8 @@
       "registration_failed": "Registration failed: {status}",
       "verification_canceled": "Verification canceled.",
       "human_check_cancelled": "Finish the human check to continue.",
-      "human_check_failed": "The human check didn't go through. Please try again."
+      "human_check_failed": "The human check didn't go through. Please try again.",
+      "edge_challenge": "Cloudflare blocked the request before it reached Liner. Turn off any VPN or proxy and try again."
     },
     "toasts": {
       "login_successful": "Login successful",

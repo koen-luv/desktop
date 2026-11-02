@@ -67,7 +67,7 @@ export default function HumanCheckNotice() {
             </div>
           </div>
           <div className="mt-[12px]">
-            <CheckFrame action={request.action} attempt={attempt} />
+            <CheckFrame request={request} attempt={attempt} />
           </div>
           <div className="mt-[10px] flex gap-[8px]">
             <button

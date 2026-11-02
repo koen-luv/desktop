@@ -162,6 +162,8 @@ export function getAuthErrorCode(error: unknown): string {
   // 5xx and cloudflare 52x: the server is down, not the user's input or connection
   if (error.status >= 500) return "server_error";
   if (error.status === 429) return "rate_limited";
+  // the api edge answered instead of the api, so no credentials were even checked
+  if (error.code === "EDGE_CHALLENGE") return "edge_challenge";
   if (error.code === "INVALID_CREDENTIALS") return "invalid_credentials";
   if (error.code === "EMAIL_ALREADY_USED") return "email_already_used";
   if (error.code === "USERNAME_TAKEN") return "username_taken";
