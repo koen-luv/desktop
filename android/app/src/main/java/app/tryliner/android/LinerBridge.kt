@@ -14,6 +14,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.provider.Settings
 import android.view.WindowManager
+import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -23,7 +24,9 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
 import java.util.Locale
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class LinerBridge(private val activity: MainActivity) {
     @Volatile private var reportedLocalStorageBytes = 0L
@@ -149,6 +152,12 @@ class LinerBridge(private val activity: MainActivity) {
             }
             if (!hasUserAgent) builder.header("User-Agent", Http.userAgent)
             builder.header("Accept-Language", "en-US,en;q=0.9")
+            // only our own api sits behind the cloudflare challenge; sending the
+            // playback hosts a cookie they never got before would change their answers
+            val linerApi = host.endsWith("tryliner.fun")
+            if (linerApi) {
+                cookiesFor(url)?.takeIf { it.isNotBlank() }?.let { builder.header("Cookie", it) }
+            }
             if (host.endsWith("youtube.com")) {
                 builder.header("Origin", "https://$host")
                 builder.header("Referer", "https://$host/")
@@ -164,6 +173,7 @@ class LinerBridge(private val activity: MainActivity) {
             }
 
             Http.client.newCall(builder.build()).execute().use { response ->
+                if (linerApi) storeCookies(url, response.headers("Set-Cookie"))
                 val responseBody = response.body?.string().orEmpty()
                 if (responseBody.length > 12_000_000) {
                     return errorJson(requestId, "Response too large")
@@ -185,6 +195,42 @@ class LinerBridge(private val activity: MainActivity) {
         } catch (error: Exception) {
             errorJson(requestId, error.message ?: "Network request failed")
         }
+    }
+
+    /**
+     * Cloudflare answers credentialed api routes with a managed challenge. The
+     * clearance cookie is minted for the Turnstile iframe running inside our
+     * WebView, so it only exists in the WebView jar — this OkHttp client keeps
+     * no jar of its own, so the request has to borrow it.
+     */
+    private fun cookiesFor(url: String): String? {
+        var cookie: String? = null
+        val latch = CountDownLatch(1)
+        activity.runOnUiThread {
+            cookie = try {
+                CookieManager.getInstance().getCookie(url)
+            } catch (_: Exception) {
+                null
+            }
+            latch.countDown()
+        }
+        latch.await(2, TimeUnit.SECONDS)
+        return cookie
+    }
+
+    private fun storeCookies(url: String, setCookies: List<String>) {
+        if (setCookies.isEmpty()) return
+        val latch = CountDownLatch(1)
+        activity.runOnUiThread {
+            try {
+                val manager = CookieManager.getInstance()
+                setCookies.forEach { manager.setCookie(url, it) }
+                manager.flush()
+            } catch (_: Exception) {
+            }
+            latch.countDown()
+        }
+        latch.await(2, TimeUnit.SECONDS)
     }
 
     private fun isAllowedHost(host: String): Boolean {

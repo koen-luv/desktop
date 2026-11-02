@@ -174,7 +174,10 @@ class MainActivity : ComponentActivity() {
         Http.userAgent = settings.userAgentString
 
         CookieManager.getInstance().setAcceptCookie(true)
-        CookieManager.getInstance().setAcceptThirdPartyCookies(view, false)
+        // the Turnstile check runs in an iframe served from api.tryliner.fun, which is
+        // a third party to the bundled app origin; without this the Cloudflare
+        // clearance cookie is dropped and every credentialed api call is challenged
+        CookieManager.getInstance().setAcceptThirdPartyCookies(view, true)
 
         view.addJavascriptInterface(LinerBridge(this), "LinerAndroid")
 
