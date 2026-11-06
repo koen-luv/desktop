@@ -39,8 +39,8 @@ npx wrangler deploy
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `TURNSTILE_MODE` | `off` | `off`, `optional` or `required` |
-| `TURNSTILE_SITE_KEY` | empty | Public widget key |
+| `TURNSTILE_MODE` | `optional` | `off`, `optional` or `required` |
+| `TURNSTILE_SITE_KEY` | `0x4AAAAAAFwIpK7QKp-h3zap` | Public widget key |
 | `ALLOWED_ORIGINS` | `*` | Comma-separated allowlist, or `*` for native clients |
 | `ACCESS_TOKEN_TTL_SECONDS` | `900` | Lifetime of the HMAC access token |
 | `REFRESH_TOKEN_TTL_DAYS` | `30` | Lifetime of the rotating refresh token |
@@ -62,9 +62,11 @@ release builds pick it up. Restart/rebuild the app after changing it.
 Turnstile in the app needs no rebuild: `/v1/auth/challenge` returns the public
 site key and the app uses it. Set `VITE_TURNSTILE_SITE_KEY` only as a fallback
 for an older API that does not return a key. Add every hostname the app is
-served from to the Turnstile widget's allowlist. Packaged Electron builds run
-from `file://` and use the Worker's `/v1/auth/verify` page instead of an inline
-widget — that page is included.
+served from to the Turnstile widget's allowlist: `tryliner.fun`, `localhost`,
+`127.0.0.1`, `appassets.androidplatform.net` (the Android WebView) and
+`liner-api.<account>.workers.dev` (the hosted check page). Packaged Electron
+builds run from `file://` and use the Worker's `/v1/auth/verify` page instead of
+an inline widget — that page is included.
 
 ## Why requests were being blocked by Turnstile
 

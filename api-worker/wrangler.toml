@@ -8,8 +8,10 @@ compatibility_date = "2025-09-01"
 [vars]
 # off | optional | required. Turnstile only becomes active when both
 # TURNSTILE_SITE_KEY and the TURNSTILE_SECRET secret are present.
-TURNSTILE_MODE = "off"
-TURNSTILE_SITE_KEY = ""
+# optional: the widget is shown and tokens are verified, but a failed widget
+# never locks a client out. Use "required" to reject sign-ins without a token.
+TURNSTILE_MODE = "optional"
+TURNSTILE_SITE_KEY = "0x4AAAAAAFwIpK7QKp-h3zap"
 # "*" lets the desktop, Android, iOS and browser builds call the Worker from
 # any origin. Use a comma-separated allowlist if you only ship web clients.
 ALLOWED_ORIGINS = "*"
