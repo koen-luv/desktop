@@ -1,0 +1,20 @@
+name = "liner-api"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+
+# Secrets (set with `npx wrangler secret put <NAME>`):
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, JWT_SECRET, TURNSTILE_SECRET
+
+[vars]
+# off | optional | required. Turnstile only becomes active when both
+# TURNSTILE_SITE_KEY and the TURNSTILE_SECRET secret are present.
+TURNSTILE_MODE = "off"
+TURNSTILE_SITE_KEY = ""
+# "*" lets the desktop, Android, iOS and browser builds call the Worker from
+# any origin. Use a comma-separated allowlist if you only ship web clients.
+ALLOWED_ORIGINS = "*"
+ACCESS_TOKEN_TTL_SECONDS = "900"
+REFRESH_TOKEN_TTL_DAYS = "30"
+
+[observability]
+enabled = true

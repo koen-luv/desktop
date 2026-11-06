@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useTheme } from "next-themes";
 import { cn } from "@/shared/utils/cn";
 import {
   humanCheckOrigin,
@@ -15,18 +16,43 @@ export interface CheckFrameProps {
 }
 
 const skeleton =
-  "absolute inset-x-[10px] top-[11px] h-[65px] animate-pulse rounded-[10px] bg-black/[0.08] transition-opacity duration-300 dark:bg-white/[0.1]";
+  "absolute inset-x-0 top-[11px] h-[65px] animate-pulse rounded-[10px] bg-black/[0.08] transition-opacity duration-300 dark:bg-white/[0.1]";
 
 /** the packaged desktop build cannot host a widget: file:// has no hostname to verify */
 function runsFromFile(): boolean {
   return typeof window !== "undefined" && window.location.protocol === "file:";
 }
 
+/** Turnstile only accepts its own two themes; follow the app or the OS. */
+function useWidgetTheme(): "light" | "dark" {
+  const { resolvedTheme } = useTheme();
+  const [systemDark, setSystemDark] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const update = () => setSystemDark(media.matches);
+    update();
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, []);
+
+  if (resolvedTheme === "light") return "light";
+  if (resolvedTheme === "dark") return "dark";
+  return systemDark ? "dark" : "light";
+}
+
 export default function CheckFrame({ request, attempt }: CheckFrameProps) {
   if (request.edge || runsFromFile()) {
     return <HostedCheck action={request.action} attempt={attempt} />;
   }
-  return <TurnstileCheck action={request.action} attempt={attempt} />;
+  return (
+    <TurnstileCheck
+      action={request.action}
+      attempt={attempt}
+      siteKey={request.siteKey}
+    />
+  );
 }
 
 /**
@@ -36,14 +62,17 @@ export default function CheckFrame({ request, attempt }: CheckFrameProps) {
 function TurnstileCheck({
   action,
   attempt,
+  siteKey,
 }: {
   action: HumanCheckAction;
   attempt: number;
+  siteKey?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const phase = useHumanCheckStore((state) => state.phase);
   const setPhase = useHumanCheckStore((state) => state.setPhase);
   const solve = useHumanCheckStore((state) => state.solve);
+  const theme = useWidgetTheme();
   const ready = phase !== "loading";
 
   useEffect(() => {
@@ -56,9 +85,11 @@ function TurnstileCheck({
       .then((turnstile) => {
         if (cancelled) return;
         widgetId = turnstile.render(container, {
-          sitekey: TURNSTILE_SITE_KEY,
+          sitekey: siteKey || TURNSTILE_SITE_KEY,
           action,
-          theme: "dark",
+          theme,
+          size: "flexible",
+          "refresh-expired": "auto",
           callback: (token) => solve(token),
           "expired-callback": () => setPhase("expired"),
           "error-callback": () => setPhase("error"),
@@ -74,15 +105,15 @@ function TurnstileCheck({
       if (widgetId) window.turnstile?.remove(widgetId);
       container.replaceChildren();
     };
-  }, [action, attempt, setPhase, solve]);
+  }, [action, attempt, setPhase, solve, theme, siteKey]);
 
   return (
-    <div className="relative mx-auto flex h-[88px] w-[320px] shrink-0 items-center justify-center">
+    <div className="relative mx-auto flex h-[88px] w-full max-w-[320px] shrink-0 items-center justify-center">
       <div className={cn(skeleton, ready && "opacity-0")} />
       <div
         ref={containerRef}
         className={cn(
-          "relative transition-opacity duration-300 ease-out",
+          "relative w-full transition-opacity duration-300 ease-out",
           ready ? "opacity-100" : "opacity-0",
         )}
       />
@@ -103,6 +134,7 @@ function HostedCheck({
   attempt: number;
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const theme = useWidgetTheme();
   const phase = useHumanCheckStore((state) => state.phase);
   const setPhase = useHumanCheckStore((state) => state.setPhase);
   const solve = useHumanCheckStore((state) => state.solve);
@@ -133,17 +165,17 @@ function HostedCheck({
   };
 
   return (
-    <div className="relative mx-auto h-[88px] w-[320px] shrink-0">
+    <div className="relative mx-auto h-[88px] w-full max-w-[320px] shrink-0">
       <div className={cn(skeleton, ready && "opacity-0")} />
       <iframe
         key={attempt}
         ref={frameRef}
-        src={humanCheckPageUrl(action)}
+        src={humanCheckPageUrl(action, theme)}
         title="Cloudflare Turnstile"
         scrolling="no"
         onLoad={markLoaded}
         className={cn(
-          "absolute inset-0 size-full border-0 bg-transparent opacity-0 transition-opacity duration-300 ease-out [color-scheme:dark]",
+          "absolute inset-0 size-full border-0 bg-transparent opacity-0 transition-opacity duration-300 ease-out",
           ready && "opacity-100",
         )}
       />

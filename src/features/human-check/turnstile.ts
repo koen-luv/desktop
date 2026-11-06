@@ -19,6 +19,8 @@ export interface TurnstileOptions {
   theme?: "light" | "dark" | "auto";
   language?: string;
   size?: "normal" | "compact" | "flexible";
+  "refresh-expired"?: "auto" | "manual" | "never";
+  retry?: "auto" | "never";
   callback?: (token: string) => void;
   "error-callback"?: (code?: string) => void;
   "expired-callback"?: () => void;
@@ -52,15 +54,35 @@ export function loadTurnstile(): Promise<TurnstileApi> {
   if (loading) return loading;
 
   loading = new Promise<TurnstileApi>((resolve, reject) => {
-    const script = document.createElement("script");
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let script: HTMLScriptElement | undefined;
+
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      script?.remove();
+      reject(error);
+    };
+
+    script = document.createElement("script");
     script.src = SCRIPT_SRC;
     script.async = true;
     script.defer = true;
     script.onload = () => {
-      if (window.turnstile) resolve(window.turnstile);
-      else reject(new Error("Turnstile did not initialise"));
+      if (settled) return;
+      if (window.turnstile) {
+        settled = true;
+        if (timer) clearTimeout(timer);
+        resolve(window.turnstile);
+      } else {
+        fail(new Error("Turnstile did not initialise"));
+      }
     };
-    script.onerror = () => reject(new Error("Turnstile failed to load"));
+    script.onerror = () => fail(new Error("Turnstile failed to load"));
+    // A blocked/slow CDN must not leave the dialog spinning forever.
+    timer = setTimeout(() => fail(new Error("Turnstile timed out")), 15_000);
     document.head.appendChild(script);
   }).catch((error: unknown) => {
     // a later attempt may still succeed (offline, blocked, flaky dns)

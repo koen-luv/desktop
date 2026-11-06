@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslation } from "@/languages";
@@ -17,7 +17,8 @@ export default function HumanCheckNotice() {
   const attempt = useHumanCheckStore((state) => state.attempt);
   const retry = useHumanCheckStore((state) => state.retry);
   const cancel = useHumanCheckStore((state) => state.cancel);
-  const failed = phase === "error";
+  const cardRef = useRef<HTMLDivElement>(null);
+  const retryable = phase === "error" || phase === "expired";
 
   useEffect(() => {
     if (!request) return;
@@ -28,12 +29,27 @@ export default function HumanCheckNotice() {
     return () => window.removeEventListener("keydown", onKey);
   }, [request, cancel]);
 
+  // Keep keyboard focus inside the floating card while the task is running,
+  // then return it to whatever opened the check.
+  useEffect(() => {
+    if (!request) return;
+    const previous =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const timer = window.setTimeout(() => cardRef.current?.focus(), 0);
+    return () => {
+      window.clearTimeout(timer);
+      previous?.focus?.();
+    };
+  }, [request]);
+
   if (typeof document === "undefined") return null;
 
   const description =
     phase === "expired"
       ? t("human_check.expired")
-      : failed
+      : phase === "error"
         ? t("human_check.failed")
         : t("human_check.description");
 
@@ -41,15 +57,20 @@ export default function HumanCheckNotice() {
     <AnimatePresence>
       {request && (
         <motion.div
+          ref={cardRef}
+          tabIndex={-1}
           role="dialog"
+          aria-modal="true"
+          aria-labelledby="human-check-title"
           aria-live="polite"
           data-no-window-drag
           initial={{ opacity: 0, y: -16, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -12, scale: 0.98 }}
           transition={{ type: "spring", stiffness: 420, damping: 34 }}
+          style={{ top: "max(20px, calc(var(--inset-top, 0px) + 12px))" }}
           className={cn(
-            "fixed left-1/2 top-[44px] z-[9998] -translate-x-1/2",
+            "fixed left-1/2 z-[9998] -translate-x-1/2 outline-none",
             "flex w-[356px] max-w-[calc(100vw-24px)] flex-col p-[18px]",
             "rounded-[26px] bg-bg-elevated/55 shadow-[0_24px_80px_rgba(0,0,0,0.35)]",
             "backdrop-blur-[40px] backdrop-saturate-150",
@@ -58,7 +79,10 @@ export default function HumanCheckNotice() {
           <div className="flex items-start gap-[14px]">
             <ShieldBadge />
             <div className="flex min-w-0 flex-col">
-              <h2 className="text-[16px] font-[600] leading-[1.25] tracking-[-0.01em] text-text-primary">
+              <h2
+                id="human-check-title"
+                className="text-[16px] font-[600] leading-[1.25] tracking-[-0.01em] text-text-primary"
+              >
                 {t("human_check.title")}
               </h2>
               <p className="mt-[5px] text-[13px] leading-[1.4] text-text-secondary">
@@ -72,15 +96,15 @@ export default function HumanCheckNotice() {
           <div className="mt-[10px] flex gap-[8px]">
             <button
               type="button"
-              disabled={!failed}
-              onClick={failed ? retry : undefined}
+              disabled={!retryable}
+              onClick={retryable ? retry : undefined}
               className={cn(
                 buttonBase,
                 "bg-text-primary/75 text-bg-primary/80",
-                failed ? "hover:bg-text-primary/90" : "cursor-default",
+                retryable ? "hover:bg-text-primary/90" : "cursor-default",
               )}
             >
-              {failed ? t("human_check.retry") : t("human_check.waiting")}
+              {retryable ? t("human_check.retry") : t("human_check.waiting")}
             </button>
             <button
               type="button"

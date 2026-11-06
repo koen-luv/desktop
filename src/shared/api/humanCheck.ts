@@ -12,6 +12,8 @@ export interface HumanCheckRequest {
    * of rendering the widget itself.
    */
   edge?: boolean;
+  /** Public key returned by the server's challenge, so self-hosted widgets work without a rebuild. */
+  siteKey?: string;
 }
 
 export type HumanCheckPrompt = (
@@ -31,8 +33,13 @@ export function setHumanCheckPrompt(next: HumanCheckPrompt | null): void {
   prompt = next;
 }
 
-export function humanCheckPageUrl(action: HumanCheckAction): string {
-  return `${getApiBaseUrl()}/v1/auth/verify?action=${action}`;
+export function humanCheckPageUrl(
+  action: HumanCheckAction,
+  theme?: "light" | "dark",
+): string {
+  const params = new URLSearchParams({ action });
+  if (theme) params.set("theme", theme);
+  return `${getApiBaseUrl()}/v1/auth/verify?${params.toString()}`;
 }
 
 export function humanCheckOrigin(): string {
@@ -47,9 +54,10 @@ export async function runHumanCheck(
   action: HumanCheckAction,
   mode: HumanCheckMode,
   edge = false,
+  siteKey?: string,
 ): Promise<string | undefined> {
   if (mode === "off") return undefined;
-  const token = prompt ? await prompt({ action, mode, edge }) : null;
+  const token = prompt ? await prompt({ action, mode, edge, siteKey }) : null;
   if (token) return token;
   if (mode === "required") throw new HumanCheckCancelledError();
   return undefined;

@@ -1,0 +1,11 @@
+# Copy to .dev.vars for `wrangler dev` and set the same values as Worker
+# secrets in production.
+SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# At least 32 random characters, e.g. `openssl rand -base64 48`.
+# Changing it signs every user out.
+JWT_SECRET=replace-with-a-long-random-secret
+
+# Optional: enables Turnstile verification on login/register.
+# TURNSTILE_SECRET=your-turnstile-secret

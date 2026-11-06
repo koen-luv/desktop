@@ -596,11 +596,13 @@ async function humanCheck(
 ): Promise<string | undefined> {
   const requested = challenge.turnstile?.mode;
   const mode = isHumanCheckMode(requested) ? requested : "off";
-  if (mode === "off" && !challenge.turnstile?.edge && !hosted) return undefined;
+  const edge = hosted || challenge.turnstile?.edge === true;
+  if (mode === "off" && !edge) return undefined;
   return runHumanCheck(
     purpose,
     mode === "off" ? "optional" : mode,
-    hosted,
+    edge,
+    challenge.turnstile?.siteKey,
   );
 }
 
@@ -612,26 +614,47 @@ async function authProofFor(
   hosted = false,
 ): Promise<AuthProof> {
   let challenge: PowChallenge;
+  let usedHosted = hosted;
   try {
     challenge = await request<PowChallenge>(
       "/v1/auth/challenge",
-      { method: "POST", body: JSON.stringify({ purpose, email }) },
+      {
+        method: "POST",
+        body: JSON.stringify({ purpose, email }),
+        ...(hosted ? { credentials: "include" as const } : {}),
+      },
       false,
     );
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return {};
-    throw error;
+    if (!hosted && error instanceof ApiError && error.code === "EDGE_CHALLENGE") {
+      // The edge blocked even the challenge. The hosted page runs on the api
+      // origin, so solving it there mints the clearance cookie the retry needs.
+      await runHumanCheck(purpose, "optional", true);
+      usedHosted = true;
+      challenge = await request<PowChallenge>(
+        "/v1/auth/challenge",
+        {
+          method: "POST",
+          body: JSON.stringify({ purpose, email }),
+          credentials: "include",
+        },
+        false,
+      );
+    } else {
+      throw error;
+    }
   }
   const work =
     challenge.mode === "off" || challenge.algorithm !== SUPPORTED_POW_ALGORITHM
       ? undefined
       : solvePow(challenge);
   void work?.catch(() => undefined);
-  const turnstile = await humanCheck(challenge, purpose, hosted);
+  const turnstile = await humanCheck(challenge, purpose, usedHosted);
   return {
     pow: await work,
     turnstile,
-    edge: challenge.turnstile?.edge === true,
+    edge: usedHosted || challenge.turnstile?.edge === true,
   };
 }
 

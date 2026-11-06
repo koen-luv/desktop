@@ -76,3 +76,7 @@ scratch/
 # local-only artifacts
 /my-release-key.jks
 /liner-src/
+
+# worker local secrets and generated state
+/api-worker/.dev.vars
+/api-worker/.wrangler/
