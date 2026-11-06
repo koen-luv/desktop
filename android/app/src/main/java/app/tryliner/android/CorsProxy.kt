@@ -8,7 +8,12 @@ import java.io.InputStream
 import java.util.Locale
 
 object CorsProxy {
-    private val apiHosts = setOf("api.tryliner.fun", "covers.tryliner.fun", "link.tryliner.fun")
+    private val apiHosts = setOf(
+        "liner-api.lucabatarcian.workers.dev",
+        "api.tryliner.fun",
+        "covers.tryliner.fun",
+        "link.tryliner.fun",
+    )
     private val imageExtensions = setOf("jpg", "jpeg", "png", "webp", "gif", "avif")
     private val forwardedHeaders = setOf(
         "authorization",

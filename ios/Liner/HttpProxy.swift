@@ -8,6 +8,7 @@ enum HttpProxy {
     private static let maxBodyBytes = 12_000_000
 
     private static let allowedHosts: Set<String> = [
+        "liner-api.lucabatarcian.workers.dev",
         "api.tryliner.fun",
         "covers.tryliner.fun",
         "link.tryliner.fun",

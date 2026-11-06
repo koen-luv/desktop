@@ -152,9 +152,9 @@ class LinerBridge(private val activity: MainActivity) {
             }
             if (!hasUserAgent) builder.header("User-Agent", Http.userAgent)
             builder.header("Accept-Language", "en-US,en;q=0.9")
-            // only our own api sits behind the cloudflare challenge; sending the
-            // playback hosts a cookie they never got before would change their answers
-            val linerApi = host.endsWith("tryliner.fun")
+            // only our own api may hold cookies; sending the playback hosts a
+            // cookie they never got before would change their answers
+            val linerApi = host.endsWith("tryliner.fun") || host.endsWith(".workers.dev")
             if (linerApi) {
                 cookiesFor(url)?.takeIf { it.isNotBlank() }?.let { builder.header("Cookie", it) }
             }
@@ -235,6 +235,7 @@ class LinerBridge(private val activity: MainActivity) {
 
     private fun isAllowedHost(host: String): Boolean {
         if (host in setOf(
+                "liner-api.lucabatarcian.workers.dev",
                 "api.tryliner.fun",
                 "covers.tryliner.fun",
                 "link.tryliner.fun",

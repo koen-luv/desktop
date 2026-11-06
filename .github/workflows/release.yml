@@ -38,7 +38,7 @@ jobs:
         run: pnpm run electron:build:linux
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VITE_API_URL: https://api.tryliner.fun
+          VITE_API_URL: https://liner-api.lucabatarcian.workers.dev
           VITE_COVERS_PROXY_URL: https://covers.tryliner.fun
           VITE_PARTY_RELAY_URL: ${{ vars.VITE_PARTY_RELAY_URL }}
 
@@ -78,7 +78,7 @@ jobs:
         run: pnpm run electron:build:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VITE_API_URL: https://api.tryliner.fun
+          VITE_API_URL: https://liner-api.lucabatarcian.workers.dev
           VITE_COVERS_PROXY_URL: https://covers.tryliner.fun
           VITE_PARTY_RELAY_URL: ${{ vars.VITE_PARTY_RELAY_URL }}
 
@@ -126,7 +126,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
-          VITE_API_URL: https://api.tryliner.fun
+          VITE_API_URL: https://liner-api.lucabatarcian.workers.dev
           VITE_COVERS_PROXY_URL: https://covers.tryliner.fun
           VITE_PARTY_RELAY_URL: ${{ vars.VITE_PARTY_RELAY_URL }}
 
@@ -168,7 +168,7 @@ jobs:
       - name: Build web bundle
         run: pnpm build
         env:
-          VITE_API_URL: https://api.tryliner.fun
+          VITE_API_URL: https://liner-api.lucabatarcian.workers.dev
           VITE_COVERS_PROXY_URL: https://covers.tryliner.fun
           VITE_PARTY_RELAY_URL: ${{ vars.VITE_PARTY_RELAY_URL }}
 
@@ -250,7 +250,7 @@ jobs:
       - name: Build web renderer
         run: pnpm build
         env:
-          VITE_API_URL: https://api.tryliner.fun
+          VITE_API_URL: https://liner-api.lucabatarcian.workers.dev
           VITE_COVERS_PROXY_URL: https://covers.tryliner.fun
           VITE_PARTY_RELAY_URL: ${{ vars.VITE_PARTY_RELAY_URL }}
 
