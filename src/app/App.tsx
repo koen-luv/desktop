@@ -10,6 +10,7 @@ import { HumanCheckNotice } from "@/features/human-check";
 import { CoverSwRegistrar } from "@/features/covers";
 import { usePresenceSync } from "@/shared/presence";
 import { useThemeCustomizationSync } from "@/features/settings/hooks/useThemeCustomizationSync";
+import { PreferencesSync } from "@/features/settings/sync";
 import { useTouchBarSync } from "@/features/touchbar";
 import { useOverlaySync } from "@/features/overlay";
 import { useDiscordSync } from "@/features/discord";
@@ -96,6 +97,7 @@ export default function App() {
         <PartySync />
         <AppleEmojiProvider>
           <I18nProvider>
+            <PreferencesSync />
             <ToastProvider>
               <RootErrorBoundary>
                 <WindowAnimationContainer>

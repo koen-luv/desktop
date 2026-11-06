@@ -60,6 +60,12 @@ create table if not exists public.saved_collections (
 create index if not exists saved_collections_user_time_idx
   on public.saved_collections(user_id, saved_at desc);
 
+create table if not exists public.user_preferences (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  preferences jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.playlists (
   id uuid primary key,
   owner_id uuid not null references public.profiles(id) on delete cascade,
@@ -711,6 +717,7 @@ alter table public.profiles enable row level security;
 alter table public.sessions enable row level security;
 alter table public.liked_tracks enable row level security;
 alter table public.saved_collections enable row level security;
+alter table public.user_preferences enable row level security;
 alter table public.playlists enable row level security;
 alter table public.playlist_items enable row level security;
 alter table public.playback_events enable row level security;
@@ -723,6 +730,7 @@ grant select, insert, update, delete on
   public.sessions,
   public.liked_tracks,
   public.saved_collections,
+  public.user_preferences,
   public.playlists,
   public.playlist_items,
   public.playback_events,
@@ -734,6 +742,7 @@ revoke all on
   public.sessions,
   public.liked_tracks,
   public.saved_collections,
+  public.user_preferences,
   public.playlists,
   public.playlist_items,
   public.playback_events,

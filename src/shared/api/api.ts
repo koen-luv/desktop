@@ -74,6 +74,7 @@ async function fetchWithTimeout(
   url: string,
   init?: RequestInit,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  silent = false,
 ): Promise<Response> {
   const controller = new AbortController();
   const userSignal = init?.signal;
@@ -106,10 +107,12 @@ async function fetchWithTimeout(
     return res;
   } catch (err: any) {
     if (didTimeout) {
-      showToast(translate("common.error_timeout_title"), "error", {
-        id: "network-timeout-toast",
-        description: translate("common.error_network"),
-      });
+      if (!silent) {
+        showToast(translate("common.error_timeout_title"), "error", {
+          id: "network-timeout-toast",
+          description: translate("common.error_network"),
+        });
+      }
       throw new ApiError(
         0,
         "Request timed out. Please check your network connection.",
@@ -119,10 +122,12 @@ async function fetchWithTimeout(
     if (userSignal?.aborted) {
       throw err;
     }
-    showToast(translate("common.error_network_title"), "error", {
-      id: "network-error-toast",
-      description: translate("common.error_network"),
-    });
+    if (!silent) {
+      showToast(translate("common.error_network_title"), "error", {
+        id: "network-error-toast",
+        description: translate("common.error_network"),
+      });
+    }
     throw new ApiError(
       0,
       "Network error. Unable to reach server.",
@@ -208,6 +213,7 @@ async function executeRequest<T>(
   init?: RequestInit,
   allowRefresh = true,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  silent = false,
 ): Promise<T> {
   const startTime = performance.now();
   const method = (init?.method ?? "GET").toUpperCase();
@@ -266,6 +272,7 @@ async function executeRequest<T>(
         },
       },
       timeoutMs,
+      silent,
     );
   } catch (err: any) {
     if (init?.signal?.aborted || err?.name === "AbortError") {
@@ -341,6 +348,7 @@ async function executeRequest<T>(
           },
         },
         timeoutMs,
+        silent,
       );
       const retryDateHeader = res.headers?.get?.("date");
       if (retryDateHeader) {
@@ -380,7 +388,7 @@ async function executeRequest<T>(
         ? body.requestId
         : undefined);
 
-    if (res.status >= 500) {
+    if (res.status >= 500 && !silent) {
       showToast(translate("common.error_server_title"), "error", {
         id: `server-error-${res.status}`,
         description: translate("common.error_server"),
@@ -424,6 +432,7 @@ async function request<T>(
   init?: RequestInit,
   allowRefresh = true,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  silent = false,
 ): Promise<T> {
   const method = (init?.method ?? "GET").toUpperCase();
   if (method === "GET" && !init?.signal) {
@@ -432,13 +441,13 @@ async function request<T>(
     if (inFlight) {
       return inFlight as Promise<T>;
     }
-    const promise = executeRequest<T>(path, init, allowRefresh, timeoutMs).finally(() => {
+    const promise = executeRequest<T>(path, init, allowRefresh, timeoutMs, silent).finally(() => {
       inFlightGetRequests.delete(key);
     });
     inFlightGetRequests.set(key, promise);
     return promise;
   }
-  return executeRequest<T>(path, init, allowRefresh, timeoutMs);
+  return executeRequest<T>(path, init, allowRefresh, timeoutMs, silent);
 }
 
 export class ApiError extends Error {
@@ -685,6 +694,11 @@ async function withAuthProof<T>(
   }
 }
 
+export interface SyncedPreferencesDocument {
+  preferences: Record<string, unknown>;
+  updatedAt: string | null;
+}
+
 export const api = {
   async login(email: string, password: string): Promise<AuthTokens> {
     const result = await withAuthProof("login", email, (proof) =>
@@ -752,6 +766,28 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(data),
     });
+  },
+
+  getPreferences(): Promise<SyncedPreferencesDocument> {
+    return request<SyncedPreferencesDocument>(
+      "/v1/me/preferences",
+      undefined,
+      true,
+      DEFAULT_TIMEOUT_MS,
+      true,
+    );
+  },
+
+  updatePreferences(
+    preferences: Record<string, unknown>,
+  ): Promise<{ updatedAt: string }> {
+    return request<{ updatedAt: string }>(
+      "/v1/me/preferences",
+      { method: "PUT", body: JSON.stringify({ preferences }) },
+      true,
+      DEFAULT_TIMEOUT_MS,
+      true,
+    );
   },
 
   getUserProfile(idOrUsername: string): Promise<UserProfile> {

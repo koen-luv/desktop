@@ -225,6 +225,12 @@ interface SavedRow {
   saved_at: string;
 }
 
+interface PreferenceRow {
+  user_id: string;
+  preferences: Record<string, unknown>;
+  updated_at: string;
+}
+
 interface EventRow {
   id: string;
   user_id: string;
@@ -870,6 +876,64 @@ async function handleUpdateProfile(
     throw new HttpError(404, "USER_NOT_FOUND", "That user was not found.");
   }
   return json(publicUser(rows[0]), request, env);
+}
+
+const PREFERENCES_MAX_BYTES = 64 * 1024;
+
+async function handleGetPreferences(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  const user = await currentUser(request, env);
+  const row = await database(env).first<PreferenceRow>(
+    "user_preferences",
+    `user_id=eq.${user.id}&select=*`,
+  );
+  return json(
+    {
+      preferences: row?.preferences ?? {},
+      updatedAt: row?.updated_at ?? null,
+    },
+    request,
+    env,
+  );
+}
+
+async function handleUpdatePreferences(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  const user = await currentUser(request, env);
+  const body = await readJson<Record<string, unknown>>(request);
+  const preferences = body.preferences;
+  if (
+    !preferences ||
+    typeof preferences !== "object" ||
+    Array.isArray(preferences)
+  ) {
+    throw new HttpError(
+      400,
+      "INVALID_INPUT",
+      "preferences must be a JSON object.",
+    );
+  }
+
+  const serialized = JSON.stringify(preferences);
+  if (new TextEncoder().encode(serialized).length > PREFERENCES_MAX_BYTES) {
+    throw new HttpError(
+      413,
+      "PAYLOAD_TOO_LARGE",
+      "The preferences payload is too large.",
+    );
+  }
+
+  const updatedAt = nowIso();
+  await database(env).upsert<PreferenceRow>(
+    "user_preferences",
+    [{ user_id: user.id, preferences, updated_at: updatedAt }],
+    "user_id",
+  );
+  return json({ updatedAt }, request, env);
 }
 
 async function handleSearchUsers(request: Request, env: Env): Promise<Response> {
@@ -1911,6 +1975,12 @@ async function route(request: Request, env: Env): Promise<Response> {
 
   if (path === "/v1/me" && method === "GET") {
     return handleMe(request, env);
+  }
+  if (path === "/v1/me/preferences" && method === "GET") {
+    return handleGetPreferences(request, env);
+  }
+  if (path === "/v1/me/preferences" && method === "PUT") {
+    return handleUpdatePreferences(request, env);
   }
   if (path === "/v1/users/me" && method === "PATCH") {
     return handleUpdateProfile(request, env);
