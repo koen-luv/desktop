@@ -29,6 +29,16 @@ export default function HumanCheckNotice() {
     return () => window.removeEventListener("keydown", onKey);
   }, [request, cancel]);
 
+  // The widget is a best-effort check here. When it errors (a packaged build,
+  // a hostname Cloudflare will not verify), do not make the user hunt for the
+  // skip button: dismiss the notice and let the request go through.
+  useEffect(() => {
+    if (!request || request.mode !== "optional") return;
+    if (phase !== "error" && phase !== "expired") return;
+    const timer = window.setTimeout(cancel, 1_200);
+    return () => window.clearTimeout(timer);
+  }, [request, phase, cancel]);
+
   // Keep keyboard focus inside the floating card while the task is running,
   // then return it to whatever opened the check.
   useEffect(() => {

@@ -662,8 +662,11 @@ export default function AppFrame({ children }: AppFrameProps) {
         `${track.title} Radio`,
         track.coverUrl,
       );
+      // Choosing a song ends the search task; the surrounding page (and its
+      // mini player) is the next thing the user should see.
+      closeSearch();
     },
-    [addHistoryItem],
+    [addHistoryItem, closeSearch],
   );
 
   const handleNavigateItem = useCallback(

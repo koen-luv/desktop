@@ -522,6 +522,9 @@
     "liked_songs": "Liked songs",
     "save_as_playlist": "Save as playlist",
     "saved_as_playlist": "Saved your liked songs",
+    "send_to_discord": "Send to Discord",
+    "sent_to_discord": "Playlist sent to Discord",
+    "send_to_discord_failed": "Could not send the playlist to Discord",
     "save_as_playlist_failed": "Couldn't save your liked songs",
     "like_all_songs": "Like all songs",
     "like_all_done": "Liked {count} songs",
@@ -891,6 +894,21 @@
         "unavailable": "This server doesn't support cloud Discord presence yet.",
         "error_expired": "The sign-in expired. Try again.",
         "error_failed": "Discord sign-in failed. Try again."
+      },
+      "webhook": {
+        "section": "Channel Webhook",
+        "enable": {
+          "title": "Announce new tracks",
+          "description": "Post each new song to a Discord channel through a webhook — works on phones too."
+        },
+        "url": {
+          "title": "Webhook URL",
+          "description": "Discord channel settings → Integrations → Webhooks → Copy Webhook URL."
+        },
+        "test": "Send test",
+        "testing": "Sending…",
+        "test_sent": "Test message sent to Discord.",
+        "test_failed": "Could not reach that webhook. Check the URL."
       }
     },
     "customization": {

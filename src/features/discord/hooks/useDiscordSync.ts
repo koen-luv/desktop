@@ -6,7 +6,9 @@ import { getAuthSession } from "@/shared/api/auth-session";
 import type { DiscordRpcStatePayload } from "../contracts";
 import { useDiscordSettingsStore } from "../store/discordSettingsStore";
 import { useDiscordCloudStore } from "../store/discordCloudStore";
+import { useDiscordWebhookStore } from "../store/discordWebhookStore";
 import { buildPresenceNotification, cloudPresence } from "../cloud";
+import { isValidDiscordWebhookUrl, sendNowPlayingWebhook } from "../webhook";
 
 const artistAvatarCache = new Map<string, string | null>();
 const pendingArtistAvatars = new Map<string, Promise<string | null>>();
@@ -34,6 +36,9 @@ export function useDiscordSync() {
   const [loadedAvatar, setLoadedAvatar] = useState<{ artistId: string; url: string | null } | null>(null);
   const cloudLinked = useDiscordCloudStore((s) => s.linked);
   const enabled = useDiscordSettingsStore((s) => s.enabled);
+  const webhookEnabled = useDiscordWebhookStore((s) => s.enabled);
+  const webhookUrl = useDiscordWebhookStore((s) => s.url);
+  const announcedTrackRef = useRef<string | null>(null);
 
   // Linked accounts report to the backend (the only path that reaches a phone);
   // everything else keeps talking to the local Discord client.
@@ -50,6 +55,47 @@ export function useDiscordSync() {
     if (!cloudLinked) return;
     if (!enabled) cloudPresence.clear(useDiscordSettingsStore.getState());
   }, [cloudLinked, enabled]);
+
+  // Channel webhooks reach Discord without a desktop client, so a phone (or a
+  // desktop without Discord running) can still announce what is playing.
+  useEffect(() => {
+    if (!webhookEnabled || !isValidDiscordWebhookUrl(webhookUrl)) return;
+    if (!currentTrack || player.status !== "playing") return;
+    if (announcedTrackRef.current === currentTrack.id) return;
+
+    announcedTrackRef.current = currentTrack.id;
+    const artistName =
+      (typeof currentTrack.artists === "string" ? currentTrack.artists : "") ||
+      (Array.isArray(currentTrack.artistList)
+        ? currentTrack.artistList
+            .map((artist) => artist.name)
+            .filter(Boolean)
+            .join(", ")
+        : "");
+    const albumName =
+      typeof currentTrack.album === "string"
+        ? currentTrack.album
+        : currentTrack.album?.title;
+
+    void sendNowPlayingWebhook(webhookUrl, {
+      id: currentTrack.id,
+      title: currentTrack.title,
+      artist: artistName,
+      album: albumName,
+      coverUrl: effectiveCover || currentTrack.coverUrl,
+    }).catch(() => {
+      // Let the next play of this song retry; a dead webhook never blocks audio.
+      if (announcedTrackRef.current === currentTrack.id) {
+        announcedTrackRef.current = null;
+      }
+    });
+  }, [
+    webhookEnabled,
+    webhookUrl,
+    currentTrack,
+    effectiveCover,
+    player.status,
+  ]);
 
   const primaryArtistId =
     currentTrack?.artistId ||

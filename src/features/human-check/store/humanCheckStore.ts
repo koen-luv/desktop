@@ -15,10 +15,22 @@ interface HumanCheckState {
 }
 
 let settle: ((token: string | null) => void) | null = null;
+let watchdog: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * An optional check must never hold up sign-in. If the widget cannot render
+ * (packaged Electron, a blocked CDN, an expired challenge) this closes the
+ * notice and lets the request continue without a token.
+ */
+const OPTIONAL_CHECK_TIMEOUT_MS = 8_000;
 
 function finish(token: string | null) {
   const done = settle;
   settle = null;
+  if (watchdog) {
+    clearTimeout(watchdog);
+    watchdog = null;
+  }
   done?.(token);
 }
 
@@ -36,6 +48,13 @@ export const useHumanCheckStore = create<HumanCheckState>((set) => ({
     }));
     return new Promise((resolve) => {
       settle = resolve;
+      if (request.mode === "optional") {
+        watchdog = setTimeout(() => {
+          if (settle !== resolve) return;
+          useHumanCheckStore.setState({ request: null });
+          finish(null);
+        }, OPTIONAL_CHECK_TIMEOUT_MS);
+      }
     });
   },
 

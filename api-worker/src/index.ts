@@ -524,6 +524,70 @@ async function optionalUser(
   }
 }
 
+const DISCORD_WEBHOOK_URL_PATTERN =
+  /^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/api\/(?:v\d+\/)?webhooks\/\d+\/[\w-]+$/i;
+
+/**
+ * Discord's execute-webhook endpoint rejects browser origins, so the app sends
+ * channel webhook messages through the API. The URL is a credential: validate
+ * it strictly, never log it, and never store it.
+ */
+async function handleDiscordWebhook(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  await currentUser(request, env);
+  const body = await readJson<Record<string, unknown>>(request);
+  const url = typeof body.url === "string" ? body.url.trim() : "";
+  if (!DISCORD_WEBHOOK_URL_PATTERN.test(url)) {
+    throw new HttpError(
+      400,
+      "INVALID_INPUT",
+      "Enter a valid Discord webhook URL.",
+    );
+  }
+  const payload = body.payload;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new HttpError(400, "INVALID_INPUT", "The webhook payload is required.");
+  }
+  const text = JSON.stringify(payload);
+  if (text.length > 16_000) {
+    throw new HttpError(
+      413,
+      "PAYLOAD_TOO_LARGE",
+      "The webhook payload is too large.",
+    );
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: text,
+    });
+  } catch (error) {
+    console.error(
+      "[liner-api] discord webhook request failed",
+      error instanceof Error ? error.message : String(error),
+    );
+    throw new HttpError(
+      502,
+      "DISCORD_WEBHOOK_FAILED",
+      "Discord could not be reached. Try again.",
+    );
+  }
+  if (!response.ok) {
+    console.warn("[liner-api] discord webhook rejected", response.status);
+    throw new HttpError(
+      502,
+      "DISCORD_WEBHOOK_FAILED",
+      "Discord rejected the message. Check the webhook URL.",
+    );
+  }
+  return empty(request, env);
+}
+
 async function loadProfile(env: Env, id: string): Promise<ProfileRow> {
   const row = await database(env).first<ProfileRow>(
     "profiles",
@@ -623,6 +687,11 @@ async function verifyTurnstile(
     );
   }
 
+  // "optional" means best-effort: the widget is shown when a client can render
+  // it, but a token that Cloudflare rejects (expired, wrong hostname, an
+  // Electron client the widget refuses to run in) must never lock the user out.
+  const optional = mode === "optional";
+
   const form = new URLSearchParams();
   form.set("secret", env.TURNSTILE_SECRET ?? "");
   form.set("response", token);
@@ -646,6 +715,7 @@ async function verifyTurnstile(
       "[liner-api] turnstile siteverify failed",
       error instanceof Error ? error.message : String(error),
     );
+    if (optional) return;
     throw new HttpError(
       503,
       "TURNSTILE_UNAVAILABLE",
@@ -655,6 +725,7 @@ async function verifyTurnstile(
 
   if (!result.success) {
     console.warn("[liner-api] turnstile rejected", result["error-codes"]);
+    if (optional) return;
     throw new HttpError(
       403,
       "TURNSTILE_FAILED",
@@ -662,6 +733,13 @@ async function verifyTurnstile(
     );
   }
   if (result.action && result.action !== action) {
+    console.warn(
+      "[liner-api] turnstile action mismatch",
+      result.action,
+      "expected",
+      action,
+    );
+    if (optional) return;
     throw new HttpError(
       403,
       "TURNSTILE_FAILED",
@@ -1987,6 +2065,10 @@ async function route(request: Request, env: Env): Promise<Response> {
   }
   if (path === "/v1/users/search" && method === "GET") {
     return handleSearchUsers(request, env);
+  }
+
+  if (path === "/v1/discord/webhook" && method === "POST") {
+    return handleDiscordWebhook(request, env);
   }
 
   if (path === "/v1/me/playlists" && method === "GET") {

@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/languages";
 import {
+  isValidDiscordWebhookUrl,
+  sendTestWebhook,
   useDiscordCloudStore,
   useDiscordSettingsStore,
+  useDiscordWebhookStore,
   type DiscordStatusDisplayType,
 } from "@/features/discord";
-import { Button, ToggleSwitch, Select } from "@/shared/ui";
-import { SettingRow, SettingSection } from "../controls";
+import { Button, ToggleSwitch, Select, TextInput, useToast } from "@/shared/ui";
+import { SettingBlock, SettingRow, SettingSection } from "../controls";
 
 export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
   const { t } = useTranslation();
@@ -26,6 +29,31 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
   const cloudError = useDiscordCloudStore((s) => s.error);
   const startCloudLink = useDiscordCloudStore((s) => s.startLink);
   const unlinkCloud = useDiscordCloudStore((s) => s.unlink);
+
+  const webhookEnabled = useDiscordWebhookStore((s) => s.enabled);
+  const setWebhookEnabled = useDiscordWebhookStore((s) => s.setEnabled);
+  const webhookUrl = useDiscordWebhookStore((s) => s.url);
+  const setWebhookUrl = useDiscordWebhookStore((s) => s.setUrl);
+  const webhookValid = isValidDiscordWebhookUrl(webhookUrl);
+  const [testingWebhook, setTestingWebhook] = useState(false);
+  const [webhookError, setWebhookError] = useState("");
+  const { toast } = useToast();
+
+  const handleTestWebhook = async () => {
+    if (!webhookValid || testingWebhook) return;
+    setTestingWebhook(true);
+    setWebhookError("");
+    try {
+      await sendTestWebhook(webhookUrl);
+      toast(t("settings.discord.webhook.test_sent"), "checkmark");
+    } catch {
+      const message = t("settings.discord.webhook.test_failed");
+      setWebhookError(message);
+      toast(message, "error");
+    } finally {
+      setTestingWebhook(false);
+    }
+  };
 
   // A linked account is served from the backend, so it counts as connected even
   // when this device has no local Discord client (always the case on phones).
@@ -343,6 +371,63 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
             />
           }
         />
+      </SettingSection>
+
+      {/* Channel webhook: reaches Discord without a local client, so phones work too */}
+      <SettingSection label={t("settings.discord.webhook.section")}>
+        <SettingRow
+          title={t("settings.discord.webhook.enable.title")}
+          description={t("settings.discord.webhook.enable.description")}
+          titleKey="settings.discord.webhook.enable.title"
+          descKey="settings.discord.webhook.enable.description"
+          searchQuery={searchQuery}
+          control={
+            <ToggleSwitch
+              checked={webhookEnabled}
+              onChange={setWebhookEnabled}
+            />
+          }
+        />
+        <SettingBlock
+          title={t("settings.discord.webhook.url.title")}
+          description={t("settings.discord.webhook.url.description")}
+          titleKey="settings.discord.webhook.url.title"
+          descKey="settings.discord.webhook.url.description"
+          searchQuery={searchQuery}
+        >
+          <div className="flex w-full max-w-[460px] flex-col gap-[8px] sm:flex-row">
+            <TextInput
+              size="sm"
+              type="url"
+              spellCheck={false}
+              autoCapitalize="none"
+              value={webhookUrl}
+              placeholder="https://discord.com/api/webhooks/…"
+              hasError={webhookUrl.trim().length > 0 && !webhookValid}
+              onChange={(event) => {
+                setWebhookUrl(event.target.value);
+                setWebhookError("");
+              }}
+              className="flex-1"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!webhookValid || testingWebhook}
+              onClick={() => void handleTestWebhook()}
+              className="shrink-0"
+            >
+              {testingWebhook
+                ? t("settings.discord.webhook.testing")
+                : t("settings.discord.webhook.test")}
+            </Button>
+          </div>
+          {webhookError ? (
+            <span className="text-[12px] text-accent-secondary">
+              {webhookError}
+            </span>
+          ) : null}
+        </SettingBlock>
       </SettingSection>
     </div>
   );

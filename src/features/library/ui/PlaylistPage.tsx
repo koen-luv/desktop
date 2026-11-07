@@ -1,5 +1,5 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useCallback, useEffect, useMemo, useRef, useState, memo, Suspense } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, memo, Suspense } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import PlaylistPageSkeleton from "./PlaylistPageSkeleton";
 import { useToast, ReorderDropPlaceholder, FloatingDragCard, EntitySidebar, SIDEBAR_TITLE_CLASS, SIDEBAR_SUBTITLE_CLASS } from "@/shared/ui";
@@ -19,6 +19,12 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import { LuArrowUpDown, LuCheck, LuImageOff, LuImagePlus, LuPencil, LuTrash2, LuText, LuShuffle } from "react-icons/lu";
 import { buildShareUrl } from "@/shared/utils/share";
+import {
+  isValidDiscordWebhookUrl,
+  sendPlaylistWebhook,
+  useDiscordWebhookStore,
+} from "@/features/discord";
+import discordLogo from "@/assets/branding/logo-discord.svg";
 import Button from "@/shared/ui/Button";
 import DropdownMenu from "@/shared/ui/DropdownMenu";
 import SongCardWithMenu from "@/features/player/ui/SongCardWithMenu";
@@ -129,6 +135,22 @@ function LibraryPlaylistContent() {
   const decodedId = id ? decodeURIComponent(id) : null;
   const isSharedPlaylist = Boolean(decodedId && isSharedPlaylistId(decodedId));
   const scrollRef = useRef<HTMLDivElement>(null);
+  const pageScrollRef = useRef<HTMLDivElement>(null);
+  // Below md the page itself scrolls (header + list); from md up the track list
+  // is its own scroll container.
+  const [isMobile, setIsMobile] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 767px)").matches,
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const query = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(query.matches);
+    update();
+    query.addEventListener?.("change", update);
+    return () => query.removeEventListener?.("change", update);
+  }, []);
   const { t } = useTranslation();
   const hasCustomBg = useIsContentTransparent();
 
@@ -378,6 +400,31 @@ function LibraryPlaylistContent() {
     }
   }, [decodedId, isSharedPlaylist, viewData?.title, toast, t]);
 
+  const webhookEnabled = useDiscordWebhookStore((state) => state.enabled);
+  const webhookUrl = useDiscordWebhookStore((state) => state.url);
+  const canSendToDiscord = webhookEnabled && isValidDiscordWebhookUrl(webhookUrl);
+
+  const handleSendToDiscord = useCallback(() => {
+    if (!viewData || !canSendToDiscord) return;
+    void sendPlaylistWebhook(webhookUrl, {
+      id: isLikesMode ? undefined : (decodedId ?? undefined),
+      title: viewData.title,
+      trackCount: currentTracks.length,
+      coverUrl: viewData.coverUrl,
+    })
+      .then(() => toast(t("playlist.sent_to_discord"), "checkmark"))
+      .catch(() => toast(t("playlist.send_to_discord_failed"), "error"));
+  }, [
+    canSendToDiscord,
+    currentTracks.length,
+    decodedId,
+    isLikesMode,
+    t,
+    toast,
+    viewData,
+    webhookUrl,
+  ]);
+
   const handleReorderCommit = useCallback(
     (fromIndex: number, toIndex: number, movingTrack: Track) => {
       if (!decodedId || !viewData || isLikesMode) return;
@@ -413,7 +460,7 @@ function LibraryPlaylistContent() {
     handleCardGrab,
   } = useListReorder<Track>({
     items: sortedTracks,
-    scrollContainerRef: scrollRef,
+    scrollContainerRef: isMobile ? pageScrollRef : scrollRef,
     listContainerRef: trackListContainerRef,
     itemHeight: 64,
     onReorder: handleReorderCommit,
@@ -421,11 +468,45 @@ function LibraryPlaylistContent() {
     maxScrollSpeed: 22,
   });
 
+  // On phones the virtualizer follows the page scroller, so the header remains
+  // part of the same scroll surface while only the visible rows are mounted.
+  const [mobileListOffset, setMobileListOffset] = useState(0);
+
+  useLayoutEffect(() => {
+    if (!isMobile) {
+      setMobileListOffset(0);
+      return;
+    }
+    const scroller = pageScrollRef.current;
+    const list = trackListContainerRef.current;
+    if (!scroller || !list) {
+      setMobileListOffset(0);
+      return;
+    }
+    const measure = () => {
+      const scrollerRect = scroller.getBoundingClientRect();
+      const listRect = list.getBoundingClientRect();
+      setMobileListOffset(listRect.top - scrollerRect.top + scroller.scrollTop);
+    };
+    measure();
+    const observer =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    observer?.observe(list);
+    observer?.observe(scroller);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [isMobile, visibleTracks.length, search.activeQuery, viewData?.title]);
+
   const rowVirtualizer = useVirtualizer({
     count: visibleTracks.length,
-    getScrollElement: () => scrollRef.current,
+    getScrollElement: () =>
+      isMobile ? pageScrollRef.current : scrollRef.current,
     estimateSize: () => 64,
     overscan: 25,
+    scrollMargin: isMobile ? mobileListOffset : 0,
     getItemKey: (index) =>
       visibleTracks[index]?.track.playlistItemId ??
       visibleTracks[index]?.track.id ??
@@ -615,14 +696,17 @@ function LibraryPlaylistContent() {
           />
         </div>
       )}
-      <div className="relative z-1 grid grid-cols-1 w-full h-full min-h-0 overflow-y-auto md:overflow-hidden">
+      <div
+        ref={pageScrollRef}
+        className="relative z-1 grid grid-cols-1 w-full h-full min-h-0 overflow-y-auto md:overflow-hidden"
+      >
         {viewData && (
           <div
-            className={`col-start-1 row-start-1 w-full h-full min-h-0 overflow-hidden transition-opacity duration-200 ease-out ${
+            className={`col-start-1 row-start-1 w-full h-auto md:h-full min-h-0 overflow-visible md:overflow-hidden transition-opacity duration-200 ease-out ${
               isReady ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
           >
-            <div className="relative z-10 flex flex-col md:flex-row items-stretch gap-2 md:gap-[16px] px-3 md:pl-[32px] md:pr-[16px] h-full w-full min-h-0 box-border">
+            <div className="relative z-10 flex flex-col md:flex-row items-stretch gap-2 md:gap-[16px] px-3 md:pl-[32px] md:pr-[16px] h-auto md:h-full w-full min-h-0 box-border">
               <div
                 className="shrink-0 w-full max-w-[280px] md:w-[280px] self-center md:self-start text-center md:text-left pt-[calc(var(--inset-top,0px)+56px)] md:pt-[56px] pb-2 md:pb-[24px]"
                 data-no-window-drag
@@ -986,6 +1070,23 @@ function LibraryPlaylistContent() {
                                     },
                                   ]
                                 : []),
+                              ...(canSendToDiscord
+                                ? [
+                                    {
+                                      id: "send-discord",
+                                      icon: (
+                                        <img
+                                          src={discordLogo}
+                                          alt=""
+                                          className="h-[15px] w-[15px]"
+                                          draggable={false}
+                                        />
+                                      ),
+                                      label: t("playlist.send_to_discord"),
+                                      onClick: handleSendToDiscord,
+                                    },
+                                  ]
+                                : []),
                               {
                                 id: "change-cover",
                                 icon: <LuImagePlus size={15} />,
@@ -1142,7 +1243,7 @@ function LibraryPlaylistContent() {
                         left: 0,
                         width: "100%",
                         height: `${virtualRow.size}px`,
-                        transform: `translateY(${virtualRow.start + shiftY}px)`,
+                        transform: `translateY(${virtualRow.start - (isMobile ? mobileListOffset : 0) + shiftY}px)`,
                         transition: isDragging
                           ? "transform 180ms cubic-bezier(0.2, 0, 0, 1)"
                           : undefined,

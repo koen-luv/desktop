@@ -1293,4 +1293,19 @@ export const api = {
       body: JSON.stringify(notification),
     });
   },
+
+  /**
+   * Discord rejects webhook calls that carry a browser origin, so the API
+   * relays them. Also makes channel webhooks work inside the Android/iOS
+   * WebViews, which never get a CORS response from discord.com.
+   */
+  sendDiscordWebhook(
+    url: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    return request<void>("/v1/discord/webhook", {
+      method: "POST",
+      body: JSON.stringify({ url, payload }),
+    });
+  },
 };

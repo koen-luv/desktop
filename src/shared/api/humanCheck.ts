@@ -50,6 +50,16 @@ export function isHumanCheckMode(value: unknown): value is HumanCheckMode {
   return value === "off" || value === "optional" || value === "required";
 }
 
+/**
+ * Packaged Electron builds are served from `file://`, where Cloudflare has no
+ * hostname it can verify. Rendering the widget there only ever paints a grey
+ * error box, so an optional check is skipped instead of delaying sign-in.
+ */
+function inlineTurnstileUnavailable(): boolean {
+  if (typeof window === "undefined") return true;
+  return window.location.protocol === "file:";
+}
+
 export async function runHumanCheck(
   action: HumanCheckAction,
   mode: HumanCheckMode,
@@ -57,6 +67,9 @@ export async function runHumanCheck(
   siteKey?: string,
 ): Promise<string | undefined> {
   if (mode === "off") return undefined;
+  if (mode === "optional" && !edge && inlineTurnstileUnavailable()) {
+    return undefined;
+  }
   const token = prompt ? await prompt({ action, mode, edge, siteKey }) : null;
   if (token) return token;
   if (mode === "required") throw new HumanCheckCancelledError();

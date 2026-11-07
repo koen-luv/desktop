@@ -42,10 +42,23 @@ export default function HomePage() {
     useRecentlyPlayed(20);
   const { data: dailyMixes } = useDailyMixes();
 
+  const popularAlbums =
+    popularItems?.filter((it) => it.type === "album") ?? [];
+  const popularPlaylists =
+    popularItems?.filter((it) => it.type === "playlist") ?? [];
+
   // A fresh self-hosted deployment has no play graph yet, so the server-side
-  // charts can be empty. Fill only the editorial rows with catalogue results;
-  // the speed dial still reflects real listening history.
-  const needsDiscovery = !tracksLoading && popularTracksOnly.length === 0;
+  // charts and the listening history can both be empty. Fill every editorial
+  // row (trending, jump back in, albums, playlists) with catalogue results;
+  // the speed dial still reflects real listening history only.
+  const needsDiscovery =
+    !tracksLoading &&
+    !popularLoading &&
+    !recentLoading &&
+    (popularTracksOnly.length === 0 ||
+      popularAlbums.length === 0 ||
+      popularPlaylists.length === 0 ||
+      (recentlyPlayed?.length ?? 0) === 0);
   const discovery = useDiscoveryFeed(needsDiscovery);
 
   const isDataLoading =
@@ -56,15 +69,16 @@ export default function HomePage() {
     likedLoading ||
     (needsDiscovery && discovery.isLoading);
 
-  const popularAlbums =
-    popularItems?.filter((it) => it.type === "album") ?? [];
-  const popularPlaylists =
-    popularItems?.filter((it) => it.type === "playlist") ?? [];
-
   const displayTracks =
     popularTracksOnly.length > 0 ? popularTracksOnly : discovery.tracks;
+  const displayRecent =
+    recentlyPlayed && recentlyPlayed.length > 0
+      ? recentlyPlayed
+      : discovery.recent;
   const displayAlbums =
     popularAlbums.length > 0 ? popularAlbums : discovery.albums;
+  const displayPlaylists =
+    popularPlaylists.length > 0 ? popularPlaylists : discovery.playlists;
 
   // Ambient time-of-day colored glow
   const glowClass = useMemo(() => {
@@ -84,7 +98,7 @@ export default function HomePage() {
     return (recentlyPlayed || []).slice(0, 5);
   }, [recentlyPlayed]);
 
-  const hasEnoughQuickData = quickRecentItems.length >= 5;
+  const hasEnoughQuickData = quickRecentItems.length >= 1;
 
   const isReady = !isDataLoading;
   const [skeletonExited, setSkeletonExited] = useState(() => !isDataLoading);
@@ -221,12 +235,12 @@ export default function HomePage() {
             />
           )}
 
-          {/* Jump Back In (History) */}
-          {recentlyPlayed && recentlyPlayed.length > 0 && (
+          {/* Jump Back In (History, or catalogue fallback) */}
+          {displayRecent.length > 0 && (
             <PopularTracksSection
               title={t("home.jumpBackIn")}
               icon={<TimeFill className="w-5 h-5 text-sky-400" />}
-              items={recentlyPlayed}
+              items={displayRecent}
               headingMarginTop="mt-[22px]"
             />
           )}
@@ -251,12 +265,12 @@ export default function HomePage() {
             />
           )}
 
-          {/* Popular Playlists */}
-          {popularPlaylists && popularPlaylists.length > 0 && (
+          {/* Popular Playlists (server chart, or fresh catalogue mixes) */}
+          {displayPlaylists.length > 0 && (
             <PopularTracksSection
               title={t("home.popularPlaylists")}
               icon={<PlaylistFill className="w-5 h-5 text-rose-400" />}
-              items={popularPlaylists}
+              items={displayPlaylists}
               headingMarginTop="mt-[22px]"
             />
           )}
