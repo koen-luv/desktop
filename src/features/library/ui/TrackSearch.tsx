@@ -97,6 +97,8 @@ interface TrackSearchFieldProps {
   /** Enter: play the first result */
   onSubmit?: () => void;
   className?: string;
+  /** keep the field visible even when it is not focused (e.g. a page header) */
+  persistent?: boolean;
 }
 
 export const TrackSearchField = memo(function TrackSearchField({
@@ -106,6 +108,7 @@ export const TrackSearchField = memo(function TrackSearchField({
   glass = false,
   onSubmit,
   className = "",
+  persistent = false,
 }: TrackSearchFieldProps) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -120,10 +123,11 @@ export const TrackSearchField = memo(function TrackSearchField({
   }, [isOpen, focusToken]);
 
   const hasQuery = query.trim().length > 0;
+  const visible = persistent || isOpen;
 
   return (
-    <AnimatePresence>
-      {isOpen && (
+    <AnimatePresence initial={false}>
+      {visible && (
         <motion.div
           key="track-search"
           role="search"
@@ -158,14 +162,14 @@ export const TrackSearchField = memo(function TrackSearchField({
                 e.preventDefault();
                 e.stopPropagation();
                 if (query) setQuery("");
-                else close();
+                else if (!persistent) close();
               } else if (e.key === "Enter") {
                 e.preventDefault();
                 onSubmit?.();
               }
             }}
             onBlur={() => {
-              if (!query.trim()) close();
+              if (!persistent && !query.trim()) close();
             }}
             className={`min-w-0 flex-1 border-none bg-transparent p-0 text-[13px] font-[400] outline-none ${
               glass

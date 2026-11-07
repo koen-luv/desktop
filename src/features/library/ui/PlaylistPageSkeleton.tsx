@@ -33,47 +33,61 @@ function PlaylistPageSkeletonComponent({
     <div
       className={`relative h-full w-full overflow-hidden bg-transparent select-none ${className}`}
     >
-      <div className="relative z-10 flex flex-row items-stretch gap-[16px] pl-[32px] pr-[16px] h-full w-full min-h-0 box-border">
-        <aside className="shrink-0 w-[280px] self-start pt-[56px] pb-[24px]">
-          <div className="relative aspect-square w-full overflow-hidden rounded-md bg-border-alpha-14">
+      <div className="w-full px-4 pt-[calc(var(--inset-top,0px)+64px)] md:px-[32px] md:pt-[76px]">
+        <div className="flex items-start gap-4 md:gap-[22px]">
+          <div className="h-[112px] w-[112px] shrink-0 overflow-hidden rounded-[14px] bg-border-alpha-14 sm:h-[144px] sm:w-[144px] md:h-[168px] md:w-[168px] md:rounded-[12px]">
             <div className="skeleton-shimmer h-full w-full" />
           </div>
 
-          <div className="skeleton-shimmer h-[26px] w-[80%] rounded-[6px] mt-[16px]" />
-          <div className="skeleton-shimmer h-[16px] w-[60%] rounded-[4px] mt-[6px]" />
-          <div className="skeleton-shimmer h-[26px] w-[130px] rounded-md mt-[8px]" />
+          <div className="flex min-w-0 flex-1 flex-col pt-0.5 md:min-h-[168px]">
+            <div className="min-h-[112px] sm:min-h-[144px] md:min-h-0">
+              <div className="skeleton-shimmer h-[30px] w-[58%] rounded-[7px] sm:h-[34px]" />
+              <div className="skeleton-shimmer mt-[10px] h-[13px] w-[38%] rounded-[5px]" />
+              <div className="mt-[14px] flex items-center gap-[6px]">
+                <div className="skeleton-shimmer h-[26px] w-[176px] rounded-[9px]" />
+              </div>
+            </div>
 
-          <div className="skeleton-shimmer h-[36px] w-full rounded-md mt-[16px]" />
-          <div className="mt-[8px] flex items-center gap-[8px]">
-            <div className="skeleton-shimmer h-[36px] flex-1 rounded-md" />
-            <div className="skeleton-shimmer h-[36px] w-[36px] rounded-md" />
-            <div className="skeleton-shimmer h-[36px] w-[36px] rounded-md" />
+            <div className="-ml-[128px] mt-4 flex w-[calc(100%+128px)] flex-wrap items-center gap-2 sm:-ml-[160px] sm:w-[calc(100%+160px)] md:ml-0 md:mt-auto md:w-full md:pt-4">
+              <div className="skeleton-shimmer h-[38px] w-[124px] rounded-full" />
+              <div className="skeleton-shimmer h-[38px] w-[38px] rounded-full" />
+              <div className="skeleton-shimmer order-last h-[32px] w-full rounded-md md:order-none md:ml-auto md:w-[220px] xl:w-[280px]" />
+              <div className="skeleton-shimmer h-[38px] w-[38px] rounded-full sm:w-[128px]" />
+              <div className="skeleton-shimmer h-[38px] w-[38px] rounded-full" />
+              <div className="skeleton-shimmer h-[38px] w-[38px] rounded-full" />
+            </div>
           </div>
-        </aside>
+        </div>
 
-        <div className="min-w-0 flex-1 h-full min-h-0 overflow-hidden px-[8px] pt-[56px] pb-[24px]">
+        <div className="mt-5 overflow-hidden rounded-[16px] bg-black/[0.035] p-[6px] shadow-[inset_0_0_0_1px_var(--border-primary)] backdrop-blur-2xl dark:bg-white/[0.05] md:mt-6 md:p-2">
           <div className="flex flex-col">
-            {Array.from({ length: 10 }).map((_, i) => (
+            {Array.from({ length: 9 }).map((_, index) => (
               <div
-                key={i}
-                className="flex items-center justify-between rounded-md p-[8px] h-[64px]"
+                key={index}
+                className="flex h-[64px] items-center justify-between rounded-[16px] p-[8px]"
               >
-                <div className="flex items-center gap-[16px] min-w-0 flex-1">
-                  <div className="skeleton-shimmer h-[48px] w-[48px] shrink-0 rounded-md" />
+                <div className="flex min-w-0 flex-1 items-center gap-[16px]">
+                  <div className="skeleton-shimmer flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-[10px]">
+                    <div className="skeleton-shimmer h-[12px] w-[12px] rounded-[3px]" />
+                  </div>
 
-                  <div className="min-w-0 flex flex-col gap-[6px] flex-1">
+                  <div className="flex min-w-0 flex-1 flex-col gap-[6px]">
                     <div
-                      className={`skeleton-shimmer h-[15px] ${TRACK_TITLE_WIDTHS[i % TRACK_TITLE_WIDTHS.length]} rounded-[4px]`}
+                      className={`skeleton-shimmer h-[15px] ${
+                        TRACK_TITLE_WIDTHS[index % TRACK_TITLE_WIDTHS.length]
+                      } rounded-[4px]`}
                     />
                     <div
-                      className={`skeleton-shimmer h-[13px] ${TRACK_ARTIST_WIDTHS[i % TRACK_ARTIST_WIDTHS.length]} rounded-[4px]`}
+                      className={`skeleton-shimmer h-[13px] ${
+                        TRACK_ARTIST_WIDTHS[index % TRACK_ARTIST_WIDTHS.length]
+                      } rounded-[4px]`}
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center gap-[16px] pr-[8px]">
+                <div className="flex shrink-0 items-center gap-[16px] pr-[8px]">
                   <div className="skeleton-shimmer h-[13px] w-[36px] rounded-[4px]" />
-                  <div className="skeleton-shimmer h-[32px] w-[32px] rounded-md" />
+                  <div className="skeleton-shimmer h-[20px] w-[20px] rounded-md" />
                 </div>
               </div>
             ))}

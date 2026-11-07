@@ -38,7 +38,6 @@ import { VolumePicker } from "./VolumePicker";
 import { TimelineSlider } from "./TimelineSlider";
 import { SleepTimerControl } from "./SleepTimerControl";
 import { useCustomizationStore, PLAYER_ELEMENT_IDS } from "@/features/settings/store/customizationStore";
-import { isWindowsDesktop } from "@/platform";
 
 import { useTranslation } from "@/languages";
 
@@ -89,7 +88,6 @@ export function PlayerUiElements({
   const sleepRemaining = useSleepTimerRemainingMs();
   const playerElementOrder = useCustomizationStore((s) => s.playerElementOrder);
   const elementOrder = playerElementOrder.length ? playerElementOrder : PLAYER_ELEMENT_IDS;
-  const showWindowsDeviceButtons = isWindowsDesktop();
   const deviceConnected = useDeviceControlStore((s) => s.controllerPhase === "connected");
   const partyActive = usePartyStore(
     (s) => s.role !== null && s.phase !== "idle" && s.phase !== "error",
@@ -240,7 +238,7 @@ export function PlayerUiElements({
 
       {/* Primary Playback Controls */}
       <div
-        className="flex items-center gap-[14px]"
+        className="flex items-center gap-[8px] sm:gap-[14px]"
         style={{ order: elementOrder.indexOf("controls") }}
       >
         <button
@@ -344,32 +342,28 @@ export function PlayerUiElements({
           </AnimatePresence>
         </div>
 
-        {showWindowsDeviceButtons && (
-          <>
-            <button
-              type="button"
-              aria-label={t("devices.remote_title")}
-              title={t("devices.remote_title")}
-              onClick={() => useDeviceControlStore.getState().setOpen(true)}
-              className={`${iconButtonClass} ${
-                deviceConnected ? "!text-white !opacity-100" : "!text-white/40"
-              }`}
-            >
-              <RemoteControlLine size={18} />
-            </button>
-            <button
-              type="button"
-              aria-label={t("party.title")}
-              title={t("party.title")}
-              onClick={() => usePartyStore.getState().setOpen(true)}
-              className={`${iconButtonClass} ${
-                partyActive ? "!text-white !opacity-100" : "!text-white/40"
-              }`}
-            >
-              <Group2Line size={18} />
-            </button>
-          </>
-        )}
+        <button
+          type="button"
+          aria-label={t("devices.remote_title")}
+          title={t("devices.remote_title")}
+          onClick={() => useDeviceControlStore.getState().setOpen(true)}
+          className={`${iconButtonClass} ${
+            deviceConnected ? "!text-white !opacity-100" : "!text-white/40"
+          }`}
+        >
+          <RemoteControlLine size={18} />
+        </button>
+        <button
+          type="button"
+          aria-label={t("party.title")}
+          title={t("party.title")}
+          onClick={() => usePartyStore.getState().setOpen(true)}
+          className={`${iconButtonClass} ${
+            partyActive ? "!text-white !opacity-100" : "!text-white/40"
+          }`}
+        >
+          <Group2Line size={18} />
+        </button>
       </div>
 
       {/* Volume (Compact smooth slider, size sm) */}

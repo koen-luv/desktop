@@ -38,6 +38,7 @@ object PlaybackHolder {
     @Volatile private var pitch = 1f
     @Volatile private var reverbLevel = 0f
     private var reverb: PresetReverb? = null
+    private var reverbSessionId = C.AUDIO_SESSION_ID_UNSET
 
     @Volatile private var currentTrackId: String? = null
     @Volatile private var loadedDurationMs = 0L
@@ -341,11 +342,16 @@ object PlaybackHolder {
         }
         val sessionId = p.audioSessionId
         if (sessionId == C.AUDIO_SESSION_ID_UNSET || sessionId == 0) return
+        // The player may be recreated (or recover with a new session), which
+        // leaves an old PresetReverb attached to a dead audio session.
+        if (reverb != null && reverbSessionId != sessionId) releaseReverb()
         if (reverb == null) {
             try {
                 reverb = PresetReverb(0, sessionId).apply { enabled = true }
+                reverbSessionId = sessionId
             } catch (_: Exception) {
                 reverb = null
+                reverbSessionId = C.AUDIO_SESSION_ID_UNSET
                 return
             }
         }
@@ -364,6 +370,7 @@ object PlaybackHolder {
     private fun releaseReverb() {
         try { reverb?.release() } catch (_: Exception) {}
         reverb = null
+        reverbSessionId = C.AUDIO_SESSION_ID_UNSET
     }
 
     fun stop() = runOnPlayer {
@@ -762,7 +769,7 @@ object PlaybackHolder {
                 if (equalizerEnabled && p != null && mainEqualizer == null) {
                     equalizerFor(p, isMain = true)
                 }
-                if (p != null && reverbLevel > 0.01f && reverb == null) ensureReverb(p)
+                if (p != null && reverbLevel > 0.01f && (reverb == null || reverbSessionId != p.audioSessionId)) ensureReverb(p)
                 main.postDelayed(this, 250L)
             }
         }

@@ -35,6 +35,10 @@ export class PlayerRuntime {
   private audioContext: AudioContext | null = null;
   private equalizerGraphs = new Set<BiquadFilterNode[]>();
   private equalizerSources = new WeakMap<HTMLAudioElement, MediaElementAudioSourceNode>();
+  private audioEffectChains = new WeakMap<
+    HTMLAudioElement,
+    { source: MediaElementAudioSourceNode; input: AudioNode; context: AudioContext }
+  >();
   private currentTrackId: string | null = null;
   private loadEpoch = 0;
   private loadAbortController: AbortController | null = null;
@@ -154,11 +158,14 @@ export class PlayerRuntime {
       return;
     }
     try {
-      this.audioContext ??= new AudioContext();
-      const source = this.audioContext.createMediaElementSource(audio);
+      const context = (this.audioContext ??= new AudioContext());
+      if (context.state === "suspended") {
+        void context.resume().catch(() => {});
+      }
+      const source = context.createMediaElementSource(audio);
       let previous: AudioNode = source;
       const filters = EQUALIZER_BANDS.map(({ frequency }) => {
-        const filter = this.audioContext!.createBiquadFilter();
+        const filter = context.createBiquadFilter();
         filter.type = "peaking";
         filter.frequency.value = frequency;
         filter.Q.value = 0.8;
@@ -166,9 +173,16 @@ export class PlayerRuntime {
         previous = filter;
         return filter;
       });
-      previous.connect(this.audioContext.destination);
+      previous.connect(context.destination);
       this.equalizerSources.set(audio, source);
       this.equalizerGraphs.add(filters);
+      // Pitch/reverb effects are inserted between the media source and the
+      // equalizer input so there is still exactly one source and one dry path.
+      this.audioEffectChains.set(audio, {
+        source,
+        input: filters[0] ?? context.destination,
+        context,
+      });
       const settings = useEqualizerSettingsStore.getState();
       this.applyEqualizer(settings.enabled, settings.gains);
     } catch (error) {
@@ -522,7 +536,9 @@ export class PlayerRuntime {
       const reverbLevel = store.reverbLevel ?? 0.35;
       const needsEffects = isReverbEnabled || (!isPitchLinked && Math.abs(pitchSemitones) >= 0.05);
       if (!needsEffects && !pitchShifter.isAttached()) return;
-      pitchShifter.attach(this.audio);
+      const chain = this.audioEffectChains.get(this.audio);
+      if (!chain) return;
+      pitchShifter.attachToChain(chain.context, chain.source, chain.input);
       pitchShifter.update({
         pitchSemitones,
         isPitchLinked,
