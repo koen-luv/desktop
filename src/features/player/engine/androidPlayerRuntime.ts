@@ -179,9 +179,34 @@ export class AndroidPlayerRuntime {
       this.crossfadeInFlight = false;
       const store = usePlayerStore.getState();
       this.nativeVolume = store.volume;
+      // Native has already promoted this player; make the runtime agree before
+      // the queue advance so a slow adopt cannot leave the old id in place.
+      this.currentTrackId = trackId;
+      this.endedTrackId = null;
+      this.endFadeTrackId = null;
+      this.currentSessionExpiresAt = null;
       this.adoptTrackId = trackId;
       log("green", "audio", "native crossfade completed - advancing queue");
       store.dispatch({ type: "SKIP_NEXT", isAutoEnd: true });
+    });
+
+    onNativeEvent("crossfadeCancelled", (payload) => {
+      let trackId: string | null = null;
+      if (typeof payload === "string") {
+        try {
+          const parsed: unknown = JSON.parse(payload);
+          trackId = typeof parsed === "string" ? parsed : null;
+        } catch {
+          trackId = payload;
+        }
+      } else if (payload && typeof payload === "object" && "trackId" in payload) {
+        trackId = String((payload as { trackId: unknown }).trackId);
+      }
+      if (!trackId || trackId !== this.crossfadeTrackId) return;
+      this.crossfadeTrackId = null;
+      this.crossfadeInFlight = false;
+      this.nativeVolume = usePlayerStore.getState().volume;
+      log("yellow", "audio", "native crossfade cancelled - sequential fallback restored");
     });
 
     this.reconcileWithNative();
@@ -307,6 +332,14 @@ export class AndroidPlayerRuntime {
   private handleNativeAutoAdvance(trackId: string): void {
     const next = peekAutoNextTrack(usePlayerStore.getState());
     if (next?.id !== trackId) return;
+    // The poll can observe the promoted native track before the
+    // crossfadeCompleted event arrives. Clear the armed id here so that late
+    // event cannot dispatch a second skip to the following track.
+    if (this.crossfadeTrackId === trackId) {
+      this.crossfadeTrackId = null;
+      this.crossfadeInFlight = false;
+      this.nativeVolume = usePlayerStore.getState().volume;
+    }
     this.adoptTrackId = trackId;
     usePlayerStore.getState().dispatch({ type: "SKIP_NEXT", isAutoEnd: true });
   }
@@ -468,13 +501,21 @@ export class AndroidPlayerRuntime {
         durationMs: next.durationMs || 0,
         startMs: 0,
       };
+      // Mark the blend before handing it to native so a fast native failure
+      // can be matched to this attempt and clear the suppression flag.
+      this.crossfadeTrackId = next.id;
       this.bridge.audioCrossfadeLoad(JSON.stringify(payload));
 
       const window = Math.min(windowMs, remainingNow);
       this.bridge.audioCrossfadeStart(window);
-      this.crossfadeTrackId = next.id;
       log("cyan", "audio", `native crossfade armed (${window}ms into "${next.title}")`);
     } catch (err) {
+      if (this.crossfadeTrackId === next.id) {
+        this.crossfadeTrackId = null;
+        try {
+          this.bridge.audioCrossfadeCancel();
+        } catch {}
+      }
       if (epoch === this.crossfadeEpoch) {
         log(
           "yellow",

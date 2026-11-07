@@ -115,7 +115,19 @@ object PlaybackHolder {
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            val failedTrackId = currentTrackId
             lastError = describePlaybackError(error)
+            val next = autoAdvancePayload.takeIf { playWhenReadyIntent && failedTrackId != null }
+            if (next != null && failedTrackId != null) {
+                autoAdvancePayload = null
+                main.post {
+                    if (currentTrackId != failedTrackId || !playWhenReadyIntent) return@post
+                    cancelCrossfadeLocked()
+                    applyLoad(next)
+                    emitTrackChange("playbackAutoAdvanced", next)
+                }
+                return
+            }
             updateState()
             NativeEvents.emit("playbackError", stateJson())
         }
@@ -243,6 +255,7 @@ object PlaybackHolder {
             autoAdvancePayload = null
             previousTrackPayload = null
             runOnPlayer {
+                cancelCrossfadeLocked()
                 applyLoad(next)
                 emitTrackChange("playbackNextAdvanced", next)
             }
@@ -438,12 +451,27 @@ object PlaybackHolder {
         ensureService(context)
         main.post {
             cancelCrossfadeLocked()
-            val svc = service ?: return@post
+            val payload = try { JSONObject(payloadJson) } catch (_: Exception) { null }
+            val requestedTrackId = payload
+                ?.optString("trackId")
+                ?.takeIf { it.isNotBlank() }
+            if (requestedTrackId != null) crossfadeTrackId = requestedTrackId
+            val svc = service ?: run {
+                // Emit via cancel so JS can fall back to the sequential path.
+                cancelCrossfadeLocked()
+                return@post
+            }
             try {
-                val payload = JSONObject(payloadJson)
+                if (payload == null) {
+                    cancelCrossfadeLocked()
+                    return@post
+                }
                 val url = payload.optString("url")
-                val trackId = payload.optString("trackId")
-                if (url.isBlank() || trackId.isBlank()) return@post
+                val trackId = requestedTrackId
+                if (url.isBlank() || trackId == null) {
+                    cancelCrossfadeLocked()
+                    return@post
+                }
 
                 val cached: File? = AudioCache.find(trackId)
                 val uri = if (cached != null) Uri.fromFile(cached) else Uri.parse(url)
@@ -469,7 +497,6 @@ object PlaybackHolder {
                 transition.playWhenReady = true // audible only through volume
                 transition.prepare()
                 transitionPlayer = transition
-                crossfadeTrackId = trackId
             } catch (error: Exception) {
                 lastError = "crossfade load failed: " + (error.message ?: "invalid payload")
                 cancelCrossfadeLocked()
@@ -662,7 +689,10 @@ object PlaybackHolder {
         crossfadeEpoch += 1
         crossfadeRunnable?.let { main.removeCallbacks(it) }
         crossfadeRunnable = null
+        val cancelledId = crossfadeTrackId
         crossfadeTrackId = null
+        // A cancelled blend may have left the outgoing player mid-ramp.
+        player?.volume = volume
         applyEqualizerSettings()
         transitionPlayer?.let { transition ->
             try { transition.stop() } catch (_: Exception) {}
@@ -671,6 +701,9 @@ object PlaybackHolder {
         transitionPlayer = null
         try { transitionEqualizer?.release() } catch (_: Exception) {}
         transitionEqualizer = null
+        // If a blend was armed but could not start (or was cancelled natively),
+        // tell JS so it does not keep suppressing future crossfades.
+        cancelledId?.let { NativeEvents.emit("crossfadeCancelled", JSONObject.quote(it)) }
     }
 
     private fun applyLoad(json: String) {

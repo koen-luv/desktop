@@ -47,14 +47,17 @@ export class PlayerRuntime {
   private sleepTimerId: ReturnType<typeof setTimeout> | null = null;
   /** Track id whose end-of-song fade-out is already running (once per track). */
   private endFadeTrackId: string | null = null;
-  /** Second element carrying the overlapping half of a crossfade. */
+  /** Spare element carrying the overlapping half of a crossfade. */
   private xAudio: HTMLAudioElement | null = null;
+  /** Elements already wired to media listeners; crossfade elements are reused. */
+  private listenerElements = new WeakSet<HTMLAudioElement>();
   private crossfade: {
     trackId: string;
     element: HTMLAudioElement;
     windowMs: number;
     startedAt: number;
     timer: ReturnType<typeof setTimeout> | null;
+    blobUrl: string | null;
   } | null = null;
   private crossfadeEpoch = 0;
   private crossfadeInFlight = false;
@@ -332,6 +335,11 @@ export class PlayerRuntime {
   }
 
   private setupAudioListeners(audioEl: HTMLAudioElement) {
+    // A parked crossfade element keeps its listeners when it is demoted; adding
+    // another set on promotion would double-fire ended/play/pause handlers.
+    if (this.listenerElements.has(audioEl)) return;
+    this.listenerElements.add(audioEl);
+
     audioEl.addEventListener("timeupdate", () => {
       if (this.isResetting || audioEl !== this.audio) return;
       if (!this.currentTrackId) return;
@@ -442,7 +450,17 @@ export class PlayerRuntime {
     });
 
     audioEl.addEventListener("error", () => {
-      if (this.isResetting || audioEl !== this.audio) return;
+      if (this.isResetting) return;
+      if (audioEl !== this.audio) {
+        if (
+          this.crossfade?.element === audioEl ||
+          (this.crossfadeInFlight && audioEl === this.xAudio)
+        ) {
+          log("yellow", "audio", "crossfade incoming stream failed");
+          this.cancelCrossfade();
+        }
+        return;
+      }
       if (!this.currentTrackId || !audioEl.src || audioEl.src === window.location.href) return;
       // the previous track's source is still attached while the next one loads
       if (this.attachedTrackId !== this.currentTrackId) return;
@@ -647,7 +665,7 @@ export class PlayerRuntime {
   private maybeStartEndFade(audioEl: HTMLAudioElement): void {
     // An active overlapping crossfade owns the tail; the sequential fade is
     // only the fallback for when no blend could start.
-    if (this.crossfade) return;
+    if (this.crossfade || this.crossfadeInFlight) return;
     const fadeOutMs = transitionSpec(
       usePlayerStore.getState().transitionPreset,
     ).fadeOutMs;
@@ -694,10 +712,15 @@ export class PlayerRuntime {
     let incomingBlobUrl: string | null = null;
     log("cyan", "audio", `crossfade starting into "${next.title}" (${windowMs}ms window)`);
     try {
-      const element = this.xAudio ?? this.createCrossfadeElement();
+      // Never reuse the element that is currently audible as the incoming side.
+      const element =
+        this.xAudio && this.xAudio !== this.audio
+          ? this.xAudio
+          : this.createCrossfadeElement();
       this.xAudio = element;
       incomingElement = element;
       this.connectEqualizer(element);
+      this.setupAudioListeners(element);
 
       const stream = await resolvePlaybackStream(
         next,
@@ -719,8 +742,8 @@ export class PlayerRuntime {
         return;
       }
 
-      const remainingNow = (this.audio.duration - this.audio.currentTime) * 1000;
-      if (!Number.isFinite(remainingNow) || remainingNow < CROSSFADE_MIN_MS) {
+      const remainingBeforePlay = (this.audio.duration - this.audio.currentTime) * 1000;
+      if (!Number.isFinite(remainingBeforePlay) || remainingBeforePlay < CROSSFADE_MIN_MS) {
         if (stream.url.startsWith("blob:")) URL.revokeObjectURL(stream.url);
         return;
       }
@@ -732,6 +755,10 @@ export class PlayerRuntime {
       (element as HTMLAudioElement & { __linerIsBlob?: boolean }).__linerIsBlob = isBlob;
       incomingBlobUrl = isBlob ? stream.url : null;
       element.playbackRate = this.audio.playbackRate;
+      element.defaultPlaybackRate = this.audio.defaultPlaybackRate;
+      element.preservesPitch = this.audio.preservesPitch;
+      (element as any).mozPreservesPitch = (this.audio as any).mozPreservesPitch;
+      (element as any).webkitPreservesPitch = (this.audio as any).webkitPreservesPitch;
       element.volume = 0;
       element.load();
       if (previousBlob && previousBlob !== stream.url) URL.revokeObjectURL(previousBlob);
@@ -747,9 +774,18 @@ export class PlayerRuntime {
         return;
       }
 
+      const remainingAfterPlay = (this.audio.duration - this.audio.currentTime) * 1000;
+      if (!Number.isFinite(remainingAfterPlay) || remainingAfterPlay < CROSSFADE_MIN_MS) {
+        element.pause();
+        element.removeAttribute("src");
+        element.load();
+        if (incomingBlobUrl) URL.revokeObjectURL(incomingBlobUrl);
+        return;
+      }
+
       // Fit the blend to the time that is actually left now that both songs
       // are audible.
-      const window = Math.min(windowMs, remainingNow);
+      const window = Math.min(windowMs, remainingAfterPlay);
 
       const state = {
         trackId: next.id,
@@ -757,6 +793,7 @@ export class PlayerRuntime {
         windowMs: window,
         startedAt: performance.now(),
         timer: null as ReturnType<typeof setTimeout> | null,
+        blobUrl: incomingBlobUrl,
       };
       this.crossfade = state;
       const tick = () => {
@@ -807,14 +844,23 @@ export class PlayerRuntime {
   private completeCrossfade(element: HTMLAudioElement, next: Track): void {
     if (!this.crossfade || this.crossfade.element !== element) return;
     this.crossfade = null;
+    this.cancelFade();
 
     const old = this.audio;
     const oldBlob = this.activeBlobUrl;
 
     this.audio = element;
+    // The old primary becomes the spare for the next crossfade; the promoted
+    // element must never stay parked, or the next blend would overwrite it.
+    this.xAudio = old === element ? null : old;
     this.audio.id = "liner-audio";
+    this.audio.volume = Math.max(0, Math.min(1, usePlayerStore.getState().volume));
     old.id = "";
+    this.currentTrackId = next.id;
     this.attachedTrackId = next.id;
+    this.endFadeTrackId = null;
+    this.recoveryAttempts = 0;
+    this.recoveryHoldUntilMs = null;
     this.activeBlobUrl = (element as HTMLAudioElement & { __linerIsBlob?: boolean }).__linerIsBlob
       ? element.src
       : null;
@@ -851,11 +897,13 @@ export class PlayerRuntime {
     this.crossfade = null;
     if (state?.timer) clearTimeout(state.timer);
     if (state) {
+      this.audio.volume = Math.max(0, Math.min(1, usePlayerStore.getState().volume));
       try {
         state.element.pause();
         state.element.removeAttribute("src");
         state.element.load();
       } catch {}
+      if (state.blobUrl) URL.revokeObjectURL(state.blobUrl);
     }
   }
 
@@ -1021,6 +1069,10 @@ export class PlayerRuntime {
       // already playing this track — adopt it instead of reloading.
       this.adoptTrackId = null;
       if (this.attachedTrackId === track.id && !this.audio.paused && !this.audio.ended) {
+        this.currentTrackId = track.id;
+        this.endFadeTrackId = null;
+        this.recoveryAttempts = 0;
+        this.recoveryHoldUntilMs = null;
         usePlayerStore.getState().setStatus("playing");
         this.updateMediaSessionMetadata(track);
         log("green", "playback", `adopted crossfaded track "${track.title}"`);
@@ -1373,6 +1425,9 @@ export class PlayerRuntime {
       return;
     }
     log("cyan", "audio", "sleep timer ended â€” fading out and pausing");
+    // The timer may expire mid-blend; stop the incoming half so the next track
+    // does not keep playing after the player reports paused.
+    this.cancelCrossfade();
     this.fadeVolume(0, 4_000, () => {
       this.audio.pause();
       this.audio.volume = Math.max(
