@@ -899,7 +899,7 @@ export default function AppFrame({ children }: AppFrameProps) {
             exit={{ y: "100%" }}
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             onAnimationComplete={() => setFullscreenEffectsReady(fullscreenPlayerOpen)}
-            className="dark absolute inset-0 z-[70] overflow-hidden bg-black will-change-transform"
+            className="dark absolute inset-0 z-[70] overflow-hidden bg-bg-primary will-change-transform"
           >
             <Suspense fallback={null}>
               <FullscreenPlayer
@@ -909,7 +909,7 @@ export default function AppFrame({ children }: AppFrameProps) {
             </Suspense>
           </motion.div>
         ) : isFullscreenRoute ? (
-          <div data-theme="dark" className="dark absolute inset-0 z-[70] overflow-hidden bg-black">
+          <div data-theme="dark" className="dark absolute inset-0 z-[70] overflow-hidden bg-bg-primary">
             {children}
           </div>
         ) : null}
@@ -928,7 +928,7 @@ export default function AppFrame({ children }: AppFrameProps) {
           >
             {/* 1. Search Input Island */}
             <div
-              className="w-[min(620px,calc(100vw-72px))] max-md:w-[calc(100vw-16px)] h-[54px] rounded-full pointer-events-auto flex items-center px-[20px] gap-[12px] bg-bg-surface/85 border border-border-primary/70 shadow-e2 backdrop-blur-2xl"
+              className="w-[min(660px,calc(100vw-72px))] max-md:w-[calc(100vw-16px)] h-[54px] rounded-[8px] pointer-events-auto flex items-center px-[18px] gap-[14px] bg-bg-panel/95 border border-border-primary/50 backdrop-blur-2xl"
             >
               <span className="shrink-0 flex items-center justify-center text-text-tertiary">
                 <AnimatePresence mode="wait" initial={false}>
@@ -1009,7 +1009,7 @@ export default function AppFrame({ children }: AppFrameProps) {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.99 }}
                   transition={{ duration: 0.1, ease: [0.16, 1, 0.3, 1] }}
-                  className="w-[min(620px,calc(100vw-72px))] max-md:w-[calc(100vw-16px)] mt-[10px] h-[500px] max-h-[500px] max-md:h-[calc(100dvh-120px)] max-md:max-h-[calc(100dvh-120px)] rounded-[24px] pointer-events-auto flex flex-col overflow-hidden bg-bg-surface/90 border border-border-primary/70 shadow-e3 backdrop-blur-2xl"
+                  className="w-[min(660px,calc(100vw-72px))] max-md:w-[calc(100vw-16px)] mt-[8px] h-[500px] max-h-[500px] max-md:h-[calc(100dvh-120px)] max-md:max-h-[calc(100dvh-120px)] rounded-[8px] pointer-events-auto flex flex-col overflow-hidden bg-bg-panel/95 border border-border-primary/50 backdrop-blur-2xl"
                 >
                   <div className="flex gap-[6px] px-[14px] pt-[12px] pb-[6px] shrink-0 overflow-x-auto">
                     {filterKeys.map((key) => {
@@ -1126,7 +1126,7 @@ export default function AppFrame({ children }: AppFrameProps) {
                   initial={{ opacity: 0, y: -6, scale: 0.99 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.99 }}
-                  transition={{ duration: 0.1, ease: [0.16, 1, 0.3, 1] }}                    className="w-[min(620px,calc(100vw-72px))] max-md:w-[calc(100vw-16px)] mt-[10px] max-h-[480px] max-md:max-h-[calc(100dvh-120px)] h-auto rounded-[24px] pointer-events-auto flex flex-col overflow-hidden bg-bg-surface/90 border border-border-primary/70 shadow-e3 backdrop-blur-2xl"
+                  transition={{ duration: 0.1, ease: [0.16, 1, 0.3, 1] }}                    className="w-[min(660px,calc(100vw-72px))] max-md:w-[calc(100vw-16px)] mt-[8px] max-h-[480px] max-md:max-h-[calc(100dvh-120px)] h-auto rounded-[8px] pointer-events-auto flex flex-col overflow-hidden bg-bg-panel/95 border border-border-primary/50 backdrop-blur-2xl"
                 >
                   <SearchHistoryList
                     onSelectQuery={handleSelectHistoryQuery}

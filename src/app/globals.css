@@ -100,23 +100,23 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not(.light) {
-    --bg-canvas: #050509;
-    --bg-surface: #0d0d14;
-    --bg-primary: #101017;
-    --bg-elevated: #171723;
-    --bg-panel: #1b1b29;
-    --bg-overlay: rgba(16, 16, 23, 0.94);
-    --bg-toolbox: rgba(255, 255, 255, 0.05);
-    --bg-toolbox-active: rgba(255, 255, 255, 0.1);
-    --border-toolbox-divider: rgba(255, 255, 255, 0.1);
+    --bg-canvas: #141418;
+    --bg-surface: #1c1c22;
+    --bg-primary: #18181d;
+    --bg-elevated: #232329;
+    --bg-panel: #2a2a32;
+    --bg-overlay: rgba(24, 24, 29, 0.94);
+    --bg-toolbox: rgba(255, 255, 255, 0.055);
+    --bg-toolbox-active: rgba(255, 255, 255, 0.105);
+    --border-toolbox-divider: rgba(255, 255, 255, 0.09);
 
-    --bg-hover: rgba(255, 255, 255, 0.06);
-    --bg-active: rgba(255, 255, 255, 0.1);
-    --bg-selected: rgba(143, 121, 255, 0.18);
+    --bg-hover: rgba(255, 255, 255, 0.065);
+    --bg-active: rgba(255, 255, 255, 0.11);
+    --bg-selected: rgba(143, 121, 255, 0.2);
 
-    --border-primary: #21212f;
-    --border-secondary: #2d2d40;
-    --border-tertiary: #44445e;
+    --border-primary: #2c2c36;
+    --border-secondary: #3b3b48;
+    --border-tertiary: #575769;
     --border-white-alpha-10: rgba(255, 255, 255, 0.06);
     --border-white-alpha-14: rgba(255, 255, 255, 0.09);
     --border-white-alpha-20: rgba(255, 255, 255, 0.14);
@@ -143,23 +143,23 @@
 }
 
 :root[data-theme="dark"], :root.dark, [data-theme="dark"], .dark {
-  --bg-canvas: #050509;
-  --bg-surface: #0d0d14;
-  --bg-primary: #101017;
-  --bg-elevated: #171723;
-  --bg-panel: #1b1b29;
-  --bg-overlay: rgba(16, 16, 23, 0.94);
-  --bg-toolbox: rgba(255, 255, 255, 0.05);
-  --bg-toolbox-active: rgba(255, 255, 255, 0.1);
-  --border-toolbox-divider: rgba(255, 255, 255, 0.1);
+  --bg-canvas: #141418;
+  --bg-surface: #1c1c22;
+  --bg-primary: #18181d;
+  --bg-elevated: #232329;
+  --bg-panel: #2a2a32;
+  --bg-overlay: rgba(24, 24, 29, 0.94);
+  --bg-toolbox: rgba(255, 255, 255, 0.055);
+  --bg-toolbox-active: rgba(255, 255, 255, 0.105);
+  --border-toolbox-divider: rgba(255, 255, 255, 0.09);
 
-  --bg-hover: rgba(255, 255, 255, 0.06);
-  --bg-active: rgba(255, 255, 255, 0.1);
-  --bg-selected: rgba(143, 121, 255, 0.18);
+  --bg-hover: rgba(255, 255, 255, 0.065);
+  --bg-active: rgba(255, 255, 255, 0.11);
+  --bg-selected: rgba(143, 121, 255, 0.2);
 
-  --border-primary: #21212f;
-  --border-secondary: #2d2d40;
-  --border-tertiary: #44445e;
+  --border-primary: #2c2c36;
+  --border-secondary: #3b3b48;
+  --border-tertiary: #575769;
   --border-white-alpha-10: rgba(255, 255, 255, 0.06);
   --border-white-alpha-14: rgba(255, 255, 255, 0.09);
   --border-white-alpha-20: rgba(255, 255, 255, 0.14);

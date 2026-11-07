@@ -439,7 +439,7 @@ export function FullscreenPlayer({
   return (
     <div
       data-theme="dark"
-      className="dark relative h-full w-full overflow-hidden bg-black text-white"
+      className="dark relative h-full w-full overflow-hidden bg-bg-primary text-white"
     >
       <div className="absolute inset-0 overflow-hidden">
         <div
