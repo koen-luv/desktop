@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { platformFetch } from "./http";
 import { installAndroidPlatform } from "./index";
 
+vi.mock("@/shared/api/baseUrl", () => ({
+  getApiBaseUrl: () => "https://liner-api.lucabatarcian.workers.dev",
+}));
+
 interface TestWindow {
   LinerAndroid?: unknown;
   linerElectron?: unknown;
@@ -71,6 +75,37 @@ describe("platformFetch", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
+  });
+
+  it("sends self-hosted Worker POSTs through the native bridge", async () => {
+    const browserFetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValue(new TypeError("browser fetch must not be used"));
+
+    const body = JSON.stringify({ email: "a@b.co", password: "password123" });
+    const response = await platformFetch(
+      "https://liner-api.lucabatarcian.workers.dev/v1/auth/login",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+      },
+    );
+
+    expect(httpRequest).toHaveBeenCalledTimes(1);
+    const [id, method, url, , sentBody] = httpRequest.mock.calls[0] as [
+      string,
+      string,
+      string,
+      string,
+      string | null,
+    ];
+    expect(typeof id).toBe("string");
+    expect(method).toBe("POST");
+    expect(url).toBe("https://liner-api.lucabatarcian.workers.dev/v1/auth/login");
+    expect(sentBody).toBe(body);
+    expect(browserFetch).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
   });
 
   it("uses the browser fetch when no native bridge is installed", async () => {

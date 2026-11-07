@@ -40,7 +40,14 @@ object CorsProxy {
         if (uri.scheme != "https" && uri.scheme != "http") return false
         val host = uri.host?.lowercase(Locale.ROOT) ?: return false
         if (host == "appassets.androidplatform.net") return false
-        if (apiHosts.contains(host)) return true
+        if (apiHosts.contains(host)) {
+            // The WebView proxy can only replay GET/HEAD/OPTIONS: it has no
+            // access to a request body. Writes must go through LinerBridge,
+            // otherwise a POST silently turns into a bodyless GET.
+            return request.method == "GET" ||
+                request.method == "HEAD" ||
+                request.method == "OPTIONS"
+        }
         if (request.method == "OPTIONS") return false
         if (request.method != "GET" && request.method != "HEAD") return false
         return isImageRequest(request, uri.lastPathSegment)

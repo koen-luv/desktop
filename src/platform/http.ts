@@ -1,4 +1,5 @@
 import { getAndroidBridge, onNativeEvent } from "./index";
+import { getApiBaseUrl } from "@/shared/api/baseUrl";
 
 /**
  * Hosts that do not send usable CORS headers (YouTube visitor bootstrap and the
@@ -10,6 +11,29 @@ import { getAndroidBridge, onNativeEvent } from "./index";
 const NATIVE_ONLY_HOST =
   /(^|\.)youtube\.com$|(^|\.)googlevideo\.com$|(^|\.)ytimg\.com$|(^|\.)googleusercontent\.com$|(^|\.)ggpht\.com$|(^|\.)youtubei\.googleapis\.com$/i;
 const LINER_API_HOST = /(^|\.)tryliner\.fun$/i;
+
+/**
+ * The bundled API base URL can point at a self-hosted Worker (for example
+ * `liner-api.<account>.workers.dev`), so match that host as well. Writes to
+ * these hosts must use the native bridge because the WebView proxy cannot
+ * forward request bodies.
+ */
+let linerApiHostOverride: string | null = null;
+try {
+  linerApiHostOverride = new URL(getApiBaseUrl()).hostname.toLowerCase();
+} catch {
+  linerApiHostOverride = null;
+}
+
+function isLinerApiHost(host: string): boolean {
+  const normalized = host.toLowerCase();
+  if (LINER_API_HOST.test(normalized)) return true;
+  if (!linerApiHostOverride) return false;
+  return (
+    linerApiHostOverride === normalized ||
+    normalized.endsWith(`.${linerApiHostOverride}`)
+  );
+}
 
 interface NativeHttpResponse {
   id?: string;
@@ -132,7 +156,7 @@ export async function platformFetch(
 
   const method = (init.method || "GET").toUpperCase();
   const nativeOnly =
-    NATIVE_ONLY_HOST.test(host) || (LINER_API_HOST.test(host) && method !== "GET");
+    NATIVE_ONLY_HOST.test(host) || (isLinerApiHost(host) && method !== "GET");
 
   if (!bridge || !nativeOnly || !/^https?:/i.test(url)) {
     return fetch(input, init);
