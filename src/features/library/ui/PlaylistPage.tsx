@@ -161,45 +161,9 @@ interface PlaylistBackdropProps {
   visible: boolean;
 }
 
-function PlaylistBackdrop({
-  coverUrl,
-  isLikesMode,
-  hasCustomBg,
-  visible,
-}: PlaylistBackdropProps) {
-  return (
-    <div
-      aria-hidden="true"
-      className={`pointer-events-none absolute inset-0 overflow-hidden transition-opacity duration-300 ${
-        visible ? "opacity-100" : "opacity-0"
-      }`}
-    >
-      {coverUrl ? (
-        <img
-          src={coverUrl}
-          alt=""
-          draggable={false}
-          className="absolute left-1/2 top-[-12%] h-[125%] w-[120%] -translate-x-1/2 scale-110 object-cover blur-[90px] saturate-150"
-        />
-      ) : (
-        <div
-          className={`absolute inset-0 ${
-            isLikesMode
-              ? "bg-gradient-to-br from-rose-500/35 via-violet-500/20 to-transparent"
-              : "bg-gradient-to-br from-bg-panel via-bg-surface to-bg-surface"
-          }`}
-        />
-      )}
-      <div
-        className={`absolute inset-0 ${
-          hasCustomBg
-            ? "bg-bg-surface/25 dark:bg-black/20"
-            : "bg-bg-surface/55 dark:bg-black/35"
-        }`}
-      />
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-bg-surface/10 to-bg-surface/95" />
-    </div>
-  );
+/* Removed: playlist now renders on the AppFrame wallpaper directly. */
+function PlaylistBackdrop(_props: PlaylistBackdropProps) {
+  return null;
 }
 
 interface TrackItemProps {
@@ -785,7 +749,7 @@ function LibraryPlaylistContent() {
   }, [viewData?.tracks, t]);
 
   const coverUrls = viewData?.coverUrls ?? (viewData?.coverUrl ? [viewData.coverUrl] : []);
-  const backdropUrl = viewData?.coverUrl || coverUrls.find(Boolean) || "";
+
   const chipClass = hasCustomBg
     ? "apple-glass-pill"
     : "bg-black/[0.045] text-text-primary dark:bg-white/[0.08]";
@@ -804,14 +768,6 @@ function LibraryPlaylistContent() {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-transparent">
-      {viewData && (
-        <PlaylistBackdrop
-          coverUrl={backdropUrl}
-          isLikesMode={isLikesMode}
-          hasCustomBg={hasCustomBg}
-          visible={isReady}
-        />
-      )}
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 hidden h-[56px] select-none md:block">
         <div
@@ -862,11 +818,7 @@ function LibraryPlaylistContent() {
               <div ref={heroRef} data-no-window-drag>
                 <div className="flex items-start gap-4 md:gap-[22px]">
                   <div
-                    className={`relative flex h-[112px] w-[112px] shrink-0 items-center justify-center overflow-hidden rounded-[14px] shadow-e2 ring-1 ring-border-primary/40 sm:h-[144px] sm:w-[144px] md:h-[168px] md:w-[168px] md:rounded-[12px] ${
-                      hasCustomBg && coverUrls.length === 0
-                        ? "apple-glass-static pointer-events-none"
-                        : "bg-bg-panel"
-                    }`}
+                    className={`relative flex h-[112px] w-[112px] shrink-0 items-center justify-center overflow-hidden rounded-[18px] shadow-[0_12px_40px_rgba(0,0,0,0.18)] ring-1 ring-white/10 backdrop-blur-xl sm:h-[144px] sm:w-[144px] md:h-[168px] md:w-[168px] ${coverUrls.length === 0 ? "bg-white/5" : "bg-white/10"}`} 
                   >
                     <PlaylistCover
                       urls={coverUrls}
@@ -880,7 +832,7 @@ function LibraryPlaylistContent() {
                     <div className="min-h-[112px] sm:min-h-[144px] md:min-h-0">
                     <h1
                       ref={titleRef}
-                      className={`m-0 line-clamp-2 text-[28px] font-[650] leading-[1.06] tracking-[-0.045em] text-text-primary sm:text-[32px] lg:text-[36px] ${
+                      className={`m-0 line-clamp-2 text-[32px] font-[700] leading-[1.02] tracking-[-0.03em] text-text-primary drop-shadow-sm sm:text-[38px] lg:text-[44px] ${
                         isLikesMode
                           ? ""
                           : "cursor-text outline-none transition-colors"
@@ -1244,7 +1196,7 @@ function LibraryPlaylistContent() {
 
               <div
                 data-no-window-drag
-                className="mt-5 overflow-hidden rounded-[16px] bg-black/[0.035] p-[6px] shadow-[inset_0_0_0_1px_var(--border-primary)] backdrop-blur-2xl dark:bg-white/[0.05] md:mt-6 md:p-2"
+                className="mt-5 md:mt-6"
               >
                 {currentTracks.length === 0 ? (
                   <div className="flex min-h-[46vh] flex-col items-center justify-center gap-[12px] text-center">

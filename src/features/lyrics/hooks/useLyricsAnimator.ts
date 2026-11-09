@@ -19,6 +19,7 @@ export function useLyricsAnimator({
   positionMs,
   durationMs,
   onActiveLineChange,
+  playbackRate = 1,
 }: {
   syncedLines: SyncedLine[];
   isActuallySynced: boolean;
@@ -26,6 +27,7 @@ export function useLyricsAnimator({
   positionMs: number;
   durationMs: number;
   onActiveLineChange: (indices: number[]) => void;
+  playbackRate?: number;
 }) {
   const isPlayingRef = useRef(isPlaying);
   const positionMsRef = useRef(positionMs);
@@ -33,6 +35,7 @@ export function useLyricsAnimator({
   const syncedLinesRef = useRef(syncedLines);
   const isActuallySyncedRef = useRef(isActuallySynced);
   const onActiveLineChangeRef = useRef(onActiveLineChange);
+  const playbackRateRef = useRef(playbackRate > 0 ? playbackRate : 1);
 
   const anchorPosRef = useRef(positionMs);
   const anchorTimeRef = useRef(performance.now());
@@ -57,6 +60,11 @@ export function useLyricsAnimator({
   }, [isPlaying]);
 
   useEffect(() => {
+    playbackRateRef.current = playbackRate > 0 ? playbackRate : 1;
+  }, [playbackRate]);
+
+  useEffect(() => {
+    const prev = positionMsRef.current;
     positionMsRef.current = positionMs;
 
     if (!isPlayingRef.current) {
@@ -65,8 +73,9 @@ export function useLyricsAnimator({
     } else {
       const now = performance.now();
       const currentExtrapolated =
-        anchorPosRef.current + (now - anchorTimeRef.current);
-      if (Math.abs(currentExtrapolated - positionMs) > 150) {
+        anchorPosRef.current + (now - anchorTimeRef.current) * playbackRateRef.current;
+      // Seek/track-change jumps, or anything beyond clock noise, re-anchor.
+      if (Math.abs(currentExtrapolated - positionMs) > 1000 || Math.abs(positionMs - prev) > 2000) {
         anchorPosRef.current = positionMs;
         anchorTimeRef.current = now;
       }
@@ -141,7 +150,7 @@ export function useLyricsAnimator({
       const estimated = playing
         ? Math.min(
             durationMsRef.current || Infinity,
-            Math.max(0, anchorPosRef.current + (now - anchorTimeRef.current)),
+            Math.max(0, anchorPosRef.current + (now - anchorTimeRef.current) * playbackRateRef.current),
           )
         : anchorPosRef.current;
 

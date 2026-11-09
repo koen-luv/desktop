@@ -477,6 +477,7 @@ function RightDrawer({ activeTab, onTabChange, onClose }: RightDrawerProps) {
     isPlaying,
     positionMs: player.positionMs,
     durationMs: player.durationMs,
+    playbackRate: player.playbackRate,
     onActiveLineChange: handleActiveLineChange,
   });
 
