@@ -94,6 +94,9 @@ export interface LinerAndroidBridge {
   audioCrossfadeCancel(): void;
   /** Supplies a resolved queue item so native playback can advance without the WebView. */
   audioSetNextTrack?(payload: string | null, autoAdvance?: boolean): void;
+  audioSetNextQueue?(payloadsJson: string | null, autoAdvance?: boolean): void;
+  audioSetCrossfade?(enabled: boolean, windowMs: number): void;
+  audioSetLoopState?(repeatMode: "off" | "all" | "one", firstPayload: string | null): void;
   audioSetPreviousTrack?(payload: string | null): void;
   audioState(): string;
   audioCache(url: string, trackId: string, mimeType: string, limitBytes: number): void;
@@ -326,6 +329,13 @@ export function installAndroidPlatform(): void {
     syncServerTime: async (dateHeaderOrMs) => wasmSyncServerTime(dateHeaderOrMs),
     getServerTimeOffset: async () => getServerTimeOffset(),
     getAppVersion: async () => bridge.getVersion(),
+    // Launcher icon follows the in-app branding accent (accentVariant).
+    setAppIcon: async (_dataUrl, options) => {
+      const variant = (options as { variant?: string } | undefined)?.variant;
+      if (variant && typeof (bridge as any).setAppIconVariant === "function") {
+        try { (bridge as any).setAppIconVariant(variant); } catch {}
+      }
+    },
     // Updater: the Android shell checks the published release itself, download
     // and install are handled natively (DownloadManager + package installer).
     checkForUpdates: async () => {

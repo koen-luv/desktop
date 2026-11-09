@@ -284,6 +284,23 @@ class LinerBridge(private val activity: MainActivity) {
         PlaybackHolder.setNextTrack(payload, autoAdvance)
 
     @JavascriptInterface
+    fun audioSetNextQueue(payloadsJson: String?, autoAdvance: Boolean) =
+        PlaybackHolder.setNextQueue(payloadsJson, autoAdvance)
+
+    @JavascriptInterface
+    fun audioSetCrossfade(enabled: Boolean, windowMs: Double) =
+        PlaybackHolder.setCrossfade(enabled, windowMs.toLong())
+
+    @JavascriptInterface
+    fun audioSetLoopState(repeatMode: String, firstPayload: String?) =
+        PlaybackHolder.setLoopState(repeatMode, firstPayload)
+
+    @JavascriptInterface
+    fun setAppIconVariant(variant: String) {
+        AppIcon.setVariant(activity.applicationContext, variant)
+    }
+
+    @JavascriptInterface
     fun audioSetPreviousTrack(payload: String?) = PlaybackHolder.setPreviousTrack(payload)
 
     @JavascriptInterface

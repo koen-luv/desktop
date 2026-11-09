@@ -28,9 +28,22 @@ object PlaybackHolder {
         internal set
 
     private var pendingLoad: String? = null
-    @Volatile private var nextTrackPayload: String? = null
-    @Volatile private var autoAdvancePayload: String? = null
+    // Pre-resolved upcoming queue, pushed by JS while the app is in the
+    // foreground. Native owns advancement from here so queue walking,
+    // error-skipping and crossfade keep working when the WebView is frozen.
+    private val queueLock = Any()
+    private val nextQueue = ArrayDeque<String>()
+    @Volatile private var queueAutoAdvance = false
     @Volatile private var previousTrackPayload: String? = null
+    private val history = ArrayDeque<String>()
+    @Volatile private var currentPayload: String? = null
+    @Volatile private var crossfadeEnabled = false
+    @Volatile private var crossfadeWindowMs = 8_000L
+    // "off" | "all" | "one" — mirrors the JS repeat mode so looping keeps
+    // working with the WebView frozen.
+    @Volatile private var repeatMode = "off"
+    @Volatile private var loopFirstPayload: String? = null
+    private var consecutiveErrors = 0
     private var pendingActions = mutableListOf<() -> Unit>()
 
     @Volatile private var volume = 1f
@@ -79,10 +92,9 @@ object PlaybackHolder {
                 if (crossfadeTrackId == null) {
                     val id = currentTrackId
                     if (id != null) {
-                        val next = autoAdvancePayload
-                        if (next != null && playWhenReadyIntent) {
-                            nextTrackPayload = null
-                            autoAdvancePayload = null
+                        val next = consumeNextLocked() ?: peekNextLocked()
+                        if (next != null && playWhenReadyIntent && queueAutoAdvance) {
+                            consumeNextLocked()
                             previousTrackPayload = null
                             main.post {
                                 if (currentTrackId != id || player?.playbackState != Player.STATE_ENDED) {
@@ -101,6 +113,26 @@ object PlaybackHolder {
                                     )
                                 }
                             }
+                        } else if (repeatMode == "one" && playWhenReadyIntent) {
+                            main.post {
+                                if (currentTrackId != id) return@post
+                                player?.seekTo(0L)
+                                player?.play()
+                                NativeEvents.emit(
+                                    "playbackAutoAdvanced",
+                                    JSONObject().put("trackId", id).toString(),
+                                )
+                            }
+                        } else if (repeatMode == "all" && playWhenReadyIntent && loopFirstPayload != null) {
+                            val first = loopFirstPayload!!
+                            main.post {
+                                if (currentTrackId != id) return@post
+                                applyLoad(first)
+                                val firstId = try { JSONObject(first).optString("trackId").takeIf { it.isNotBlank() } } catch (_: Exception) { null }
+                                if (firstId != null && currentTrackId == firstId) {
+                                    NativeEvents.emit("playbackAutoAdvanced", JSONObject().put("trackId", firstId).toString())
+                                }
+                            }
                         } else {
                             NativeEvents.emit("playbackEnded", JSONObject.quote(id))
                         }
@@ -111,15 +143,20 @@ object PlaybackHolder {
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) consecutiveErrors = 0
             updateState()
         }
 
         override fun onPlayerError(error: PlaybackException) {
             val failedTrackId = currentTrackId
             lastError = describePlaybackError(error)
-            val next = autoAdvancePayload.takeIf { playWhenReadyIntent && failedTrackId != null }
+            consecutiveErrors += 1
+            // Skip unavailable / undecodable tracks without JS. Consecutive
+            // errors only stop at the cap, so a bad track never wedges the
+            // queue while the WebView is frozen.
+            val canSkip = playWhenReadyIntent && failedTrackId != null && queueAutoAdvance && consecutiveErrors <= 10
+            val next = if (canSkip) consumeNextLocked() else null
             if (next != null && failedTrackId != null) {
-                autoAdvancePayload = null
                 main.post {
                     if (currentTrackId != failedTrackId || !playWhenReadyIntent) return@post
                     cancelCrossfadeLocked()
@@ -230,8 +267,63 @@ object PlaybackHolder {
     }
 
     fun setNextTrack(payload: String?, autoAdvance: Boolean) {
-        nextTrackPayload = validateTrackPayload(payload)
-        autoAdvancePayload = if (autoAdvance) nextTrackPayload else null
+        val validated = validateTrackPayload(payload)
+        main.post {
+            synchronized(queueLock) {
+                nextQueue.clear()
+                if (validated != null) nextQueue.addLast(validated)
+            }
+            queueAutoAdvance = autoAdvance
+        }
+    }
+
+    fun setNextQueue(payloadsJson: String?, autoAdvance: Boolean) {
+        val payloads = mutableListOf<String>()
+        if (!payloadsJson.isNullOrBlank()) {
+            try {
+                val arr = org.json.JSONArray(payloadsJson)
+                for (i in 0 until arr.length()) {
+                    val raw = arr.optString(i)
+                    validateTrackPayload(raw)?.let { payloads.add(it) }
+                }
+            } catch (_: Exception) {
+            }
+        }
+        main.post {
+            synchronized(queueLock) {
+                nextQueue.clear()
+                nextQueue.addAll(payloads)
+            }
+            queueAutoAdvance = autoAdvance
+        }
+    }
+
+    fun setCrossfade(enabled: Boolean, windowMs: Long) {
+        crossfadeEnabled = enabled
+        crossfadeWindowMs = windowMs.coerceIn(2_000L, 12_000L)
+    }
+
+    fun setLoopState(mode: String, firstPayload: String?) {
+        repeatMode = when (mode.trim().lowercase()) { "one" -> "one"; "all" -> "all"; else -> "off" }
+        loopFirstPayload = validateTrackPayload(firstPayload)
+    }
+
+    private fun peekNextLocked(): String? = synchronized(queueLock) { nextQueue.firstOrNull() }
+
+    private fun consumeNextLocked(): String? = synchronized(queueLock) {
+        if (nextQueue.isEmpty()) null else nextQueue.removeFirst()
+    }
+
+    private fun removeFromNextQueue(trackId: String?) {
+        if (trackId == null) return
+        synchronized(queueLock) {
+            val it = nextQueue.iterator()
+            while (it.hasNext()) {
+                val raw = it.next()
+                val id = try { JSONObject(raw).optString("trackId") } catch (_: Exception) { null }
+                if (id == trackId) it.remove()
+            }
+        }
     }
 
     fun setPreviousTrack(payload: String?) {
@@ -249,10 +341,8 @@ object PlaybackHolder {
         }
 
     fun skipToNext() {
-        val next = nextTrackPayload
+        val next = consumeNextLocked()
         if (next != null) {
-            nextTrackPayload = null
-            autoAdvancePayload = null
             previousTrackPayload = null
             runOnPlayer {
                 cancelCrossfadeLocked()
@@ -269,11 +359,12 @@ object PlaybackHolder {
             if (current.currentPosition > 3_000L) {
                 current.seekTo(0L)
             } else {
-                val previous = previousTrackPayload
+                val previous = synchronized(queueLock) {
+                    if (history.isNotEmpty()) history.removeLast() else null
+                } ?: previousTrackPayload
                 if (previous != null) {
                     previousTrackPayload = null
-                    nextTrackPayload = null
-                    autoAdvancePayload = null
+                    synchronized(queueLock) { nextQueue.clear() }
                     applyLoad(previous)
                     emitTrackChange("playbackPreviousAdvanced", previous)
                 } else {
@@ -389,9 +480,10 @@ object PlaybackHolder {
     fun stop() = runOnPlayer {
         cancelCrossfadeLocked()
         playWhenReadyIntent = false
-        nextTrackPayload = null
-        autoAdvancePayload = null
+        synchronized(queueLock) { nextQueue.clear(); history.clear() }
+        queueAutoAdvance = false
         previousTrackPayload = null
+        currentPayload = null
         it.volume = volume
         it.stop()
         it.clearMediaItems()
@@ -543,6 +635,37 @@ object PlaybackHolder {
 
     fun crossfadeCancel() = main.post { cancelCrossfadeLocked() }
 
+    /**
+     * Native crossfade watchdog, driven from the service ticker (not the
+     * WebView). When JS is frozen in background, the JS poll that used to
+     * arm blends never runs — this watches the real remaining time and
+     * blends into the queued next track entirely natively.
+     */
+    private fun maybeStartNativeCrossfade() {
+        if (!crossfadeEnabled || crossfadeTrackId != null || transitionPlayer != null) return
+        if (!playWhenReadyIntent || !queueAutoAdvance) return
+        val p = player ?: return
+        if (!p.isPlaying) return
+        val next = peekNextLocked() ?: return
+        val duration = p.duration.takeIf { it > 0 && it != C.TIME_UNSET } ?: loadedDurationMs
+        if (duration <= 0L) return
+        val remaining = duration - p.currentPosition
+        if (remaining <= 0L || remaining > 12_000L) return
+        val nextDuration = try { JSONObject(next).optLong("durationMs", 0L) } catch (_: Exception) { 0L }
+        var window = minOf(crossfadeWindowMs, remaining)
+        if (nextDuration > 2_000L) window = minOf(window, nextDuration - 2_000L)
+        if (window < 2_000L) return
+        // Reuse the JS entry points so a foreground blend and a background
+        // blend share the exact load/ready/promote path.
+        crossfadeLoad(service ?: return, next)
+        main.postDelayed({ crossfadeStart(window) }, 50L)
+        logReady(window, remaining)
+    }
+
+    private fun logReady(window: Long, remaining: Long) {
+        // keep stdlib-only; failures here must never break playback
+    }
+
     private fun scheduleRampTick(epoch: Int) {
         crossfadeRunnable?.let { main.removeCallbacks(it) }
         val tick = Runnable { runRampTick(epoch) }
@@ -658,18 +781,7 @@ object PlaybackHolder {
         try { session?.setPlayer(promotedSessionPlayer) } catch (_: Exception) {}
         transitionPlayer = null
         crossfadeTrackId = null
-        if (nextTrackPayload?.let {
-                try { JSONObject(it).optString("trackId") == promotedId } catch (_: Exception) { false }
-            } == true
-        ) {
-            nextTrackPayload = null
-        }
-        if (autoAdvancePayload?.let {
-                try { JSONObject(it).optString("trackId") == promotedId } catch (_: Exception) { false }
-            } == true
-        ) {
-            autoAdvancePayload = null
-        }
+        removeFromNextQueue(promotedId)
         if (previousTrackPayload?.let {
                 try { JSONObject(it).optString("trackId") == promotedId } catch (_: Exception) { false }
             } == true
@@ -713,11 +825,16 @@ object PlaybackHolder {
             val url = payload.optString("url")
             val trackId = payload.optString("trackId")
             if (url.isBlank() || trackId.isBlank()) return
-            if (nextTrackPayload?.let {
-                    try { JSONObject(it).optString("trackId") == trackId } catch (_: Exception) { false }
-                } == true
-            ) {
-                nextTrackPayload = null
+            removeFromNextQueue(trackId)
+            // Remember the outgoing track so Previous works in background
+            // even when JS never pushed a previous payload.
+            val outgoing = currentPayload
+            val outgoingId = try { outgoing?.let { JSONObject(it).optString("trackId") } } catch (_: Exception) { null }
+            if (outgoing != null && outgoingId != null && outgoingId != trackId) {
+                synchronized(queueLock) {
+                    history.addLast(outgoing)
+                    while (history.size > 50) history.removeFirst()
+                }
             }
 
             if (previousTrackPayload?.let {
@@ -746,6 +863,7 @@ object PlaybackHolder {
                 .apply { if (resolvedMime != null) setMimeType(resolvedMime) }
                 .build()
 
+            currentPayload = json
             currentTrackId = trackId
             loadedDurationMs = payload.optLong("durationMs", 0L)
             lastError = null
@@ -797,6 +915,7 @@ object PlaybackHolder {
         if (ticker != null) return
         val runnable = object : Runnable {
             override fun run() {
+                maybeStartNativeCrossfade()
                 updateState()
                 val p = player
                 if (equalizerEnabled && p != null && mainEqualizer == null) {

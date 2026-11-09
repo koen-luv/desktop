@@ -82,7 +82,7 @@ export interface LinerElectronApi {
   }>;
   setAppIcon: (
     dataUrl: string,
-    options?: { isDefault?: boolean },
+    options?: { isDefault?: boolean; variant?: string },
   ) => Promise<void>;
   getAppVersion: () => Promise<string>;
   getCacheStats: () => Promise<ElectronCacheStats>;

@@ -21,7 +21,6 @@ import {
   PlaylistFill,
 } from "@mingcute/react";
 import Sidebar from "./Sidebar";
-import MobileNav from "./MobileNav";
 import WindowControls from "./WindowControls";
 import PageTransition from "./PageTransition";
 import RightDrawer from "./RightDrawer";
@@ -767,9 +766,9 @@ export default function AppFrame({ children }: AppFrameProps) {
     <div
       ref={appFrameRef}
       data-custom-bg={hasCustomBg ? "true" : undefined}
-      className={`safe-area-shell isolate relative flex flex-col md:flex-row h-full w-full overflow-hidden ${
-        isEdgeToEdge ? "rounded-none p-0" : "rounded-none p-0 md:rounded-5xl md:p-2"
-      } bg-bg-canvas gap-0 md:gap-2`}
+      className={`safe-area-shell isolate relative flex flex-row h-full w-full overflow-hidden ${
+        isEdgeToEdge ? "rounded-none p-0" : "rounded-5xl p-2"
+      } bg-bg-canvas gap-2`}
       onScroll={(e) => {
         if (e.currentTarget.scrollLeft !== 0) e.currentTarget.scrollLeft = 0;
         if (e.currentTarget.scrollTop !== 0) e.currentTarget.scrollTop = 0;
@@ -803,7 +802,7 @@ export default function AppFrame({ children }: AppFrameProps) {
 
       <aside
         ref={sidebarRef}
-        className="hidden md:block w-[58px] h-full shrink-0 z-[45] relative"
+        className="block w-[58px] h-full shrink-0 z-[45] relative"
       >
         <Sidebar
           searchOpen={searchOpen}
@@ -812,7 +811,7 @@ export default function AppFrame({ children }: AppFrameProps) {
         />
       </aside>
 
-      <div className="relative z-[1] flex-1 flex flex-col min-w-0 min-h-0 h-full gap-0 md:gap-2 overflow-hidden">
+      <div className="relative z-[1] flex-1 flex flex-col min-w-0 min-h-0 h-full gap-2 overflow-hidden">
         <main
           data-custom-bg={hasCustomBg ? "true" : undefined}
           className={`flex-1 min-w-0 flex flex-col relative h-full ${
@@ -820,7 +819,7 @@ export default function AppFrame({ children }: AppFrameProps) {
           } ${
             isEdgeToEdge
               ? "rounded-none"
-              : "rounded-none md:rounded-[28px] md:border md:border-border-primary/60 md:shadow-e1"
+              : "rounded-[28px] border border-border-primary/60 shadow-e1"
           } overflow-hidden`}
           style={mainStyle}
         >
@@ -1148,7 +1147,6 @@ export default function AppFrame({ children }: AppFrameProps) {
         </motion.div>
       )}      </AnimatePresence>
 
-      <MobileNav searchOpen={searchOpen} onSearchToggle={handleSearchToggle} />
 
       <AddToPlaylistModal />
       <AddToLibraryModal />

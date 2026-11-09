@@ -20,6 +20,9 @@ import {
 
 /** When false, native playback never caches audio to disk (only Download saves). */
 const AUTO_CACHE_AUDIO = false;
+/** Tracks ahead to resolve while the app is open, so native can keep going
+ *  (skip errors, crossfade, radio/autoplay) with the WebView frozen. */
+const PRELOAD_WINDOW = 8;
 
 interface NativeAudioState {
   ok?: boolean;
@@ -123,6 +126,9 @@ export class AndroidPlayerRuntime {
     this.applyPlaybackRateAndPitch();
 
     this.unsubscribe = usePlayerStore.subscribe((state, prev) => {
+      if (state.transitionPreset !== prev.transitionPreset || state.repeat !== prev.repeat) {
+        this.syncCrossfadeFlag();
+      }
       if (state.volume !== prev.volume) {
         // A direct user volume change wins over any in-flight transition ramp.
         this.cancelRamp();
@@ -174,13 +180,19 @@ export class AndroidPlayerRuntime {
       } else if (payload && typeof payload === "object" && "trackId" in payload) {
         trackId = String((payload as { trackId: unknown }).trackId);
       }
-      if (!trackId || trackId !== this.crossfadeTrackId) return;
+      if (!trackId) return;
+      const wasArmed = this.crossfadeTrackId === trackId;
       this.crossfadeTrackId = null;
       this.crossfadeInFlight = false;
       const store = usePlayerStore.getState();
       this.nativeVolume = store.volume;
       // Native has already promoted this player; make the runtime agree before
       // the queue advance so a slow adopt cannot leave the old id in place.
+      // Accept both JS-armed blends and native-watchdog (background) blends.
+      if (!wasArmed) {
+        this.handleNativeAutoAdvance(trackId);
+        return;
+      }
       this.currentTrackId = trackId;
       this.endedTrackId = null;
       this.endFadeTrackId = null;
@@ -209,6 +221,7 @@ export class AndroidPlayerRuntime {
       log("yellow", "audio", "native crossfade cancelled - sequential fallback restored");
     });
 
+    this.syncCrossfadeFlag();
     this.reconcileWithNative();
     this.pollTimer = setInterval(() => this.poll(), this.pollIntervalMs);
     log("green", "boot", "android native player runtime initialized");
@@ -303,7 +316,8 @@ export class AndroidPlayerRuntime {
 
   public clearPreloadedTrack(): void {
     this.nextTrackEpoch += 1;
-    this.bridge.audioSetNextTrack?.(null, false);
+    if (this.bridge.audioSetNextQueue) this.bridge.audioSetNextQueue(null, false);
+    else this.bridge.audioSetNextTrack?.(null, false);
   }
 
   public clearPreloadedPreviousTrack(): void {
@@ -329,40 +343,94 @@ export class AndroidPlayerRuntime {
     return null;
   }
 
+  /** Ground truth is the native player: queued events may be stale when
+   *  native skipped several tracks while JS was frozen. */
+  private resolveNativeTrackId(eventTrackId: string): string {
+    const live = this.readState()?.trackId;
+    return live && live !== this.currentTrackId ? live : eventTrackId;
+  }
+
+  /** Jump the store straight to the track native is actually playing, even
+   *  if it is several positions ahead (background error-skipping). */
+  private jumpToNativeTrack(targetId: string): boolean {
+    const store = usePlayerStore.getState();
+    const idx = store.queue.findIndex((t) => t.id === targetId);
+    if (idx < 0) return false;
+    if (idx === store.currentIndex || store.queue[idx].id === store.currentTrack?.id) return true;
+    const track = store.queue[idx];
+    this.adoptTrackId = targetId;
+    if (this.crossfadeTrackId === targetId) {
+      this.crossfadeTrackId = null;
+      this.crossfadeInFlight = false;
+      this.nativeVolume = store.volume;
+    }
+    store.setCurrentTrack(track, idx);
+    store.setPosition(0);
+    store.setDuration(track.durationMs ?? 0);
+    store.setStatus("loading", null);
+    void this.loadAndPlay(track);
+    return true;
+  }
+
   private handleNativeAutoAdvance(trackId: string): void {
+    const target = this.resolveNativeTrackId(trackId);
+    if (this.jumpToNativeTrack(target)) return;
+    // Legacy single-step path when the track is not in the known queue
+    // (e.g. repeat-all wrap to index 0 handled by computeNextIndex).
     const next = peekAutoNextTrack(usePlayerStore.getState());
-    if (next?.id !== trackId) return;
-    // The poll can observe the promoted native track before the
-    // crossfadeCompleted event arrives. Clear the armed id here so that late
-    // event cannot dispatch a second skip to the following track.
-    if (this.crossfadeTrackId === trackId) {
+    if (next?.id !== target) return;
+    if (this.crossfadeTrackId === target) {
       this.crossfadeTrackId = null;
       this.crossfadeInFlight = false;
       this.nativeVolume = usePlayerStore.getState().volume;
     }
-    this.adoptTrackId = trackId;
+    this.adoptTrackId = target;
     usePlayerStore.getState().dispatch({ type: "SKIP_NEXT", isAutoEnd: true });
   }
 
   private handleNativeNextAdvance(trackId: string): void {
+    const target = this.resolveNativeTrackId(trackId);
+    if (this.jumpToNativeTrack(target)) return;
     const store = usePlayerStore.getState();
     const nextIndex = computeNextIndex(store);
-    if (nextIndex === null || store.queue[nextIndex]?.id !== trackId) return;
-    this.adoptTrackId = trackId;
+    if (nextIndex === null || store.queue[nextIndex]?.id !== target) return;
+    this.adoptTrackId = target;
     store.dispatch({ type: "SKIP_NEXT" });
   }
 
   private handleNativePreviousAdvance(trackId: string): void {
+    const target = this.resolveNativeTrackId(trackId);
     const store = usePlayerStore.getState();
+    if (store.queue.some((t) => t.id === target)) {
+      if (target !== store.currentTrack?.id) this.jumpToNativeTrack(target);
+      return;
+    }
     const previousIndex =
       store.currentIndex > 0
         ? store.currentIndex - 1
         : store.repeat === "all" && store.queue.length > 0
           ? store.queue.length - 1
           : store.currentIndex;
-    if (store.queue[previousIndex]?.id !== trackId || trackId === store.currentTrack?.id) return;
-    this.adoptTrackId = trackId;
+    if (store.queue[previousIndex]?.id !== target || target === store.currentTrack?.id) return;
+    this.adoptTrackId = target;
     store.dispatch({ type: "SKIP_PREVIOUS" });
+  }
+
+  private syncLoopState(): void {
+    const s = usePlayerStore.getState();
+    let firstPayload: string | null = null;
+    const first = s.queue[0];
+    if (first) {
+      const cached = this.preloaded.get(first.id);
+      if (cached) firstPayload = JSON.stringify(this.toPayload(first, cached.stream));
+    }
+    this.bridge.audioSetLoopState?.(s.repeat, firstPayload);
+  }
+
+  private syncCrossfadeFlag(): void {
+    const spec = transitionSpec(usePlayerStore.getState().transitionPreset);
+    this.bridge.audioSetCrossfade?.(spec.overlap, 8000);
+    this.syncLoopState();
   }
 
   /**
@@ -538,61 +606,82 @@ export class AndroidPlayerRuntime {
     log("cyan", "audio", "native crossfade cancelled");
   }
 
+  private toPayload(t: Track, s: ResolvedPlaybackStream): NativeLoadPayload {
+    return {
+      url: s.url,
+      mimeType: s.mimeType,
+      trackId: t.id,
+      title: t.title,
+      artist: t.artists || "",
+      album:
+        typeof t.album === "string"
+          ? t.album
+          : (t.album as { title?: string } | undefined)?.title || "Liner",
+      coverUrl: t.coverUrl || "",
+      durationMs: t.durationMs || 0,
+      startMs: 0,
+    } satisfies NativeLoadPayload;
+  }
+    /**
+     * Resolve the immediate next track plus the following tracks in the
+     * store queue (up to PRELOAD_WINDOW) and hand them to native. While the
+     * app is open JS can await the network; while it is frozen, native
+     * walks this list — skipping unavailable tracks, crossfading and
+     * continuing radio/autoplay — without any JS.
+     */
   public async preloadTrack(track: Track, autoAdvance = true): Promise<void> {
     const preloadEpoch = ++this.nextTrackEpoch;
-    this.bridge.audioSetNextTrack?.(null, false);
     if (this.currentTrackId === track.id) return;
-    try {
-      const cached = this.preloaded.get(track.id);
-      let stream = cached?.stream;
-      if (!stream || (stream.expiresAtMs !== null && Date.now() >= stream.expiresAtMs - 15_000)) {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 12_000);
-        try {
-          stream = await resolvePlaybackStream(
-            track,
-            controller.signal,
-            "playback",
-            usePlayerStore.getState().audioQuality,
-          );
-        } finally {
-          clearTimeout(timeout);
-        }
+    const quality = usePlayerStore.getState().audioQuality;
+    const resolveOne = async (t: Track): Promise<ResolvedPlaybackStream | null> => {
+      const cached = this.preloaded.get(t.id);
+      if (cached && (cached.stream.expiresAtMs === null || Date.now() < cached.stream.expiresAtMs - 15_000)) return cached.stream;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12_000);
+      try {
+        const stream = await resolvePlaybackStream(t, controller.signal, "playback", quality);
+        if (stream.expiresAtMs !== null && Date.now() >= stream.expiresAtMs - 15_000) return null;
+        this.preloaded.set(t.id, { stream, at: Date.now() });
+        return stream;
+      } catch (err) {
+        log("yellow", "preload", `next stream resolution failed for "${t.title}": ${err instanceof Error ? err.message : String(err)}`);
+        return null;
+      } finally {
+        clearTimeout(timeout);
       }
-      if (preloadEpoch !== this.nextTrackEpoch) return;
-      if (stream.expiresAtMs !== null && Date.now() >= stream.expiresAtMs - 15_000) return;
-      this.preloaded.set(track.id, { stream, at: Date.now() });
-      this.bridge.audioSetNextTrack?.(
-        JSON.stringify({
-          url: stream.url,
-          mimeType: stream.mimeType,
-          trackId: track.id,
-          title: track.title,
-          artist: track.artists || "",
-          album:
-            typeof track.album === "string"
-              ? track.album
-              : (track.album as { title?: string } | undefined)?.title || "Liner",
-          coverUrl: track.coverUrl || "",
-          durationMs: track.durationMs || 0,
-          startMs: 0,
-        } satisfies NativeLoadPayload),
-        autoAdvance,
-      );
-      // keep the map bounded; a queue is at most a few dozen tracks
-      if (this.preloaded.size > 12) {
-        const oldest = [...this.preloaded.entries()].sort((a, b) => a[1].at - b[1].at)[0];
-        if (oldest) this.preloaded.delete(oldest[0]);
+    };
+    // Immediate next first (must land in native ASAP for skip latency),
+    // then the rest of the window in the background.
+    const state = usePlayerStore.getState();
+    const idx = state.queue.findIndex((t) => t.id === track.id);
+    const windowTracks: Track[] = [track];
+    if (idx >= 0) {
+      for (let i = idx + 1; i < state.queue.length && windowTracks.length < PRELOAD_WINDOW; i++) {
+        windowTracks.push(state.queue[i]);
       }
-      log("cyan", "preload", `resolved next stream for "${track.title}"`);
-    } catch (err) {
-      if (preloadEpoch !== this.nextTrackEpoch) return;
-      log(
-        "yellow",
-        "preload",
-        `next stream resolution failed for "${track.title}": ${err instanceof Error ? err.message : String(err)}`,
-      );
     }
+    const payloads: string[] = [];
+    const pushWindow = () => {
+      if (this.bridge.audioSetNextQueue) {
+        this.bridge.audioSetNextQueue(JSON.stringify(payloads), autoAdvance);
+      } else if (payloads.length > 0) {
+        this.bridge.audioSetNextTrack?.(payloads[0], autoAdvance);
+      }
+    };
+    for (const t of windowTracks) {
+      if (preloadEpoch !== this.nextTrackEpoch) return;
+      const stream = await resolveOne(t);
+      if (!stream) continue;
+      payloads.push(JSON.stringify(this.toPayload(t, stream)));
+      // Publish after the first track, then extend the window as more resolve.
+      pushWindow();
+    }
+    if (this.preloaded.size > 32) {
+      const oldest = [...this.preloaded.entries()].sort((a, b) => a[1].at - b[1].at)[0];
+      if (oldest) this.preloaded.delete(oldest[0]);
+    }
+    this.syncLoopState();
+    log("cyan", "preload", `resolved ${payloads.length} upcoming stream(s), first: "${track.title}"`);
   }
 
   public async loadAndPlay(track: Track, startPositionMs = 0): Promise<void> {
@@ -622,6 +711,7 @@ export class AndroidPlayerRuntime {
       }
     }
     this.cancelCrossfade();
+    this.syncCrossfadeFlag();
     const epoch = ++this.loadEpoch;
 
     if (this.currentTrackId !== track.id) {
@@ -678,6 +768,9 @@ export class AndroidPlayerRuntime {
 
       this.currentSessionExpiresAt = stream.expiresAtMs;
       this.activeStream = stream;
+      // Keep the current stream reachable as a loop target for repeat-all/one.
+      this.preloaded.set(track.id, { stream, at: Date.now() });
+      this.syncLoopState();
 
       const payload: NativeLoadPayload = {
         url: stream.url,
@@ -842,12 +935,12 @@ export class AndroidPlayerRuntime {
     const state = this.readState();
     if (!state || !state.trackId) return;
     if (state.trackId !== this.currentTrackId) {
-      const next = peekAutoNextTrack(usePlayerStore.getState());
-      if (next?.id === state.trackId) {
-        this.handleNativeAutoAdvance(state.trackId);
-      } else {
-        this.handleNativePreviousAdvance(state.trackId);
-      }
+      const storeNow = usePlayerStore.getState();
+      const idx = storeNow.queue.findIndex((t) => t.id === state.trackId);
+      if (idx >= 0 && idx > storeNow.currentIndex) this.handleNativeAutoAdvance(state.trackId);
+      else if (idx >= 0) this.handleNativePreviousAdvance(state.trackId);
+      else if (peekAutoNextTrack(storeNow)?.id === state.trackId) this.handleNativeAutoAdvance(state.trackId);
+      else this.handleNativePreviousAdvance(state.trackId);
       return;
     }
     const store = usePlayerStore.getState();
@@ -882,6 +975,9 @@ export class AndroidPlayerRuntime {
         break;
       case "error": {
         const message = state.error || "Audio playback error";
+        // Native already skipped to a following track in background: that
+        // advance is reconciled by the track-id check above. Only surface
+        // an error when native is stuck on this track.
         if (this.erroredTrackId !== state.trackId) {
           this.erroredTrackId = state.trackId;
           store.setStatus("error", message);

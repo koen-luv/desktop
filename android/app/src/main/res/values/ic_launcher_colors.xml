@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background_default">#0D0D10</color>
+    <color name="ic_launcher_background_spotify">#0B0B0B</color>
+    <color name="ic_launcher_background_discord">#111111</color>
+    <color name="ic_launcher_background_telegram">#0F0F0F</color>
+    <color name="ic_launcher_background_aurora">#0B1C2C</color>
+    <color name="ic_launcher_background_sunset">#180A06</color>
+    <color name="ic_launcher_background_ocean">#031B2E</color>
+    <color name="ic_launcher_background_forest">#06130C</color>
+    <color name="ic_launcher_background_berry">#1D0713</color>
+    <color name="ic_launcher_background_carbon">#111111</color>
+    <color name="ic_launcher_background_pixel">#0A0A0A</color>
+    <color name="ic_launcher_background_scanlines">#0A0A0A</color>
+    <color name="ic_launcher_background_vhs">#120216</color>
+</resources>

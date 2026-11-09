@@ -94,6 +94,7 @@ export function useAppIconSync() {
       if (window.linerElectron?.setAppIcon) {
         window.linerElectron.setAppIcon(dataUrl, {
           isDefault: accentVariant === "default",
+          variant: accentVariant,
         });
       }
 
