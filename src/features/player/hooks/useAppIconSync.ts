@@ -74,7 +74,9 @@ async function renderIconDataUrl(
     ctx.filter = "invert(1)";
   }
 
-  ctx.drawImage(img, 128.7, 107.8, 254.6, 296.4);
+  // The logo art is centred in its 67x78 box; draw it so the monogram keeps the
+  // same visual weight as the packaged app icons (~60% of the tile height).
+  ctx.drawImage(img, 93.5, 66.9, 324.9, 378.2);
   return canvas.toDataURL("image/png");
 }
 
