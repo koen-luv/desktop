@@ -19,7 +19,7 @@ import {
   type SignRequestInput,
 } from "./crypto.js";
 import {
-  DEEP_LINK_SCHEME,
+  DEEP_LINK_SCHEMES,
   findDeeplinkArg,
   parseDeeplink,
   type DeeplinkTarget,
@@ -171,7 +171,8 @@ const shutdown = createShutdown({
   watchdogMs: 4000,
 });
 
-// neritium:// deeplink support (share links bounce here from link.tryliner.fun)
+// neritium:// deeplink support (share links bounce here from link.tryliner.fun);
+// legacy liner:// links from the old redirector are accepted as well
 
 // cold-start url arrives before the window exists, stash it until renderer is ready
 let pendingDeeplink: DeeplinkTarget | null = findDeeplinkArg(process.argv)
@@ -418,12 +419,15 @@ if (!gotTheLock) {
       });
     });
     ipcMain.handle("lan:stop-host", () => stopLanHost());
-    // register neritium:// so browsers / xdg-open route share links to us
-    // (on linux the packaged .desktop carries the mime handler too)
-    if (process.defaultApp && process.argv.length >= 2) {
-      app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME, process.execPath, [path.resolve(process.argv[1]!)]);
-    } else {
-      app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
+    // register neritium:// (and legacy liner://) so browsers / xdg-open route
+    // share links to us (on linux the packaged .desktop carries the mime
+    // handlers too)
+    for (const scheme of DEEP_LINK_SCHEMES) {
+      if (process.defaultApp && process.argv.length >= 2) {
+        app.setAsDefaultProtocolClient(scheme, process.execPath, [path.resolve(process.argv[1]!)]);
+      } else {
+        app.setAsDefaultProtocolClient(scheme);
+      }
     }
     touchBarManager = new TouchBarManager(
       path.join(__dirname, "preload.cjs"),

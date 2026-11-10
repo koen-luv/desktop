@@ -1,6 +1,6 @@
 {
   "name": "@neritium/client",
-  "version": "0.1.57",
+  "version": "0.2.1",
   "type": "module",
   "private": true,
   "description": "Neritium Music Player",
@@ -46,7 +46,8 @@
       {
         "name": "Neritium",
         "schemes": [
-          "neritium"
+          "neritium",
+          "liner"
         ]
       }
     ],

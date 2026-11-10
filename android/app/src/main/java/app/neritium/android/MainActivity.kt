@@ -189,7 +189,7 @@ class MainActivity : ComponentActivity() {
                 val uri = request.url
                 if (uri.host == "appassets.androidplatform.net") return false
                 when (uri.scheme?.lowercase()) {
-                    "neritium" -> {
+                    "neritium", "liner" -> {
                         handleDeeplink(uri)
                         return true
                     }
@@ -459,7 +459,7 @@ class MainActivity : ComponentActivity() {
     private fun handleIntent(intent: Intent?) {
         if (intent?.action != Intent.ACTION_VIEW) return
         val data = intent.data ?: return
-        if (data.scheme?.lowercase() != "neritium") return
+        if (data.scheme?.lowercase() !in setOf("neritium", "liner")) return
         handleDeeplink(data)
     }
 

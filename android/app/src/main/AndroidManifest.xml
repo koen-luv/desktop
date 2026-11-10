@@ -37,6 +37,8 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="neritium" />
+                <!-- links minted before the rebrand still use liner:// -->
+                <data android:scheme="liner" />
             </intent-filter>
         </activity>
         <activity-alias

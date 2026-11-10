@@ -197,7 +197,9 @@ final class NeritiumHost {
 
 
     func handleIncoming(url: URL) {
-        guard url.scheme?.lowercased() == "neritium" else { return }
+        // neritium:// plus the pre-rebrand liner:// links still flowing from the
+        // share redirector and support emails
+        guard ["neritium", "liner"].contains(url.scheme?.lowercased() ?? "") else { return }
         guard ready else {
             pendingURL = url
             return

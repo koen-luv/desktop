@@ -3,6 +3,16 @@
 // entity types, opaque catalog tokens only.
 export const DEEP_LINK_SCHEME = "neritium";
 
+// Links minted before the rebrand (the share redirector, support emails) still
+// use liner://, so we keep answering that scheme too and only advertise the new
+// one. Both parse into the exact same targets.
+export const LEGACY_DEEP_LINK_SCHEMES = ["liner"] as const;
+
+export const DEEP_LINK_SCHEMES: readonly string[] = [
+  DEEP_LINK_SCHEME,
+  ...LEGACY_DEEP_LINK_SCHEMES,
+];
+
 const DEEP_LINK_IDS: Record<string, RegExp> = {
   // youtube channel ids, always UC + 22 base64url chars
   artist: /^UC[A-Za-z0-9_-]{22}$/,
@@ -22,6 +32,10 @@ export interface DeeplinkTarget {
   id: string;
 }
 
+function isDeeplinkProtocol(protocol: string): boolean {
+  return DEEP_LINK_SCHEMES.includes(protocol.replace(/:$/, "").toLowerCase());
+}
+
 export function parseDeeplink(raw: string): DeeplinkTarget | null {
   let url: URL;
   try {
@@ -29,7 +43,7 @@ export function parseDeeplink(raw: string): DeeplinkTarget | null {
   } catch {
     return null;
   }
-  if (url.protocol !== `${DEEP_LINK_SCHEME}:`) return null;
+  if (!isDeeplinkProtocol(url.protocol)) return null;
   const type = url.hostname.toLowerCase();
   const pattern = DEEP_LINK_IDS[type];
   if (!pattern) return null;
@@ -42,5 +56,9 @@ export function parseDeeplink(raw: string): DeeplinkTarget | null {
 }
 
 export function findDeeplinkArg(argv: string[]): string | undefined {
-  return argv.find((arg) => arg.startsWith(`${DEEP_LINK_SCHEME}://`));
+  const prefixes = DEEP_LINK_SCHEMES.map((scheme) => `${scheme}://`);
+  return argv.find((arg) => {
+    const lower = arg.toLowerCase();
+    return prefixes.some((prefix) => lower.startsWith(prefix));
+  });
 }

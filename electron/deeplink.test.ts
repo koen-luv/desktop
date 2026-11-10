@@ -51,10 +51,33 @@ describe("parseDeeplink", () => {
     expect(parseDeeplink("not a url")).toBeNull();
   });
 
+  it("accepts legacy liner:// links from before the rebrand", () => {
+    expect(parseDeeplink("liner://track?id=RGdkabupfPI")).toEqual({
+      type: "track",
+      id: "RGdkabupfPI",
+    });
+    expect(parseDeeplink("LINER://artist?id=UCGtGpOIGHfRu1KYL9pi-mNQ")).toEqual({
+      type: "artist",
+      id: "UCGtGpOIGHfRu1KYL9pi-mNQ",
+    });
+    const token = `lrst_${"a".repeat(43)}`;
+    expect(parseDeeplink(`liner://reset-password?id=${token}`)).toEqual({
+      type: "reset-password",
+      id: token,
+    });
+    // still strict about everything after the scheme
+    expect(parseDeeplink("liner://evil?id=RGdkabupfPI")).toBeNull();
+    expect(parseDeeplink("liner://track?id=RGdkabupfPIextra")).toBeNull();
+    expect(parseDeeplink("linerx://track?id=RGdkabupfPI")).toBeNull();
+  });
+
   it("finds the deeplink arg anywhere in argv", () => {
     expect(
       findDeeplinkArg(["/usr/bin/neritium", "neritium://track?id=RGdkabupfPI"]),
     ).toBe("neritium://track?id=RGdkabupfPI");
+    expect(
+      findDeeplinkArg(["/usr/bin/neritium", "liner://track?id=RGdkabupfPI"]),
+    ).toBe("liner://track?id=RGdkabupfPI");
     expect(findDeeplinkArg(["/usr/bin/neritium", "--no-sandbox"])).toBeUndefined();
   });
 });

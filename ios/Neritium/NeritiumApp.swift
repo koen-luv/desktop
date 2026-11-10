@@ -185,7 +185,7 @@ final class NeritiumWebViewController: UIViewController, WKNavigationDelegate, W
         }
 
         switch scheme {
-        case "neritium":
+        case "neritium", "liner":
             NeritiumHost.shared.handleIncoming(url: url)
             decisionHandler(.cancel)
         case "http", "https":

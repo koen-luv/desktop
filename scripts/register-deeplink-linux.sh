@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # registers the neritium:// protocol for xdg-open (linux dev testing).
+# liner:// is registered too so pre-rebrand share links keep working.
 # packaged installs self-register via electron-builder protocols, this is
 # only so a dev checkout answers share-link clicks too.
 # usage: ./scripts/register-deeplink-linux.sh [--binary /path/to/neritium]
@@ -32,11 +33,13 @@ Exec=$EXEC
 Type=Application
 Terminal=false
 NoDisplay=true
-MimeType=x-scheme-handler/neritium;
+MimeType=x-scheme-handler/neritium;x-scheme-handler/liner;
 EOF
 
 update-desktop-database "$APP_DIR" >/dev/null 2>&1 || true
 xdg-mime default "$ENTRY" x-scheme-handler/neritium
+xdg-mime default "$ENTRY" x-scheme-handler/liner
 
 echo "handler: $(xdg-mime query default x-scheme-handler/neritium)"
 echo "test with: xdg-open 'neritium://artist?id=UCGtGpOIGHfRu1KYL9pi-mNQ'"
+echo "or legacy: xdg-open 'liner://artist?id=UCGtGpOIGHfRu1KYL9pi-mNQ'"
