@@ -1,19 +1,3 @@
-<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="surface" x1="256" y1="0" x2="256" y2="512" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#181920"/>
-      <stop offset="1" stop-color="#0a0a0c"/>
-    </linearGradient>
-    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"
-      gradientTransform="translate(150 92) rotate(48) scale(430)">
-      <stop stop-color="#ffffff" stop-opacity="0.10"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <rect width="512" height="512" rx="112" fill="url(#surface)"/>
-  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
-  <rect x="1" y="1" width="510" height="510" rx="111" stroke="#ffffff" stroke-opacity="0.09" stroke-width="2"/>
-  <g transform="translate(93.6 66.9) scale(4.848)" fill="#ffffff">
-    <path d="M6 6H12A3 3 0 0 1 15 9V69A3 3 0 0 1 12 72H6A3 3 0 0 1 3 69V9A3 3 0 0 1 6 6ZM55 6H61A3 3 0 0 1 64 9V69A3 3 0 0 1 61 72H55A3 3 0 0 1 52 69V9A3 3 0 0 1 55 6ZM11 6H22L57 72H46Z"/>
-  </g>
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M11 13.25A4.25 4.25 0 0 1 15.25 9A4.25 4.25 0 0 1 19.5 13.25V50.75A4.25 4.25 0 0 1 15.25 55A4.25 4.25 0 0 1 11 50.75ZM28 15L53 32L28 49Z" fill="#FFFFFF"/>
 </svg>
