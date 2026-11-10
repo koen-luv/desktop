@@ -169,12 +169,6 @@ export function SpotifyTab({ searchQuery }: { searchQuery?: string }) {
         />
       </SettingSection>
 
-      {!connected && available && (
-        <div className="px-[14px] py-[10px] rounded-lg bg-border-alpha-10 text-[13px] text-text-secondary leading-[1.5]">
-          {t("settings.spotify.redirect_hint") ||
-            "In your Spotify app settings, add http://127.0.0.1:43821/callback as a redirect URI. Neritium opens your browser and catches the callback on your own machine."}
-        </div>
-      )}
 
       {/* Import */}
       {connected && (

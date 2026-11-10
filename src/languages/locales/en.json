@@ -827,7 +827,6 @@
       "description": "Import your Spotify playlists and liked songs into Neritium.",
       "desktop_only": "Connecting a Spotify account is only available in the desktop app.",
       "modal_action": "Import your playlists and liked songs from a connected Spotify account",
-      "redirect_hint": "In your Spotify app settings, add http://127.0.0.1:43821/callback as a redirect URI. Neritium opens your browser and catches the callback on your own machine.",
       "section_account": "Account",
       "section_import": "Import",
       "account": {
