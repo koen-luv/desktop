@@ -41,6 +41,7 @@
         </activity>
         <activity-alias
             android:name=".Icon_default"
+            android:targetActivity=".MainActivity"
             android:enabled="true"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_default"
@@ -50,10 +51,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <meta-data android:name="android.app.targetActivity" android:value=".MainActivity" />
         </activity-alias>
         <activity-alias
             android:name=".Icon_spotify"
+            android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_spotify"
@@ -63,10 +64,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <meta-data android:name="android.app.targetActivity" android:value=".MainActivity" />
         </activity-alias>
         <activity-alias
             android:name=".Icon_discord"
+            android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_discord"
@@ -76,10 +77,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <meta-data android:name="android.app.targetActivity" android:value=".MainActivity" />
         </activity-alias>
         <activity-alias
             android:name=".Icon_telegram"
+            android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_telegram"
@@ -89,10 +90,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <meta-data android:name="android.app.targetActivity" android:value=".MainActivity" />
         </activity-alias>
         <activity-alias
             android:name=".Icon_aurora"
+            android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_aurora"
@@ -102,10 +103,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <meta-data android:name="android.app.targetActivity" android:value=".MainActivity" />
         </activity-alias>
         <activity-alias
             android:name=".Icon_sunset"
+            android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_sunset"
@@ -115,10 +116,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <meta-data android:name="android.app.targetActivity" android:value=".MainActivity" />
         </activity-alias>
         <activity-alias
             android:name=".Icon_ocean"
+            android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_ocean"
@@ -128,10 +129,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <meta-data android:name="android.app.targetActivity" android:value=".MainActivity" />
         </activity-alias>
         <activity-alias
             android:name=".Icon_forest"
+            android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_forest"
@@ -141,10 +142,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <meta-data android:name="android.app.targetActivity" android:value=".MainActivity" />
         </activity-alias>
         <activity-alias
             android:name=".Icon_berry"
+            android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_berry"
@@ -154,10 +155,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <meta-data android:name="android.app.targetActivity" android:value=".MainActivity" />
         </activity-alias>
         <activity-alias
             android:name=".Icon_carbon"
+            android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_carbon"
@@ -167,10 +168,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <meta-data android:name="android.app.targetActivity" android:value=".MainActivity" />
         </activity-alias>
         <activity-alias
             android:name=".Icon_pixel"
+            android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_pixel"
@@ -180,10 +181,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <meta-data android:name="android.app.targetActivity" android:value=".MainActivity" />
         </activity-alias>
         <activity-alias
             android:name=".Icon_scanlines"
+            android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_scanlines"
@@ -193,10 +194,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <meta-data android:name="android.app.targetActivity" android:value=".MainActivity" />
         </activity-alias>
         <activity-alias
             android:name=".Icon_vhs"
+            android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_vhs"
@@ -206,7 +207,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <meta-data android:name="android.app.targetActivity" android:value=".MainActivity" />
         </activity-alias>
 
         <provider
