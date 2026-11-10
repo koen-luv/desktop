@@ -13,7 +13,7 @@ export function applyWindowVisibility(next: boolean): void {
 function ensureSubscribed(): void {
   if (subscribed || typeof window === "undefined") return;
   subscribed = true;
-  window.linerElectron?.onWindowStateChange?.((state) => {
+  window.neritiumElectron?.onWindowStateChange?.((state) => {
     applyWindowVisibility(state.isVisible !== false);
   });
 }

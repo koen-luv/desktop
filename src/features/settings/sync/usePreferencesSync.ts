@@ -19,7 +19,7 @@ import {
   type SyncedTheme,
 } from "./preferences";
 
-const SYNC_META_KEY = "liner_preferences_sync_v1";
+const SYNC_META_KEY = "neritium_preferences_sync_v1";
 const PUBLISH_DELAY_MS = 650;
 const POLL_INTERVAL_MS = 45_000;
 const RETRY_DELAY_MS = 15_000;

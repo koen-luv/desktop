@@ -297,7 +297,7 @@ export class AndroidPlayerRuntime {
           album:
             typeof track.album === "string"
               ? track.album
-              : (track.album as { title?: string } | undefined)?.title || "Liner",
+              : (track.album as { title?: string } | undefined)?.title || "Neritium",
           coverUrl: track.coverUrl || "",
           durationMs: track.durationMs || 0,
           startMs: 0,
@@ -564,7 +564,7 @@ export class AndroidPlayerRuntime {
         album:
           typeof next.album === "string"
             ? next.album
-            : (next.album as { title?: string } | undefined)?.title || "Liner",
+            : (next.album as { title?: string } | undefined)?.title || "Neritium",
         coverUrl: next.coverUrl || "",
         durationMs: next.durationMs || 0,
         startMs: 0,
@@ -616,7 +616,7 @@ export class AndroidPlayerRuntime {
       album:
         typeof t.album === "string"
           ? t.album
-          : (t.album as { title?: string } | undefined)?.title || "Liner",
+          : (t.album as { title?: string } | undefined)?.title || "Neritium",
       coverUrl: t.coverUrl || "",
       durationMs: t.durationMs || 0,
       startMs: 0,
@@ -781,7 +781,7 @@ export class AndroidPlayerRuntime {
         album:
           typeof track.album === "string"
             ? track.album
-            : (track.album as { title?: string } | undefined)?.title || "Liner",
+            : (track.album as { title?: string } | undefined)?.title || "Neritium",
         coverUrl: track.coverUrl || "",
         durationMs: track.durationMs || 0,
         startMs: startPositionMs,

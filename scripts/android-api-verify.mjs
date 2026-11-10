@@ -1,4 +1,4 @@
-// End-to-end verification of the official Liner API using the production WASM signer.
+// End-to-end verification of the official Neritium API using the production WASM signer.
 import fs from "node:fs";
 import crypto from "node:crypto";
 
@@ -67,10 +67,10 @@ if (fs.existsSync(accountPath)) {
 } else {
   const suffix = crypto.randomBytes(4).toString("hex");
   account = {
-    email: `liner.android.port.${suffix}@example.com`,
-    password: `Liner-${crypto.randomBytes(9).toString("base64url")}!`,
-    username: `liner_android_${suffix}`,
-    displayName: "Liner Android QA",
+    email: `neritium.android.port.${suffix}@example.com`,
+    password: `Neritium-${crypto.randomBytes(9).toString("base64url")}!`,
+    username: `neritium_android_${suffix}`,
+    displayName: "Neritium Android QA",
   };
   fs.writeFileSync(accountPath, JSON.stringify(account, null, 2));
 }

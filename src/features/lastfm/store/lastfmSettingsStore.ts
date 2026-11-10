@@ -4,14 +4,14 @@ import { debouncedStorage } from "@/shared/utils/storage";
 import { lastfmGetSession, type LastfmCredentials } from "../lib/lastfmClient";
 
 /**
- * Liner's own Last.fm API application (registered by the project owner).
+ * Neritium's own Last.fm API application (registered by the project owner).
  * It is the only credential source — the settings UI no longer accepts
  * user-provided keys, so scrobbling works without any setup.
  */
 const LASTFM_DEFAULT_API_KEY = "e7bad882b0268344492d389582f21514";
 const LASTFM_DEFAULT_API_SECRET = "429ffb72c7aa50452e15a7d303c778ff";
 
-/** Effective credentials: always the built-in Liner application. */
+/** Effective credentials: always the built-in Neritium application. */
 export function resolveLastfmCredentials(
   _apiKey?: string,
   _apiSecret?: string,
@@ -77,7 +77,7 @@ export const useLastfmSettingsStore = create<LastfmSettingsState>()(
         set({ sessionKey: null, username: null, pendingToken: null, pendingTokenAt: null }),
     }),
     {
-      name: "liner_lastfm_settings_v1",
+      name: "neritium_lastfm_settings_v1",
       storage: createJSONStorage(() => debouncedStorage),
       partialize: (state) => ({
         enabled: state.enabled,

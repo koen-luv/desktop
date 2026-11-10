@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { linerDb } from "./linerDb";
+import { neritiumDb } from "./neritiumDb";
 import { audioCache } from "./audioCache";
 
-describe("linerDb storage layer", () => {
+describe("neritiumDb storage layer", () => {
   beforeEach(async () => {
-    await linerDb.clearAll();
+    await neritiumDb.clearAll();
   });
 
   it("stores and retrieves track metadata", async () => {
-    await linerDb.putTrack({
+    await neritiumDb.putTrack({
       id: "track_test_1",
       title: "Test Song",
       artists: "Test Artist",
@@ -17,7 +17,7 @@ describe("linerDb storage layer", () => {
       playCount: 0,
     });
 
-    const record = await linerDb.getTrack("track_test_1");
+    const record = await neritiumDb.getTrack("track_test_1");
     expect(record).not.toBeNull();
     expect(record?.title).toBe("Test Song");
     expect(record?.artists).toBe("Test Artist");
@@ -41,7 +41,7 @@ describe("linerDb storage layer", () => {
     const hasAudio = await audioCache.hasAudio("track_audio_1");
     expect(hasAudio).toBe(true);
 
-    const totalBytes = await linerDb.getTotalAudioBytes();
+    const totalBytes = await neritiumDb.getTotalAudioBytes();
     expect(totalBytes).toBe(dummyBlob.size);
 
     await audioCache.deleteAudio("track_audio_1");
@@ -51,7 +51,7 @@ describe("linerDb storage layer", () => {
 
   it("stores lyrics and updates weekly checked timestamp", async () => {
     const initialTime = Date.now() - 10000;
-    await linerDb.putLyrics({
+    await neritiumDb.putLyrics({
       trackId: "track_lyric_1",
       syncLevel: "word_level",
       quality: 95,
@@ -80,17 +80,17 @@ describe("linerDb storage layer", () => {
       updatedAt: initialTime,
     });
 
-    const record = await linerDb.getLyrics("track_lyric_1");
+    const record = await neritiumDb.getLyrics("track_lyric_1");
     expect(record).not.toBeNull();
     expect(record?.syncLevel).toBe("word_level");
     expect(record?.quality).toBe(95);
     expect(record?.lastCheckedAt).toBe(initialTime);
 
-    await linerDb.updateLyricsChecked("track_lyric_1");
-    const updated = await linerDb.getLyrics("track_lyric_1");
+    await neritiumDb.updateLyricsChecked("track_lyric_1");
+    const updated = await neritiumDb.getLyrics("track_lyric_1");
     expect(updated?.lastCheckedAt).toBeGreaterThan(initialTime);
 
-    await linerDb.putLyrics({
+    await neritiumDb.putLyrics({
       trackId: "track_line_only",
       syncLevel: "line_level",
       quality: 60,
@@ -118,13 +118,13 @@ describe("linerDb storage layer", () => {
       lastCheckedAt: initialTime,
       updatedAt: initialTime,
     });
-    const lineRecord = await linerDb.getLyrics("track_line_only");
+    const lineRecord = await neritiumDb.getLyrics("track_line_only");
     expect(lineRecord).not.toBeNull();
     expect(lineRecord?.activeProvider).toBe("lrclib");
     expect(lineRecord?.syncLevel).toBe("line_level");
 
     // cadence / polaris with line_level should not be cached
-    await linerDb.putLyrics({
+    await neritiumDb.putLyrics({
       trackId: "track_cadence_line",
       syncLevel: "line_level",
       quality: 70,
@@ -152,13 +152,13 @@ describe("linerDb storage layer", () => {
       lastCheckedAt: initialTime,
       updatedAt: initialTime,
     });
-    const cadenceRecord = await linerDb.getLyrics("track_cadence_line");
+    const cadenceRecord = await neritiumDb.getLyrics("track_cadence_line");
     expect(cadenceRecord).toBeNull();
   });
 
   it("stores artist data and calculates total artist bytes", async () => {
     const initialTime = Date.now() - 50000;
-    await linerDb.putArtist({
+    await neritiumDb.putArtist({
       id: "artist_test_1",
       data: {
         title: "Test Artist",
@@ -175,41 +175,41 @@ describe("linerDb storage layer", () => {
       lastCheckedAt: initialTime,
     });
 
-    const record = await linerDb.getArtist("artist_test_1");
+    const record = await neritiumDb.getArtist("artist_test_1");
     expect(record).not.toBeNull();
     expect(record?.data.title).toBe("Test Artist");
     expect(record?.lastCheckedAt).toBe(initialTime);
 
-    const totalBytes = await linerDb.getTotalArtistBytes();
+    const totalBytes = await neritiumDb.getTotalArtistBytes();
     expect(totalBytes).toBeGreaterThan(0);
 
-    await linerDb.updateArtistChecked("artist_test_1");
-    const updated = await linerDb.getArtist("artist_test_1");
+    await neritiumDb.updateArtistChecked("artist_test_1");
+    const updated = await neritiumDb.getArtist("artist_test_1");
     expect(updated?.lastCheckedAt).toBeGreaterThan(initialTime);
   });
 
   it("keeps only the most recent audio blobs in memory instead of every played track", async () => {
     for (let i = 1; i <= 6; i++) {
-      await linerDb.putAudio(`track_mem_${i}`, new Blob([`audio ${i}`], { type: "audio/ogg" }), "audio/ogg");
+      await neritiumDb.putAudio(`track_mem_${i}`, new Blob([`audio ${i}`], { type: "audio/ogg" }), "audio/ogg");
     }
-    const inMemory = [...(linerDb as unknown as { memAudio: Map<string, unknown> }).memAudio.keys()];
+    const inMemory = [...(neritiumDb as unknown as { memAudio: Map<string, unknown> }).memAudio.keys()];
     expect(inMemory).toEqual(["track_mem_4", "track_mem_5", "track_mem_6"]);
 
-    await linerDb.getAudio("track_mem_5");
-    const afterRead = [...(linerDb as unknown as { memAudio: Map<string, unknown> }).memAudio.keys()];
+    await neritiumDb.getAudio("track_mem_5");
+    const afterRead = [...(neritiumDb as unknown as { memAudio: Map<string, unknown> }).memAudio.keys()];
     expect(afterRead).toEqual(["track_mem_4", "track_mem_6", "track_mem_5"]);
   });
 
   it("tracks lastPlayedAt on putAudio and touchAudio", async () => {
     const blob1 = new Blob(["audio content 1"], { type: "audio/ogg" });
     const earlyTime = 100000;
-    await linerDb.putAudio("track_lru_1", blob1, "audio/ogg", earlyTime);
+    await neritiumDb.putAudio("track_lru_1", blob1, "audio/ogg", earlyTime);
 
-    const initial = await linerDb.getAudio("track_lru_1");
+    const initial = await neritiumDb.getAudio("track_lru_1");
     expect(initial?.lastPlayedAt).toBe(earlyTime);
 
-    await linerDb.touchAudio("track_lru_1");
-    const touched = await linerDb.getAudio("track_lru_1");
+    await neritiumDb.touchAudio("track_lru_1");
+    const touched = await neritiumDb.getAudio("track_lru_1");
     expect(touched?.lastPlayedAt).toBeGreaterThan(earlyTime);
   });
 
@@ -218,11 +218,11 @@ describe("linerDb storage layer", () => {
     const chunk2 = new Blob(["1234567890".repeat(10)], { type: "audio/ogg" });
     const chunk3 = new Blob(["1234567890".repeat(10)], { type: "audio/ogg" });
 
-    await linerDb.putAudio("track_oldest", chunk1, "audio/ogg", 1000);
-    await linerDb.putAudio("track_middle", chunk2, "audio/ogg", 2000);
-    await linerDb.putAudio("track_newest", chunk3, "audio/ogg", 3000);
+    await neritiumDb.putAudio("track_oldest", chunk1, "audio/ogg", 1000);
+    await neritiumDb.putAudio("track_middle", chunk2, "audio/ogg", 2000);
+    await neritiumDb.putAudio("track_newest", chunk3, "audio/ogg", 3000);
 
-    const initialTotal = await linerDb.getTotalAudioBytes();
+    const initialTotal = await neritiumDb.getTotalAudioBytes();
     expect(initialTotal).toBe(300);
 
     const limit = 200;

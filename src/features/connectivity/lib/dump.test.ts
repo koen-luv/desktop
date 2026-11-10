@@ -24,7 +24,7 @@ describe("buildOfflineDump", () => {
     expect(dump.failures).toHaveLength(1);
     expect(dump.machine?.trace?.hops).toHaveLength(1);
     expect(JSON.stringify(dump)).not.toMatch(/bearer|token|authorization|proxy/i);
-    expect(dumpFilename(dump)).toMatch(/^liner-offline-dump-.*\.json$/);
+    expect(dumpFilename(dump)).toMatch(/^neritium-offline-dump-.*\.json$/);
   });
 
   it("calls electron saveDump when available", async () => {
@@ -40,7 +40,7 @@ describe("buildOfflineDump", () => {
       filePath: "/home/user/Desktop/test-dump.json",
     });
 
-    (window as any).linerElectron = {
+    (window as any).neritiumElectron = {
       saveDump: mockSaveDump,
     };
 
@@ -51,6 +51,6 @@ describe("buildOfflineDump", () => {
     expect(result.success).toBe(true);
     expect(result.filePath).toBe("/home/user/Desktop/test-dump.json");
 
-    delete (window as any).linerElectron;
+    delete (window as any).neritiumElectron;
   });
 });

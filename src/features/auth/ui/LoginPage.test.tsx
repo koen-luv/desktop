@@ -44,7 +44,7 @@ vi.mock("@/languages", () => {
   const translations: Record<string, string> = {
     "login.auth_title_login": "Your music, your way",
     "login.auth_subtitle_login": "Sign in and pick up right where you left off.",
-    "login.auth_title_register": "Join Liner",
+    "login.auth_title_register": "Join Neritium",
     "login.auth_subtitle_register": "Create an account and start building your personal library.",
     "login.profile_setup_title": "Set up your profile",
     "login.profile_setup_subtitle": "Choose your unique handle and display name.",

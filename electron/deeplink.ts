@@ -1,7 +1,7 @@
-// liner:// deeplink parsing, shared by main process (no electron imports here
+// neritium:// deeplink parsing, shared by main process (no electron imports here
 // so vitest can cover it). same strict allowlist as the link server: fixed
 // entity types, opaque catalog tokens only.
-export const DEEP_LINK_SCHEME = "liner";
+export const DEEP_LINK_SCHEME = "neritium";
 
 const DEEP_LINK_IDS: Record<string, RegExp> = {
   // youtube channel ids, always UC + 22 base64url chars
@@ -13,7 +13,7 @@ const DEEP_LINK_IDS: Record<string, RegExp> = {
   playlist: /^[A-Za-z0-9_-]{8,64}$/,
   // youtube video ids are always 11 base64url chars
   track: /^[A-Za-z0-9_-]{11}$/,
-  // one-time password reset links from the Liner support email
+  // one-time password reset links from the Neritium support email
   "reset-password": /^lrst_[A-Za-z0-9_-]{43}$/,
 };
 

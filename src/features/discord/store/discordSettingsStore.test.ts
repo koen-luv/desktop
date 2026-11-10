@@ -69,7 +69,7 @@ describe("discordSettingsStore", () => {
 
   it("notifies Electron bridge when settings change", () => {
     const notifySpy = vi.fn();
-    (window as any).linerElectron = {
+    (window as any).neritiumElectron = {
       discordUpdateSettings: notifySpy,
     };
 

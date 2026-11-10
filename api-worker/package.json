@@ -1,5 +1,5 @@
 {
-  "name": "@liner/api-worker",
+  "name": "@neritium/api-worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",

@@ -27,6 +27,11 @@ export interface ClientImportOutcome {
 export interface RunImportOptions {
   signal?: AbortSignal;
   onProgress?: (progress: ImportProgress) => void;
+  /**
+   * A playlist that is already resolved (for example from a connected Spotify
+   * account) skips the URL parser entirely.
+   */
+  playlist?: ClientImportedPlaylist;
 }
 
 function newId(): string {
@@ -108,7 +113,7 @@ async function matchPlaylist(playlist: ClientImportedPlaylist, options: RunImpor
 
 export async function runClientImport(url: string, options: RunImportOptions = {}): Promise<ClientImportOutcome> {
   options.onProgress?.({ phase: "loading_source", result: { total: 0, imported: 0, skipped: 0 } });
-  const playlist = await parseImportSource(url, options.signal);
+  const playlist = options.playlist ?? (await parseImportSource(url, options.signal));
   if (playlist.tracks.length === 0) {
     throw new Error("No tracks found in the imported playlist. Make sure the playlist is public and contains available tracks.");
   }

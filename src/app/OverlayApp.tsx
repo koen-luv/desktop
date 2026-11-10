@@ -6,7 +6,7 @@ import "./globals.css";
 
 export default function OverlayApp() {
   if (!getAuthSession()) {
-    window.linerElectron?.closeOverlay?.();
+    window.neritiumElectron?.closeOverlay?.();
     return null;
   }
 

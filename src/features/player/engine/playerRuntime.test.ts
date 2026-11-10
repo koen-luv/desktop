@@ -6,7 +6,7 @@ vi.mock("./streamResolver", () => ({ resolvePlaybackStream: mocks.resolvePlaybac
 
 import { playerRuntime, PlayerRuntime } from "./playerRuntime";
 import { usePlayerStore } from "../store/playerStore";
-import { linerDb } from "@/shared/storage";
+import { neritiumDb } from "@/shared/storage";
 import type { Track } from "@/shared/types";
 
 const urlStream = {
@@ -161,13 +161,13 @@ describe("PlayerRuntime audio caching", () => {
     mocks.resolvePlaybackStream.mockReset();
   });
 
-  it("plays directly from linerDb cache when audio blob exists without resolving a stream", async () => {
+  it("plays directly from neritiumDb cache when audio blob exists without resolving a stream", async () => {
     const playSpy = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
     const sessionSpy = mocks.resolvePlaybackStream;
     const fetchSpy = vi.spyOn(globalThis, "fetch");
 
     const mockBlob = new Blob(["fake-opus-data"], { type: "audio/webm" });
-    await linerDb.putAudio("cached-track-1", mockBlob, "audio/webm");
+    await neritiumDb.putAudio("cached-track-1", mockBlob, "audio/webm");
 
     const cachedTrack: Track = {
       ...track,
@@ -184,7 +184,7 @@ describe("PlayerRuntime audio caching", () => {
   });
 
   // NOTE: this fork ships AUTO_CACHE_AUDIO = false — audio is written to
-  // linerDb only through the explicit Download action, never in the
+  // neritiumDb only through the explicit Download action, never in the
   // background. The upstream tests below are therefore inverted: playing a
   // stream must NOT fetch/overwrite the cache, and preload only warms the
   // resolver instead of downloading the track.
@@ -209,7 +209,7 @@ describe("PlayerRuntime audio caching", () => {
     expect(sessionSpy).toHaveBeenCalledTimes(1);
     expect(playSpy).toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(await linerDb.getAudio("fresh-track-2")).toBeFalsy();
+    expect(await neritiumDb.getAudio("fresh-track-2")).toBeFalsy();
   });
 
   it("preloads only the resolved stream when background auto-cache is disabled", async () => {
@@ -231,7 +231,7 @@ describe("PlayerRuntime audio caching", () => {
 
     expect(sessionSpy).toHaveBeenCalledTimes(1);
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(await linerDb.getAudio("next-track-3")).toBeFalsy();
+    expect(await neritiumDb.getAudio("next-track-3")).toBeFalsy();
 
     sessionSpy.mockClear();
     fetchSpy.mockClear();
@@ -258,7 +258,7 @@ describe("PlayerRuntime audio caching", () => {
     );
 
     const emptyBlob = new Blob([], { type: "audio/webm" });
-    await linerDb.putAudio("corrupt-track-4", emptyBlob, "audio/webm");
+    await neritiumDb.putAudio("corrupt-track-4", emptyBlob, "audio/webm");
 
     const corruptTrack: Track = {
       ...track,
@@ -272,7 +272,7 @@ describe("PlayerRuntime audio caching", () => {
     expect(playSpy).toHaveBeenCalled();
     expect(usePlayerStore.getState().status).toBe("playing");
 
-    const cachedAfter = await linerDb.getAudio("corrupt-track-4");
+    const cachedAfter = await neritiumDb.getAudio("corrupt-track-4");
     expect(cachedAfter?.byteSize).not.toBe(0);
   });
 
@@ -296,7 +296,7 @@ describe("PlayerRuntime audio caching", () => {
 
     await playerRuntime!.preloadTrack(partialTrack);
 
-    const stored = await linerDb.getAudio("partial-track-5");
+    const stored = await neritiumDb.getAudio("partial-track-5");
     expect(stored).toBeNull();
   });
 
@@ -308,7 +308,7 @@ describe("PlayerRuntime audio caching", () => {
     );
 
     const corruptTrack: Track = { ...track, id: "corrupt-track", title: "Corrupt" };
-    await linerDb.putAudio(corruptTrack.id, new Blob([new Uint8Array([9, 9, 9])], { type: "audio/webm" }), "audio/webm");
+    await neritiumDb.putAudio(corruptTrack.id, new Blob([new Uint8Array([9, 9, 9])], { type: "audio/webm" }), "audio/webm");
     usePlayerStore.setState({ currentTrack: corruptTrack, positionMs: 0 });
     await playerRuntime!.loadAndPlay(corruptTrack);
     expect(resolveSpy).not.toHaveBeenCalled();
@@ -319,7 +319,7 @@ describe("PlayerRuntime audio caching", () => {
       audio.dispatchEvent(new Event("error"));
       await vi.waitFor(() => expect(resolveSpy).toHaveBeenCalledTimes(1));
       await vi.waitFor(() => expect(usePlayerStore.getState().status).toBe("playing"), { timeout: 5000 });
-      expect(await linerDb.getAudio(corruptTrack.id)).toBeNull();
+      expect(await neritiumDb.getAudio(corruptTrack.id)).toBeNull();
 
       audio.dispatchEvent(new Event("error"));
       await vi.waitFor(() => expect(usePlayerStore.getState().status).toBe("error"));

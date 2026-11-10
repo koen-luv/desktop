@@ -1,6 +1,6 @@
-# Liner API Worker
+# Neritium API Worker
 
-A self-hostable backend for the Liner client: Cloudflare Workers for the API,
+A self-hostable backend for the Neritium client: Cloudflare Workers for the API,
 Supabase (Postgres) for storage. It implements the routes the app needs to sign
 in, sync a library, edit playlists, record listening history, read profiles and
 show leaderboards — enough to use the app without `api.tryliner.fun`.

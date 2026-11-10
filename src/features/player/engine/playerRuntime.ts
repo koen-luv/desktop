@@ -2,11 +2,15 @@ import { usePlayerStore } from "../store/playerStore";
 import { ApiError } from "@/shared/api";
 import { log } from "@/shared/utils/logger";
 import { telemetry } from "@/shared/telemetry";
-import { linerDb, audioCache } from "@/shared/storage";
+import { neritiumDb, audioCache } from "@/shared/storage";
 import { isStandaloneAudioFile } from "@/shared/storage/audioFormat";
 import type { Track } from "@/shared/types";
 import { pitchShifter } from "./pitchShifter";
-import { resolvePlaybackStream, type PlaybackStream } from "./streamResolver";
+import {
+  resolvePlaybackStream,
+  isWebPlaybackUnsupported,
+  type PlaybackStream,
+} from "./streamResolver";
 import { downloadAudioBytes } from "@/shared/media/innertube";
 import {
   autoCrossfadeWindowMs,
@@ -18,6 +22,7 @@ import {
 import { peekAutoNextTrack } from "./queueNext";
 import { EQUALIZER_BANDS, effectiveEqualizerGains } from "./equalizer";
 import { useEqualizerSettingsStore } from "../store/equalizerSettingsStore";
+import { isWebApp } from "@/platform";
 
 /**
  * When false, playback streams directly and never writes audio to disk; files
@@ -87,22 +92,25 @@ export class PlayerRuntime {
   // the status for that re-animated the play / pause button on every seek
   private waitingTimer: ReturnType<typeof setTimeout> | null = null;
   public onEnded?: () => void;
-  public onError?: (info: { trackId: string; message: string }) => void;
+  public onError?: (info: { trackId: string; message: string; fatal?: boolean }) => void;
 
   constructor() {
     const win = typeof window !== "undefined" ? (window as any) : null;
-    let audio = (win?.__liner_audio || (typeof document !== "undefined" && document.getElementById("liner-audio"))) as HTMLAudioElement | null;
+    let audio = (win?.__neritium_audio || (typeof document !== "undefined" && document.getElementById("neritium-audio"))) as HTMLAudioElement | null;
     if (!audio) {
       audio = new Audio();
-      audio.id = "liner-audio";
-      audio.crossOrigin = "anonymous";
+      audio.id = "neritium-audio";
+      // The website plays streams that do not send CORS headers. Asking for
+      // `anonymous` there fails the load outright, and a CORS-tainted element
+      // would only matter for the Web Audio graph, which the web build skips.
+      if (!isWebApp()) audio.crossOrigin = "anonymous";
       audio.preload = "auto";
       if (typeof document !== "undefined") {
         document.body.appendChild(audio);
       }
     }
     if (win) {
-      win.__liner_audio = audio;
+      win.__neritium_audio = audio;
     }
     this.audio = audio;
     this.connectEqualizer(audio);
@@ -157,6 +165,10 @@ export class PlayerRuntime {
   }
 
   private connectEqualizer(audio: HTMLAudioElement): void {
+    // Web Audio can only read a same-origin/CORS media element. Cross-origin
+    // streams in a browser would be silenced by this graph, so the website
+    // plays without the equalizer rather than playing nothing.
+    if (isWebApp()) return;
     if (typeof window === "undefined" || !window.AudioContext || this.equalizerSources.has(audio)) {
       return;
     }
@@ -320,7 +332,7 @@ export class PlayerRuntime {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: track.title,
         artist: track.artists,
-        album: (track as { albumTitle?: string }).albumTitle || "Liner",
+        album: (track as { albumTitle?: string }).albumTitle || "Neritium",
         artwork: track.coverUrl
           ? [
               { src: track.coverUrl, sizes: "96x96", type: "image/jpeg" },
@@ -485,7 +497,7 @@ export class PlayerRuntime {
       if (this.activeBlobUrl) {
         URL.revokeObjectURL(this.activeBlobUrl);
         this.activeBlobUrl = null;
-        void linerDb.deleteAudio(this.currentTrackId);
+        void neritiumDb.deleteAudio(this.currentTrackId);
         audioCache.deleteAudio(this.currentTrackId);
       }
 
@@ -752,7 +764,7 @@ export class PlayerRuntime {
       const previousBlob = element.src.startsWith("blob:") ? element.src : null;
       element.src = stream.url;
       incomingUrl = stream.url;
-      (element as HTMLAudioElement & { __linerIsBlob?: boolean }).__linerIsBlob = isBlob;
+      (element as HTMLAudioElement & { __neritiumIsBlob?: boolean }).__neritiumIsBlob = isBlob;
       incomingBlobUrl = isBlob ? stream.url : null;
       element.playbackRate = this.audio.playbackRate;
       element.defaultPlaybackRate = this.audio.defaultPlaybackRate;
@@ -853,7 +865,7 @@ export class PlayerRuntime {
     // The old primary becomes the spare for the next crossfade; the promoted
     // element must never stay parked, or the next blend would overwrite it.
     this.xAudio = old === element ? null : old;
-    this.audio.id = "liner-audio";
+    this.audio.id = "neritium-audio";
     this.audio.volume = Math.max(0, Math.min(1, usePlayerStore.getState().volume));
     old.id = "";
     this.currentTrackId = next.id;
@@ -861,11 +873,11 @@ export class PlayerRuntime {
     this.endFadeTrackId = null;
     this.recoveryAttempts = 0;
     this.recoveryHoldUntilMs = null;
-    this.activeBlobUrl = (element as HTMLAudioElement & { __linerIsBlob?: boolean }).__linerIsBlob
+    this.activeBlobUrl = (element as HTMLAudioElement & { __neritiumIsBlob?: boolean }).__neritiumIsBlob
       ? element.src
       : null;
     if (typeof window !== "undefined") {
-      (window as unknown as { __liner_audio: HTMLAudioElement }).__liner_audio = element;
+      (window as unknown as { __neritium_audio: HTMLAudioElement }).__neritium_audio = element;
     }
     this.setupAudioListeners(element);
     this.applyPlaybackRateAndPitch();
@@ -885,7 +897,7 @@ export class PlayerRuntime {
   private createCrossfadeElement(): HTMLAudioElement {
     const element = new Audio();
     element.preload = "auto";
-    element.crossOrigin = "anonymous";
+    if (!isWebApp()) element.crossOrigin = "anonymous";
     this.connectEqualizer(element);
     return element;
   }
@@ -928,7 +940,7 @@ export class PlayerRuntime {
 
   // between tracks: silence the old source but keep it attached until the next one
   // is ready. Emptying the element here made Chromium drop the system media session
-  // during every skip, so Windows controls / FluentFlyout lost Liner after a track change.
+  // during every skip, so Windows controls / FluentFlyout lost Neritium after a track change.
   private pauseForTransition() {
     this.isResetting = true;
     this.currentSessionExpiresAt = null;
@@ -969,7 +981,7 @@ export class PlayerRuntime {
     if (this.currentTrackId === track.id) return;
     if (this.preloadingTrackId === track.id) return;
 
-    const cached = await linerDb.getAudio(track.id);
+    const cached = await neritiumDb.getAudio(track.id);
     if (cached) return;
 
     this.preloadAbortController?.abort();
@@ -993,7 +1005,7 @@ export class PlayerRuntime {
         const blob = await this.downloadAudioBlob(stream, controller.signal);
         if (!blob || controller.signal.aborted) return;
         if (!(await audioCache.saveAudioBlob(track.id, blob, blob.type, generation))) return;
-        await linerDb.putTrack(track);
+        await neritiumDb.putTrack(track);
         log(
           "green",
           "preload",
@@ -1124,7 +1136,7 @@ export class PlayerRuntime {
     this.pauseForTransition();
 
     try {
-      const cachedAudio = bypassCache ? null : await linerDb.getAudio(track.id);
+      const cachedAudio = bypassCache ? null : await neritiumDb.getAudio(track.id);
       if (epoch !== this.loadEpoch || controller.signal.aborted) {
         return;
       }
@@ -1135,13 +1147,13 @@ export class PlayerRuntime {
         (!cachedAudio!.blob.type || cachedAudio!.blob.type.startsWith("audio/"));
 
       if (cachedAudio && !isValidCachedBlob) {
-        void linerDb.deleteAudio(track.id);
+        void neritiumDb.deleteAudio(track.id);
         audioCache.deleteAudio(track.id);
       }
 
       if (cachedAudio && isValidCachedBlob) {
         this.currentSessionExpiresAt = null;
-        void linerDb.putTrack(track);
+        void neritiumDb.putTrack(track);
         const blobUrl = URL.createObjectURL(cachedAudio.blob);
         this.attachSource(blobUrl, true, track.id);
         this.audio.volume = 0;
@@ -1295,6 +1307,7 @@ export class PlayerRuntime {
       console.error("[LoadAndPlayError]", track.id, error);
       log("red", "playback", `failed: ${message}`);
       usePlayerStore.getState().setStatus("error", message);
+      const fatal = isWebPlaybackUnsupported(error);
 
       telemetry
         .reportError(error, {
@@ -1304,7 +1317,7 @@ export class PlayerRuntime {
         })
         .catch(() => {});
 
-      this.onError?.({ trackId: track.id, message });
+      this.onError?.({ trackId: track.id, message, fatal });
     } finally {
       if (epoch === this.loadEpoch) {
         this.activePlayPromise = null;
@@ -1512,7 +1525,7 @@ export class PlayerRuntime {
         const blob = await this.downloadAudioBlob(stream, signal);
         if (!blob || signal.aborted) return;
         if (!(await audioCache.saveAudioBlob(track.id, blob, blob.type, generation))) return;
-        await linerDb.putTrack(track);
+        await neritiumDb.putTrack(track);
         log("green", "playback", `background cached: ${track.title} (${Math.round(blob.size / 1024)} KB)`);
       } catch {}
     })();
@@ -1523,6 +1536,6 @@ export class PlayerRuntime {
 // AndroidPlayerRuntime (native Media3 service) is the only audio engine, so no
 // second HTMLAudioElement engine is created here.
 export const playerRuntime =
-  typeof window !== "undefined" && !(window as { LinerAndroid?: unknown }).LinerAndroid
+  typeof window !== "undefined" && !(window as { NeritiumAndroid?: unknown }).NeritiumAndroid
     ? new PlayerRuntime()
     : null;

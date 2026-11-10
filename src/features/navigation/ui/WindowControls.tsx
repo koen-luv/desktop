@@ -47,7 +47,7 @@ export default function WindowControls({
   const { t } = useTranslation();
   const { isFullScreen: isWindowFullScreen, isMaximized: isWindowMaximized } = useWindowState();
 
-  const isHyprland = window.linerElectron?.isHyprland ?? false;
+  const isHyprland = window.neritiumElectron?.isHyprland ?? false;
 
   const handleMinimize = () => {
     // macos fullscreen spaces and hyprland tiling wm prohibit/ignore minimizing
@@ -57,7 +57,7 @@ export default function WindowControls({
   };
 
   const handleMaximize = () => {
-    window.linerElectron?.toggleMaximize();
+    window.neritiumElectron?.toggleMaximize();
   };
 
   const handleClose = () => {
@@ -71,6 +71,9 @@ export default function WindowControls({
 
   // Android owns the system UI; desktop window chrome has no meaning here.
   if (isAndroidApp()) return null;
+  // Browser build (the website): there is no window to minimize or close, so
+  // rendering the chrome would ship dead controls.
+  if (!window.neritiumElectron?.toggleMaximize) return null;
 
   return (
     <div

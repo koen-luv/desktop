@@ -42,7 +42,7 @@ export default function UpdateModal() {
             style={font}
           >
             {t("updater.modal_desc", { version: updateInfo.version }) ||
-              `A new version of Liner (v${updateInfo.version}) is ready.`}{" "}
+              `A new version of Neritium (v${updateInfo.version}) is ready.`}{" "}
             <a
               href={changelogUrl}
               target="_blank"

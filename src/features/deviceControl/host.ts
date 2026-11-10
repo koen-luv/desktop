@@ -1,5 +1,5 @@
 /**
- * Host side of remote device control: the PC (or any Liner instance running
+ * Host side of remote device control: the PC (or any Neritium instance running
  * the player) shows a six-digit code, waits for a controller to join through
  * a relay invite or same-network LAN discovery, then applies incoming control
  * commands and streams authoritative playback state back.
@@ -131,7 +131,7 @@ export function stopHosting(): void {
   clearRelay();
   stopLocalAnswerListener?.();
   stopLocalAnswerListener = null;
-  void window.linerElectron?.stopLanHost?.();
+  void window.neritiumElectron?.stopLanHost?.();
   pendingId = null;
   stopBroadcast?.();
   const store = useDeviceControlStore.getState();
@@ -158,7 +158,7 @@ export function startHosting(): void {
     hostConnections: new Map(),
   });
 
-  const electron = window.linerElectron;
+  const electron = window.neritiumElectron;
   const startLanHost = electron?.startLanHost;
   const onLanAnswer = electron?.onLanAnswer;
   const hasLanHost = Boolean(electron && startLanHost && onLanAnswer);
@@ -297,7 +297,7 @@ function onControllerOpen(id: string): void {
   clearRelay();
   stopLocalAnswerListener?.();
   stopLocalAnswerListener = null;
-  void window.linerElectron?.stopLanHost?.();
+  void window.neritiumElectron?.stopLanHost?.();
 
   useDeviceControlStore.setState({
     hostPhase: "connected",
@@ -337,7 +337,7 @@ function onControllerClose(id: string): void {
   if (wasPending) {
     stopLocalAnswerListener?.();
     stopLocalAnswerListener = null;
-    void window.linerElectron?.stopLanHost?.();
+    void window.neritiumElectron?.stopLanHost?.();
   }
 
   if (controllers.length === 0) stopBroadcast?.();

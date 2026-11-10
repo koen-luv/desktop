@@ -190,7 +190,7 @@ function orderedProviders(
   const pool = overrides ?? customProviders ?? defaultSourceProviders;
   const ranked = [...pool].sort((a, b) => b.priority - a.priority);
   if (quality !== "lossless") return ranked;
-  // YouTube's best is ~256 kbps, so a lossless request has to try the Liner
+  // YouTube's best is ~256 kbps, so a lossless request has to try the Neritium
   // master first; the lossy providers stay as the fallback chain.
   return ranked.sort(
     (a, b) => Number(Boolean(b.losslessCapable)) - Number(Boolean(a.losslessCapable)),

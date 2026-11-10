@@ -27,6 +27,16 @@ import {
   type AccessUser,
 } from "./auth";
 import { Supabase, SupabaseError } from "./supabase";
+import {
+  handleLyrics,
+  handlePlaybackSession,
+  handleStream,
+} from "./playback";
+import {
+  handleAttRelay,
+  handleGenerateItRelay,
+  handleInterpreterRelay,
+} from "./youtubeRelay";
 
 // ---------------------------------------------------------------------------
 // Wire types (kept in sync with src/shared/contracts)
@@ -1899,7 +1909,7 @@ function handleVerifyPage(request: Request, env: Env, url: URL): Response {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Liner verification</title>
+<title>Neritium verification</title>
 <style>
   :root { color-scheme: light dark; }
   html, body { margin: 0; height: 100%; background: transparent; }
@@ -2175,9 +2185,32 @@ async function route(request: Request, env: Env): Promise<Response> {
     return handleUserProfile(request, env, userProfile[1]);
   }
 
-  // The catalog, playback signing, lyrics and Discord cloud presence stay on
-  // the devices / are out of scope for this backend. A 404 (not 5xx) lets the
-  // client fall back without surfacing a server-error toast.
+  // Playback resolution, the audio proxy and lyrics are served here so a
+  // browser (which cannot call YouTube cross-origin) can play too.
+  const playback = path.match(/^\/v1\/tracks\/([^/]+)\/playback$/);
+  if (playback && method === "POST") {
+    return handlePlaybackSession(request, env, decodeURIComponent(playback[1]));
+  }
+  const lyrics = path.match(/^\/v1\/tracks\/([^/]+)\/lyrics$/);
+  if (lyrics && method === "GET") {
+    return handleLyrics(request, env, decodeURIComponent(lyrics[1]), url);
+  }
+  if (path.startsWith("/v1/stream/") && (method === "GET" || method === "HEAD")) {
+    return handleStream(request, env, path.slice("/v1/stream/".length));
+  }
+  // Integrity relays for clients that mint their own PO tokens (the website).
+  if (path === "/v1/yt/att" && method === "POST") {
+    return handleAttRelay(request, env);
+  }
+  if (path === "/v1/yt/interpreter" && method === "GET") {
+    return handleInterpreterRelay(request, env, url);
+  }
+  if (path === "/v1/yt/generate-it" && method === "POST") {
+    return handleGenerateItRelay(request, env);
+  }
+
+  // The catalog stays on the device. A 404 (not 5xx) lets the client fall back
+  // without surfacing a server-error toast.
   if (
     path === "/v1/search" ||
     path.startsWith("/v1/tracks/") ||

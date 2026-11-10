@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *, .dark, .dark *));:root {
-  /* ── Liner · "Studio" design language ───────────────────────────────
+  /* ── Neritium · "Studio" design language ───────────────────────────────
      Warm stone neutrals + a violet signal colour, generous radii,
      soft oversized elevation and one shared motion curve. */
-  --bg-canvas: #e3e1dc;
+  --bg-canvas: #dcdad5;
   --bg-surface: #ffffff;
-  --bg-primary: #faf9f7;
-  --bg-elevated: #f1efeb;
-  --bg-panel: #e9e7e2;
+  --bg-primary: #fbfaf8;
+  --bg-elevated: #f1f0ed;
+  --bg-panel: #e7e5e0;
   --bg-overlay: rgba(250, 249, 247, 0.94);
   --bg-toolbox: rgba(26, 24, 32, 0.05);
   --bg-toolbox-active: rgba(26, 24, 32, 0.095);
@@ -19,17 +19,17 @@
   --bg-active: rgba(26, 24, 32, 0.1);
   --bg-selected: rgba(109, 74, 255, 0.11);
 
-  --border-primary: #e6e2db;
-  --border-secondary: #d6d1c8;
-  --border-tertiary: #b6b0a4;
+  --border-primary: #e5e3de;
+  --border-secondary: #d5d3ce;
+  --border-tertiary: #b6b4ae;
   --border-white-alpha-10: rgba(26, 24, 32, 0.05);
   --border-white-alpha-14: rgba(26, 24, 32, 0.08);
   --border-white-alpha-20: rgba(26, 24, 32, 0.12);
   --border-white-alpha-33: rgba(26, 24, 32, 0.18);
 
-  --text-primary: #17151d;
-  --text-secondary: rgba(23, 21, 29, 0.66);
-  --text-tertiary: rgba(23, 21, 29, 0.44);
+  --text-primary: #16151a;
+  --text-secondary: rgba(22, 21, 26, 0.72);
+  --text-tertiary: rgba(22, 21, 26, 0.66);
 
   --accent-primary: #6d4aff;
   --accent-secondary: #8b6bff;
@@ -61,11 +61,11 @@
 }
 
 :root[data-theme="light"], :root.light {
-  --bg-canvas: #e3e1dc;
+  --bg-canvas: #dcdad5;
   --bg-surface: #ffffff;
-  --bg-primary: #faf9f7;
-  --bg-elevated: #f1efeb;
-  --bg-panel: #e9e7e2;
+  --bg-primary: #fbfaf8;
+  --bg-elevated: #f1f0ed;
+  --bg-panel: #e7e5e0;
   --bg-overlay: rgba(250, 249, 247, 0.94);
   --bg-toolbox: rgba(26, 24, 32, 0.05);
   --bg-toolbox-active: rgba(26, 24, 32, 0.095);
@@ -75,17 +75,17 @@
   --bg-active: rgba(26, 24, 32, 0.1);
   --bg-selected: rgba(109, 74, 255, 0.11);
 
-  --border-primary: #e6e2db;
-  --border-secondary: #d6d1c8;
-  --border-tertiary: #b6b0a4;
+  --border-primary: #e5e3de;
+  --border-secondary: #d5d3ce;
+  --border-tertiary: #b6b4ae;
   --border-white-alpha-10: rgba(26, 24, 32, 0.05);
   --border-white-alpha-14: rgba(26, 24, 32, 0.08);
   --border-white-alpha-20: rgba(26, 24, 32, 0.12);
   --border-white-alpha-33: rgba(26, 24, 32, 0.18);
 
-  --text-primary: #17151d;
-  --text-secondary: rgba(23, 21, 29, 0.66);
-  --text-tertiary: rgba(23, 21, 29, 0.44);
+  --text-primary: #16151a;
+  --text-secondary: rgba(22, 21, 26, 0.72);
+  --text-tertiary: rgba(22, 21, 26, 0.66);
 
   --accent-primary: #6d4aff;
   --accent-secondary: #8b6bff;
@@ -100,11 +100,11 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not(.light) {
-    --bg-canvas: #141418;
-    --bg-surface: #1c1c22;
-    --bg-primary: #18181d;
-    --bg-elevated: #232329;
-    --bg-panel: #2a2a32;
+    --bg-canvas: #101014;
+    --bg-surface: #191920;
+    --bg-primary: #16161c;
+    --bg-elevated: #212128;
+    --bg-panel: #26262f;
     --bg-overlay: rgba(24, 24, 29, 0.94);
     --bg-toolbox: rgba(255, 255, 255, 0.055);
     --bg-toolbox-active: rgba(255, 255, 255, 0.105);
@@ -114,17 +114,17 @@
     --bg-active: rgba(255, 255, 255, 0.11);
     --bg-selected: rgba(143, 121, 255, 0.2);
 
-    --border-primary: #2c2c36;
-    --border-secondary: #3b3b48;
-    --border-tertiary: #575769;
+    --border-primary: #2b2b35;
+    --border-secondary: #3a3a46;
+    --border-tertiary: #565664;
     --border-white-alpha-10: rgba(255, 255, 255, 0.06);
     --border-white-alpha-14: rgba(255, 255, 255, 0.09);
     --border-white-alpha-20: rgba(255, 255, 255, 0.14);
     --border-white-alpha-33: rgba(255, 255, 255, 0.22);
 
-    --text-primary: #f2f1f7;
-    --text-secondary: rgba(242, 241, 247, 0.64);
-    --text-tertiary: rgba(242, 241, 247, 0.42);
+    --text-primary: #f4f3f8;
+    --text-secondary: rgba(244, 243, 248, 0.72);
+    --text-tertiary: rgba(244, 243, 248, 0.58);
 
     --accent-primary: #8f79ff;
     --accent-secondary: #a894ff;
@@ -143,11 +143,11 @@
 }
 
 :root[data-theme="dark"], :root.dark, [data-theme="dark"], .dark {
-  --bg-canvas: #141418;
-  --bg-surface: #1c1c22;
-  --bg-primary: #18181d;
-  --bg-elevated: #232329;
-  --bg-panel: #2a2a32;
+  --bg-canvas: #101014;
+  --bg-surface: #191920;
+  --bg-primary: #16161c;
+  --bg-elevated: #212128;
+  --bg-panel: #26262f;
   --bg-overlay: rgba(24, 24, 29, 0.94);
   --bg-toolbox: rgba(255, 255, 255, 0.055);
   --bg-toolbox-active: rgba(255, 255, 255, 0.105);
@@ -157,17 +157,17 @@
   --bg-active: rgba(255, 255, 255, 0.11);
   --bg-selected: rgba(143, 121, 255, 0.2);
 
-  --border-primary: #2c2c36;
-  --border-secondary: #3b3b48;
-  --border-tertiary: #575769;
+  --border-primary: #2b2b35;
+  --border-secondary: #3a3a46;
+  --border-tertiary: #565664;
   --border-white-alpha-10: rgba(255, 255, 255, 0.06);
   --border-white-alpha-14: rgba(255, 255, 255, 0.09);
   --border-white-alpha-20: rgba(255, 255, 255, 0.14);
   --border-white-alpha-33: rgba(255, 255, 255, 0.22);
 
-  --text-primary: #f2f1f7;
-  --text-secondary: rgba(242, 241, 247, 0.64);
-  --text-tertiary: rgba(242, 241, 247, 0.42);
+  --text-primary: #f4f3f8;
+  --text-secondary: rgba(244, 243, 248, 0.72);
+  --text-tertiary: rgba(244, 243, 248, 0.58);
 
   --accent-primary: #8f79ff;
   --accent-secondary: #a894ff;
@@ -482,6 +482,13 @@ button.apple-glass-action:hover,
 /* Edge-to-edge shell: keep content out of status bar / cutout. The native host
    publishes real WindowInsets as --inset-* because Android WebView reports
    env(safe-area-inset-*) as 0 even when it draws edge-to-edge. */
+.safe-area-shell {
+  /* Browser build: env() is the only source of notch/gesture-bar insets. */
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
 .platform-android .safe-area-shell {
   padding-top: max(env(safe-area-inset-top), var(--inset-top, 0px));
   padding-left: max(env(safe-area-inset-left), var(--inset-left, 0px));
@@ -514,9 +521,18 @@ button.apple-glass-action:hover,
   touch-action: manipulation;
 }
 
+/* Mobile dock sits on top of the system gesture bar; the shell supplies the
+   side/bottom insets, the dock only needs its own breathing room. */
+.platform-android .safe-area-shell {
+  padding-bottom: max(env(safe-area-inset-bottom), var(--inset-bottom, 0px));
+}
+
 @media (prefers-reduced-motion: reduce) {
   .page-transition {
     animation: none;
+  }
+  .sleeve-edge {
+    transition: none !important;
   }
   .search-popup-enter {
     animation: none;

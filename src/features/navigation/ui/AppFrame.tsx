@@ -21,6 +21,7 @@ import {
   PlaylistFill,
 } from "@mingcute/react";
 import Sidebar from "./Sidebar";
+import MobileDock from "./MobileNav";
 import WindowControls from "./WindowControls";
 import PageTransition from "./PageTransition";
 import RightDrawer from "./RightDrawer";
@@ -75,10 +76,10 @@ const SIDEBAR_WIDTH = 58;
 const SHELL_EDGE_GAP = 12;
 const SEARCH_QUERY_CACHE_TTL_MS = 60_000;
 const LEGACY_LAYOUT_STORAGE_KEYS = [
-  "liner_right_sidebar",
-  "liner_sidebar_position",
-  "liner_sidebar_width",
-  "liner_queue_popup_open",
+  "neritium_right_sidebar",
+  "neritium_sidebar_position",
+  "neritium_sidebar_width",
+  "neritium_queue_popup_open",
 ] as const;
 
 export default function AppFrame({ children }: AppFrameProps) {
@@ -107,7 +108,7 @@ export default function AppFrame({ children }: AppFrameProps) {
   const [queuePopupOpen, setQueuePopupOpen] = useState(false);
   const [rightDrawerTab, setRightDrawerTabState] = useState<"queue" | "lyrics">(() => {
     if (typeof window === "undefined") return "queue";
-    const saved = window.localStorage.getItem("liner_right_drawer_tab");
+    const saved = window.localStorage.getItem("neritium_right_drawer_tab");
     return saved === "queue" || saved === "lyrics" ? saved : "queue";
   });
   const fullscreenPlayerOpen = usePlayerStore((state) => state.fullscreen);
@@ -264,7 +265,7 @@ export default function AppFrame({ children }: AppFrameProps) {
 
   const setRightDrawerTab = useCallback((tab: "queue" | "lyrics") => {
     setRightDrawerTabState(tab);
-    localStorage.setItem("liner_right_drawer_tab", tab);
+    localStorage.setItem("neritium_right_drawer_tab", tab);
   }, []);
 
   const openRightPanel = useCallback(
@@ -766,9 +767,9 @@ export default function AppFrame({ children }: AppFrameProps) {
     <div
       ref={appFrameRef}
       data-custom-bg={hasCustomBg ? "true" : undefined}
-      className={`safe-area-shell isolate relative flex flex-row h-full w-full overflow-hidden ${
-        isEdgeToEdge ? "rounded-none p-0" : "rounded-5xl p-2"
-      } bg-bg-canvas gap-2`}
+      className={`safe-area-shell isolate relative flex h-full w-full overflow-hidden flex-col md:flex-row ${
+        isEdgeToEdge ? "gap-0 p-0" : "gap-2 p-2"
+      } bg-bg-canvas`}
       onScroll={(e) => {
         if (e.currentTarget.scrollLeft !== 0) e.currentTarget.scrollLeft = 0;
         if (e.currentTarget.scrollTop !== 0) e.currentTarget.scrollTop = 0;
@@ -802,7 +803,7 @@ export default function AppFrame({ children }: AppFrameProps) {
 
       <aside
         ref={sidebarRef}
-        className="block w-[58px] h-full shrink-0 z-[45] relative"
+        className="hidden h-full w-[60px] shrink-0 md:block"
       >
         <Sidebar
           searchOpen={searchOpen}
@@ -811,7 +812,7 @@ export default function AppFrame({ children }: AppFrameProps) {
         />
       </aside>
 
-      <div className="relative z-[1] flex-1 flex flex-col min-w-0 min-h-0 h-full gap-2 overflow-hidden">
+      <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden">
         <main
           data-custom-bg={hasCustomBg ? "true" : undefined}
           className={`flex-1 min-w-0 flex flex-col relative h-full ${
@@ -1147,6 +1148,8 @@ export default function AppFrame({ children }: AppFrameProps) {
         </motion.div>
       )}      </AnimatePresence>
 
+
+      <MobileDock searchOpen={searchOpen} onSearchToggle={handleSearchToggle} />
 
       <AddToPlaylistModal />
       <AddToLibraryModal />

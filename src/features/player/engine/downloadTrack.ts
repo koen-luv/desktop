@@ -45,7 +45,7 @@ export function downloadFileName(track: Track, mimeType: string): string {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 120);
-  return `${base || "liner-track"}.${extensionForMimeType(mimeType)}`;
+  return `${base || "neritium-track"}.${extensionForMimeType(mimeType)}`;
 }
 
 function makeRequestId(): string {

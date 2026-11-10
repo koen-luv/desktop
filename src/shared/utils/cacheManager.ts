@@ -1,4 +1,4 @@
-import { linerDb } from "@/shared/storage/linerDb";
+import { neritiumDb } from "@/shared/storage/neritiumDb";
 import {
   audioCache,
   DEFAULT_AUDIO_CACHE_LIMIT_BYTES,
@@ -21,10 +21,10 @@ export async function setAudioCacheLimitBytes(bytes: number): Promise<void> {
 }
 
 const PRESERVED_STORAGE_KEYS = new Set([
-  "liner_access_token",
-  "liner_refresh_token",
-  "liner_auth_session",
-  "liner_locale",
+  "neritium_access_token",
+  "neritium_refresh_token",
+  "neritium_auth_session",
+  "neritium_locale",
   "theme",
 ]);
 
@@ -68,9 +68,9 @@ export async function clearMediaAndCoverCache(): Promise<void> {
       const key = localStorage.key(i);
       if (
         key &&
-        (key.startsWith("liner:playlist-covers") ||
-          key.startsWith("liner:cover:") ||
-          key.startsWith("liner:cache:"))
+        (key.startsWith("neritium:playlist-covers") ||
+          key.startsWith("neritium:cover:") ||
+          key.startsWith("neritium:cache:"))
       ) {
         keysToRemove.push(key);
       }
@@ -88,7 +88,7 @@ export async function clearSearchAndQueryCache(): Promise<void> {
   queryCache.clear();
   try {
     useSearchHistoryStore.getState().clearHistory();
-    debouncedStorage.removeItem("liner_search_history");
+    debouncedStorage.removeItem("neritium_search_history");
     debouncedStorage.flush();
   } catch {
     // Best-effort in non-store environments
@@ -100,11 +100,11 @@ export async function clearSearchAndQueryCache(): Promise<void> {
       const key = localStorage.key(i);
       if (
         key &&
-        (key.startsWith("liner:search:") ||
-          key.startsWith("liner:query:") ||
-          key.startsWith("liner_search_") ||
+        (key.startsWith("neritium:search:") ||
+          key.startsWith("neritium:query:") ||
+          key.startsWith("neritium_search_") ||
           key.startsWith("search-cache") ||
-          key === "liner_search_history")
+          key === "neritium_search_history")
       ) {
         keysToRemove.push(key);
       }
@@ -122,7 +122,7 @@ export async function clearApplicationCacheSafely(): Promise<void> {
   clearCoverRegistry();
   try {
     useSearchHistoryStore.getState().clearHistory();
-    debouncedStorage.removeItem("liner_search_history");
+    debouncedStorage.removeItem("neritium_search_history");
     debouncedStorage.flush();
   } catch {}
 
@@ -137,7 +137,7 @@ export async function clearApplicationCacheSafely(): Promise<void> {
       const key = localStorage.key(i);
       if (key && !PRESERVED_STORAGE_KEYS.has(key)) {
         if (
-          key.startsWith("liner:") ||
+          key.startsWith("neritium:") ||
           key.startsWith("lyrics-storage") ||
           key === "player-temp"
         ) {
@@ -157,9 +157,9 @@ async function getCoverCacheBytes(): Promise<{ bytes: number; count: number }> {
     return { bytes: 0, count: 0 };
   }
   try {
-    const hasCovers = await window.caches.has("liner-covers-v2");
+    const hasCovers = await window.caches.has("neritium-covers-v2");
     if (!hasCovers) return { bytes: 0, count: 0 };
-    const cache = await window.caches.open("liner-covers-v2");
+    const cache = await window.caches.open("neritium-covers-v2");
     const requests = await cache.keys();
     const count = requests.length;
     if (count === 0) return { bytes: 0, count: 0 };
@@ -208,19 +208,19 @@ export async function getStorageAnalytics(): Promise<StorageAnalytics> {
     cachePath: string;
   } | null = null;
 
-  if (typeof window !== "undefined" && window.linerElectron?.getCacheStats) {
+  if (typeof window !== "undefined" && window.neritiumElectron?.getCacheStats) {
     try {
-      electronStats = await window.linerElectron.getCacheStats();
+      electronStats = await window.neritiumElectron.getCacheStats();
       if (electronStats.cachePath) {
         cachePath = electronStats.cachePath;
       }
     } catch {}
   }
 
-  // 2. indexeddb audio tracks & metadata added in linerDb
+  // 2. indexeddb audio tracks & metadata added in neritiumDb
   try {
-    const audioTrackBytes = await linerDb.getTotalTrackBytes();
-    const audioBlobBytes = await linerDb.getTotalAudioBytes();
+    const audioTrackBytes = await neritiumDb.getTotalTrackBytes();
+    const audioBlobBytes = await neritiumDb.getTotalAudioBytes();
     audioBytes = audioTrackBytes + audioBlobBytes;
   } catch {}
 
@@ -255,17 +255,17 @@ export async function getStorageAnalytics(): Promise<StorageAnalytics> {
     }
   }
 
-  // 4. lyrics cache added in lyricsCache.ts + linerDb lyrics
+  // 4. lyrics cache added in lyricsCache.ts + neritiumDb lyrics
   try {
-    const lBytes = await linerDb.getTotalLyricsBytes();
+    const lBytes = await neritiumDb.getTotalLyricsBytes();
     const lStats = lyricsCache.getStats();
     lyricsBytes = lBytes + lStats.bytes;
   } catch {}
 
-  // 5. in-memory catalog cache added in queryCache.ts + linerDb artists
+  // 5. in-memory catalog cache added in queryCache.ts + neritiumDb artists
   try {
     const qStats = queryCache.getStats();
-    const aBytes = await linerDb.getTotalArtistBytes();
+    const aBytes = await neritiumDb.getTotalArtistBytes();
     metadataBytes += qStats.bytes + aBytes;
   } catch {}
 
@@ -276,27 +276,27 @@ export async function getStorageAnalytics(): Promise<StorageAnalytics> {
       if (!k) continue;
       const v = localStorage.getItem(k) || "";
       const size = (k.length + v.length) * 2;
-      if (k.startsWith("liner:playlist-covers") || k.startsWith("liner:cover:")) {
+      if (k.startsWith("neritium:playlist-covers") || k.startsWith("neritium:cover:")) {
         coversBytes += size;
       } else if (
-        k.startsWith("liner:search:") ||
-        k.startsWith("liner:query:") ||
-        k.startsWith("liner_search_") ||
+        k.startsWith("neritium:search:") ||
+        k.startsWith("neritium:query:") ||
+        k.startsWith("neritium_search_") ||
         k.startsWith("search-cache") ||
-        k === "liner_search_history"
+        k === "neritium_search_history"
       ) {
         metadataBytes += size;
-      } else if (k.startsWith("liner:artist:")) {
+      } else if (k.startsWith("neritium:artist:")) {
         metadataBytes += size;
       } else if (
-        k.startsWith("liner_lyrics_") ||
+        k.startsWith("neritium_lyrics_") ||
         k.startsWith("lyrics-storage")
       ) {
         if (
-          !k.startsWith("liner_lyrics_v2_item_") &&
-          k !== "liner_lyrics_v2_index" &&
-          !k.startsWith("liner_lyrics_item_") &&
-          k !== "liner_lyrics_lru_index"
+          !k.startsWith("neritium_lyrics_v2_item_") &&
+          k !== "neritium_lyrics_v2_index" &&
+          !k.startsWith("neritium_lyrics_item_") &&
+          k !== "neritium_lyrics_lru_index"
         ) {
           lyricsBytes += size;
         }
@@ -369,32 +369,32 @@ export async function clearStorageCategories(categoryIds: StorageCategoryId[]): 
 
   if (set.has("audio")) {
     audioCache.invalidate();
-    await linerDb.clearStore("audio");
-    await linerDb.clearStore("tracks");
+    await neritiumDb.clearStore("audio");
+    await neritiumDb.clearStore("tracks");
     if (isAllCategories) {
-      await linerDb.close();
+      await neritiumDb.close();
     }
-    if (typeof window !== "undefined" && window.linerElectron?.clearAudioCache) {
-      await window.linerElectron.clearAudioCache(isAllCategories);
+    if (typeof window !== "undefined" && window.neritiumElectron?.clearAudioCache) {
+      await window.neritiumElectron.clearAudioCache(isAllCategories);
     }
   }
 
   if (set.has("covers")) {
     await clearMediaAndCoverCache();
-    if (typeof window !== "undefined" && window.linerElectron?.clearCoversCache) {
-      await window.linerElectron.clearCoversCache();
+    if (typeof window !== "undefined" && window.neritiumElectron?.clearCoversCache) {
+      await window.neritiumElectron.clearCoversCache();
     }
   }
 
   if (set.has("lyrics")) {
     lyricsCache.clear();
-    await linerDb.clearStore("lyrics");
+    await neritiumDb.clearStore("lyrics");
     if (typeof window !== "undefined" && window.localStorage) {
       localStorage.removeItem("lyrics-storage");
       const toRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && k.startsWith("liner_lyrics_")) toRemove.push(k);
+        if (k && k.startsWith("neritium_lyrics_")) toRemove.push(k);
       }
       toRemove.forEach((k) => localStorage.removeItem(k));
     }
@@ -402,7 +402,7 @@ export async function clearStorageCategories(categoryIds: StorageCategoryId[]): 
 
   if (set.has("metadata")) {
     queryCache.clear();
-    await linerDb.clearStore("artists");
+    await neritiumDb.clearStore("artists");
     await clearSearchAndQueryCache();
     if (typeof window !== "undefined" && window.localStorage) {
       const toRemove: string[] = [];
@@ -410,12 +410,12 @@ export async function clearStorageCategories(categoryIds: StorageCategoryId[]): 
         const k = localStorage.key(i);
         if (
           k &&
-          (k.startsWith("liner:artist:") ||
-            k.startsWith("liner:search:") ||
-            k.startsWith("liner:query:") ||
-            k.startsWith("liner_search_") ||
+          (k.startsWith("neritium:artist:") ||
+            k.startsWith("neritium:search:") ||
+            k.startsWith("neritium:query:") ||
+            k.startsWith("neritium_search_") ||
             k.startsWith("search-cache") ||
-            k === "liner_search_history")
+            k === "neritium_search_history")
         ) {
           toRemove.push(k);
         }
@@ -424,14 +424,14 @@ export async function clearStorageCategories(categoryIds: StorageCategoryId[]): 
     }
   }
 
-  if (typeof window !== "undefined" && window.linerElectron?.clearHttpCache) {
-    await window.linerElectron.clearHttpCache();
+  if (typeof window !== "undefined" && window.neritiumElectron?.clearHttpCache) {
+    await window.neritiumElectron.clearHttpCache();
   }
 }
 
 export async function openCacheFolder(): Promise<boolean> {
-  if (typeof window !== "undefined" && window.linerElectron?.openCacheFolder) {
-    return window.linerElectron.openCacheFolder();
+  if (typeof window !== "undefined" && window.neritiumElectron?.openCacheFolder) {
+    return window.neritiumElectron.openCacheFolder();
   }
   return false;
 }
@@ -448,7 +448,7 @@ export function formatStorageBytes(bytes: number): string {
   return `${gb.toFixed(2)} GB`;
 }
 
-const CACHE_ANALYTICS_STORAGE_KEY = "liner_cached_storage_analytics";
+const CACHE_ANALYTICS_STORAGE_KEY = "neritium_cached_storage_analytics";
 
 function readPersistedAnalytics(): StorageAnalytics | null {
   if (typeof window === "undefined" || !window.sessionStorage) return null;

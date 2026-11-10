@@ -56,7 +56,7 @@ export default function CheckFrame({ request, attempt }: CheckFrameProps) {
 }
 
 /**
- * Renders the widget created for Liner in the app itself and hands its token
+ * Renders the widget created for Neritium in the app itself and hands its token
  * straight to the auth flow.
  */
 function TurnstileCheck({

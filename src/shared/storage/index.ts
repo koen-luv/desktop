@@ -1,10 +1,10 @@
 export {
-  linerDb,
+  neritiumDb,
   type CachedTrackRecord,
   type CachedAudioRecord,
   type CachedLyricsRecord,
   type CachedArtistRecord,
-} from "./linerDb";
+} from "./neritiumDb";
 export {
   audioCache,
   AUDIO_CACHE_LIMIT_STORAGE_KEY,

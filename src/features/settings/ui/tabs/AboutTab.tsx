@@ -55,15 +55,15 @@ export function AboutTab({ searchQuery }: { searchQuery?: string }) {
 
   useEffect(() => {
     // dynamically query electron runtime version & bundle status
-    if (window.linerElectron) {
-      window.linerElectron
+    if (window.neritiumElectron) {
+      window.neritiumElectron
         .getAppVersion?.()
         .then((ver) => {
           if (ver) setAppVersion(ver);
         })
         .catch(() => {});
 
-      window.linerElectron
+      window.neritiumElectron
         .bundleGetStatus?.()
         .then((status) => {
           if (status) {
@@ -109,7 +109,7 @@ export function AboutTab({ searchQuery }: { searchQuery?: string }) {
     if (!searchQuery?.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
     const searchableKeys = [
-      "settings.about.liner",
+      "settings.about.neritium",
       "settings.about.tagline",
       "settings.about.updates_title",
       "settings.about.build_info",
@@ -133,7 +133,7 @@ export function AboutTab({ searchQuery }: { searchQuery?: string }) {
                 ? logo
                 : brandingLogos[accentVariant]
             }
-            alt="Liner Logo"
+            alt="Neritium Logo"
             width={44}
             height={44}
             className={
@@ -155,7 +155,7 @@ export function AboutTab({ searchQuery }: { searchQuery?: string }) {
             className="text-text-primary text-[20px] font-[600] tracking-[-0.01em] leading-none m-0"
             style={font}
           >
-            {t("settings.about.liner")}
+            {t("settings.about.neritium")}
           </h2>
           <div
             className="inline-flex items-center gap-[5px] h-[22px] rounded-full bg-border-alpha-14 px-[9px] border border-border-primary/40 text-[11.5px] font-[500] text-text-secondary leading-none select-none"

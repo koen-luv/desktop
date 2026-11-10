@@ -40,7 +40,7 @@ describe("useWindowState", () => {
     document.body.className = "h-full w-full bg-transparent overflow-hidden p-1";
     document.body.removeAttribute("data-edge-to-edge");
 
-    (window as any).linerElectron = {
+    (window as any).neritiumElectron = {
       isFullScreen: mockIsFullScreen,
       isMaximized: mockIsMaximized,
       toggleFullScreen: vi.fn().mockResolvedValue(undefined),
@@ -63,7 +63,7 @@ describe("useWindowState", () => {
     root = null;
     container = null;
     latestState = null;
-    delete (window as any).linerElectron;
+    delete (window as any).neritiumElectron;
     vi.restoreAllMocks();
   });
 
@@ -186,8 +186,8 @@ describe("useWindowState", () => {
     expect(removeEventListenerSpy).toHaveBeenCalledWith("resize", expect.any(Function));
   });
 
-  it("works safely when window.linerElectron is undefined (browser mode)", async () => {
-    delete (window as any).linerElectron;
+  it("works safely when window.neritiumElectron is undefined (browser mode)", async () => {
+    delete (window as any).neritiumElectron;
 
     await mount();
 
@@ -199,7 +199,7 @@ describe("useWindowState", () => {
   });
 
   it("enters and exits fullscreen via fullscreenchange in browser mode", async () => {
-    delete (window as any).linerElectron;
+    delete (window as any).neritiumElectron;
 
     await mount();
 
@@ -295,7 +295,7 @@ describe("useWindowState", () => {
     window.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true);
-    expect(window.linerElectron?.toggleFullScreen).toHaveBeenCalledTimes(1);
+    expect(window.neritiumElectron?.toggleFullScreen).toHaveBeenCalledTimes(1);
   });
 
   it("does not retrigger native fullscreen while F11 is held", async () => {
@@ -305,7 +305,7 @@ describe("useWindowState", () => {
       new KeyboardEvent("keydown", { key: "F11", repeat: true, cancelable: true }),
     );
 
-    expect(window.linerElectron?.toggleFullScreen).not.toHaveBeenCalled();
+    expect(window.neritiumElectron?.toggleFullScreen).not.toHaveBeenCalled();
   });
 
   it("updates document.body classes and data-edge-to-edge attribute", async () => {

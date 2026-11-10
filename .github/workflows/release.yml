@@ -197,8 +197,8 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/liner-release.jks
-            printf 'storeFile=liner-release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/neritium-release.jks
+            printf 'storeFile=neritium-release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
               "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD" \
               > android/keystore.properties
             echo "Release keystore configured — APK will be signed."
@@ -271,12 +271,12 @@ jobs:
       - name: Archive app (unsigned)
         run: |
           xcodebuild \
-            -project ios/Liner.xcodeproj \
-            -scheme Liner \
+            -project ios/Neritium.xcodeproj \
+            -scheme Neritium \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath ios/build/DerivedData \
-            -archivePath ios/build/Liner.xcarchive \
+            -archivePath ios/build/Neritium.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -285,19 +285,19 @@ jobs:
       - name: Package unsigned IPA
         run: |
           set -euo pipefail
-          APP="ios/build/Liner.xcarchive/Products/Applications/Liner.app"
+          APP="ios/build/Neritium.xcarchive/Products/Applications/Neritium.app"
           test -d "$APP"
-          rm -rf ios/build/Payload Liner-unsigned.ipa
+          rm -rf ios/build/Payload Neritium-unsigned.ipa
           mkdir -p ios/build/Payload
           cp -R "$APP" ios/build/Payload/
-          (cd ios/build && ditto -c -k --sequesterRsrc --keepParent Payload ../../Liner-unsigned.ipa)
-          ls -lh Liner-unsigned.ipa
+          (cd ios/build && ditto -c -k --sequesterRsrc --keepParent Payload ../../Neritium-unsigned.ipa)
+          ls -lh Neritium-unsigned.ipa
 
       - name: Upload iOS Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa
-          path: Liner-unsigned.ipa
+          path: Neritium-unsigned.ipa
           if-no-files-found: error
           retention-days: 30
 
@@ -332,7 +332,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release.outputs.tag }}
-          name: Liner ${{ steps.release.outputs.tag }}
+          name: Neritium ${{ steps.release.outputs.tag }}
           generate_release_notes: true
           files: |
             artifacts/linux-packages/*.AppImage

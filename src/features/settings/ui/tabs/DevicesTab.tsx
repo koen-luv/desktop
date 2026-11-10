@@ -43,7 +43,7 @@ export function DevicesTab({ searchQuery }: { searchQuery?: string }) {
 
   const canHostLocally =
     typeof window !== "undefined" &&
-    Boolean(window.linerElectron?.startLanHost && window.linerElectron?.onLanAnswer);
+    Boolean(window.neritiumElectron?.startLanHost && window.neritiumElectron?.onLanAnswer);
   const showController = matches(
     t("settings.devices.controller_title"),
     t("settings.devices.controller_desc"),

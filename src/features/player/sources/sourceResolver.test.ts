@@ -61,7 +61,7 @@ describe("source resolver quality tiers", () => {
     const calls: string[] = [];
     __setCustomProviders([
       makeProvider("youtube", 110, false, calls),
-      makeProvider("liner", 100, true, calls),
+      makeProvider("neritium", 100, true, calls),
     ]);
 
     const resolution = await resolvePlayback({ track, quality: "high" });
@@ -74,12 +74,12 @@ describe("source resolver quality tiers", () => {
     const calls: string[] = [];
     __setCustomProviders([
       makeProvider("youtube", 110, false, calls),
-      makeProvider("liner", 100, true, calls),
+      makeProvider("neritium", 100, true, calls),
     ]);
 
     const resolution = await resolvePlayback({ track, quality: "lossless" });
 
-    expect(resolution.providerId).toBe("liner");
+    expect(resolution.providerId).toBe("neritium");
     expect(resolution.stream.quality).toBe("lossless");
     expect(calls).toEqual(["lossless"]);
   });
@@ -88,7 +88,7 @@ describe("source resolver quality tiers", () => {
     const calls: string[] = [];
     __setCustomProviders([
       makeProvider("youtube", 110, false, calls),
-      makeProvider("liner", 100, true, calls, true),
+      makeProvider("neritium", 100, true, calls, true),
     ]);
 
     const resolution = await resolvePlayback({ track, quality: "lossless" });

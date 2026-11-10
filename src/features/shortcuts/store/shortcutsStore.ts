@@ -23,8 +23,8 @@ interface ShortcutsStoreState extends ShortcutsSettings {
 }
 
 function notifyElectronGlobalShortcuts(global: GlobalShortcutsSettings) {
-  if (typeof window !== "undefined" && window.linerElectron?.updateOverlaySettings) {
-    window.linerElectron.updateOverlaySettings({
+  if (typeof window !== "undefined" && window.neritiumElectron?.updateOverlaySettings) {
+    window.neritiumElectron.updateOverlaySettings({
       shortcut: global.toggleOverlay,
       likeShortcut: global.quickLikeSong,
     });
@@ -39,8 +39,8 @@ export const useShortcutsStore = create<ShortcutsStoreState>()(
 
       setIsRecording: (recording: boolean) => {
         set({ isRecording: recording });
-        if (typeof window !== "undefined" && window.linerElectron?.pauseOverlayShortcuts) {
-          window.linerElectron.pauseOverlayShortcuts(recording);
+        if (typeof window !== "undefined" && window.neritiumElectron?.pauseOverlayShortcuts) {
+          window.neritiumElectron.pauseOverlayShortcuts(recording);
         }
       },
 
@@ -119,7 +119,7 @@ export const useShortcutsStore = create<ShortcutsStoreState>()(
       },
     }),
     {
-      name: "liner_shortcuts_settings_v1",
+      name: "neritium_shortcuts_settings_v1",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         global: state.global,

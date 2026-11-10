@@ -303,7 +303,7 @@ describe("auth-session token system", () => {
       const rotated = { ...base(), accessToken: "other_window_token", refreshToken: "rt_9" };
       globalThis.fetch = vi.fn().mockImplementation(async () => {
         // another window finished a refresh meanwhile
-        storageMap.set("liner_auth_session", JSON.stringify(rotated));
+        storageMap.set("neritium_auth_session", JSON.stringify(rotated));
         return reject(401, "TOKEN_REUSED");
       }) as any;
       const res = await refreshAuthSession();

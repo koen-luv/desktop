@@ -3,6 +3,7 @@ import type { ImportJob, ImportReview } from "@/shared/api";
 import type { ImportSource, Track } from "@/shared/contracts";
 import { notifyLibraryChanged } from "../hooks/usePlaylists";
 import { detectImportSource } from "../services/import";
+import type { ClientImportedPlaylist } from "../services/import/importTypes";
 import { runClientImport, type ImportProgress } from "../services/import/manager/clientImportManager";
 import {
   createLocalImportJob,
@@ -21,6 +22,8 @@ export interface ActiveImportState {
   reviewItems: ImportReview[] | null;
   approvedTracks: Track[] | null;
   startImport: (url: string, pendingTrack?: TrackDetail | null) => Promise<ImportJob>;
+  /** Imports a playlist already resolved on the client (e.g. Spotify account). */
+  startAccountImport: (playlist: ClientImportedPlaylist) => Promise<ImportJob>;
   cancelPolling: () => void;
   reset: () => void;
 }
@@ -61,6 +64,48 @@ export const useImportStore = create<ActiveImportState>((set, get) => ({
   cancelPolling: () => {
     cleanupActiveImport();
     set({ isPolling: false });
+  },
+
+  startAccountImport: async (playlist: ClientImportedPlaylist) => {
+    get().cancelPolling();
+    const job = createLocalImportJob(playlist.source, playlist.sourceUrl);
+    const controller = new AbortController();
+    activeAbortController = controller;
+    set({ job, error: null, isPolling: true, pendingTrack: null, reviewItems: null, approvedTracks: null });
+
+    void (async () => {
+      try {
+        const outcome = await runClientImport(playlist.sourceUrl, {
+          signal: controller.signal,
+          playlist,
+          onProgress: (progress) => updateLocalImportJob(job.id, progressPatch(progress)),
+        });
+        if (controller.signal.aborted) return;
+        const meta = { title: outcome.title, description: outcome.description, result: outcome.result };
+
+        if (outcome.reviewItems.length > 0) {
+          updateLocalImportJob(job.id, { ...meta, status: "awaiting_decision", requiresDecision: true }, outcome.reviewItems);
+          set({ isPolling: false, reviewItems: outcome.reviewItems, approvedTracks: outcome.approvedTracks });
+          useModalStore.setState({ importReviewPrefetched: outcome.reviewItems, importReviewApprovedTracks: outcome.approvedTracks });
+          useModalStore.getState().openImportReview(job.id, outcome.reviewItems, outcome.approvedTracks);
+          return;
+        }
+
+        updateLocalImportJob(job.id, meta);
+        await finalizeLocalImport(job.id, outcome.approvedTracks, outcome.title, outcome.description);
+        set({ isPolling: false });
+        notifyLibraryChanged();
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        const message = errorMessage(error);
+        updateLocalImportJob(job.id, { status: "failed", error: { code: "IMPORT_FAILED", message } });
+        set({ isPolling: false, error: message });
+      } finally {
+        if (activeAbortController === controller) activeAbortController = null;
+      }
+    })();
+
+    return job;
   },
 
   startImport: async (url: string, pendingTrack: TrackDetail | null = null) => {

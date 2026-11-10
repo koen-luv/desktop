@@ -44,7 +44,7 @@ export const usePlaylistViewStore = create<PlaylistViewState>()(
         }),
     }),
     {
-      name: "liner:playlist-view-v1",
+      name: "neritium:playlist-view-v1",
       storage: createJSONStorage(() => debouncedStorage),
     },
   ),

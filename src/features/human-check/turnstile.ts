@@ -1,5 +1,5 @@
 /**
- * The Turnstile widget created for Liner. The site key is public — it only names
+ * The Turnstile widget created for Neritium. The site key is public — it only names
  * the widget; the matching secret stays on the api and is never shipped here.
  * `VITE_TURNSTILE_SITE_KEY` lets a build point at a different widget (a staging
  * one, or a replacement key) without a code change.

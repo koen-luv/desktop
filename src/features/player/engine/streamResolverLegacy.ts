@@ -52,7 +52,7 @@ export function classifySourceError(err: unknown, providerId: string): SourceErr
 }
 
 /**
- * Best-effort expiry extraction. Signed media URLs (googlevideo / Liner proxy)
+ * Best-effort expiry extraction. Signed media URLs (googlevideo / Neritium proxy)
  * embed `expire=<epoch seconds>`; fall back to the session's `expiresAt`.
  */
 export function streamExpiryMs(url: string, sessionExpiresAt?: string): number | null {
@@ -89,7 +89,7 @@ export async function executeDirectPlanStream(
   rawSession: PlaybackSession,
   options: StreamResolveOptions = {},
 ): Promise<ResolvedStream> {
-  const providerId = options.providerId ?? "liner-direct";
+  const providerId = options.providerId ?? "neritium-direct";
   const session = asSessionResponse(rawSession);
   if (!session.endpoint || !session.body) {
     throw new SourceError(
@@ -138,11 +138,11 @@ export async function executeDirectPlanStream(
 }
 
 /**
- * Resolves a direct media URL by asking Liner's resolver endpoint for the
+ * Resolves a direct media URL by asking Neritium's resolver endpoint for the
  * signed Innertube player request, then executing it from the client using the
  * project's request signing (WASM / Electron RSA / WebCrypto).
  *
- * The stream URL itself is never proxied through Liner ΓÇö it is fetched from
+ * The stream URL itself is never proxied through Neritium ΓÇö it is fetched from
  * the media host (googlevideo.com) directly, exactly as the browser does when
  * streaming.
  */
@@ -150,7 +150,7 @@ export async function resolveDirectInnertubeStream(
   track: Track,
   options: StreamResolveOptions = {},
 ): Promise<ResolvedStream> {
-  const providerId = options.providerId ?? "liner-innertube";
+  const providerId = options.providerId ?? "neritium-innertube";
   const session = await api.createPlaybackSession(
     track.id,
     options.preferredCodec,
@@ -178,7 +178,7 @@ export function resolveProxySessionStream(
   rawSession: PlaybackSession,
   options: StreamResolveOptions = {},
 ): ResolvedStream {
-  const providerId = options.providerId ?? "liner-proxy";
+  const providerId = options.providerId ?? "neritium-proxy";
   const session = asSessionResponse(rawSession);
   if (!session.streamUrl) {
     throw new SourceError(
@@ -203,7 +203,7 @@ export function resolveProxySessionStream(
 }
 
 /**
- * Resolves a stream served by Liner's own proxy transport. This transport is
+ * Resolves a stream served by Neritium's own proxy transport. This transport is
  * only used when the provider explicitly supports it (the resolver endpoint
  * returns 404 otherwise).
  */
@@ -211,7 +211,7 @@ export async function resolveProxyInnertubeStream(
   track: Track,
   options: StreamResolveOptions = {},
 ): Promise<ResolvedStream> {
-  const providerId = options.providerId ?? "liner-proxy";
+  const providerId = options.providerId ?? "neritium-proxy";
   const session = await api.createPlaybackSession(
     track.id,
     options.preferredCodec,

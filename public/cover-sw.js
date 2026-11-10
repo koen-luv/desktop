@@ -1,4 +1,4 @@
-const CACHE_NAME = "liner-covers-v2";
+const CACHE_NAME = "neritium-covers-v2";
 const MAX_ENTRIES = 600;
 
 const COVER_HOSTS = [

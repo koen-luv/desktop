@@ -20,7 +20,7 @@
 # ios (generated project, synced renderer bundle, build products)
 /ios/Web/
 /ios/Info.plist
-/ios/Liner.xcodeproj/
+/ios/Neritium.xcodeproj/
 /ios/build/
 /ios/*.ipa
 /ios/build/Payload/
@@ -62,7 +62,7 @@ renderer.log
 *.tsbuildinfo
 
 # cache
-.liner_local_cache
+.neritium_local_cache
 signer/
 
 # agent rules

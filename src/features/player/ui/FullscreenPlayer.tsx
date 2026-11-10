@@ -139,7 +139,7 @@ function BraccatoLyricsView({ lyrics }: BraccatoLyricsViewProps) {
     el.lyrics = latestLyricsRef.current;
     const androidClock = isAndroidApp();
     if (!androidClock) {
-      el.source = "#liner-audio";
+      el.source = "#neritium-audio";
     }
 
     const handleBraccatoLineClick = (e: Event) => {
@@ -225,7 +225,7 @@ function BraccatoLyricsView({ lyrics }: BraccatoLyricsViewProps) {
           el.playing = state.status === "playing";
         } catch {}
       } else {
-        const audioEl = document.getElementById("liner-audio") as HTMLAudioElement | null;
+        const audioEl = document.getElementById("neritium-audio") as HTMLAudioElement | null;
         if (audioEl && !Number.isNaN(audioEl.currentTime)) {
           currentMs = audioEl.currentTime * 1000;
         }
@@ -320,7 +320,7 @@ function BraccatoLyricsView({ lyrics }: BraccatoLyricsViewProps) {
     const holdTop = () => {
       const el = elementRef.current as HTMLElement & { renderer?: { noteUserScroll?: () => void; resumeAutoscroll?: () => void } };
       if (!pinnedToTopRef.current) return;
-      const audio = document.getElementById("liner-audio") as HTMLAudioElement | null;
+      const audio = document.getElementById("neritium-audio") as HTMLAudioElement | null;
       const release = shouldReleaseTopPin({
         status: playerEngine.getSnapshot().status,
         audioPaused: !audio || audio.paused,
@@ -346,7 +346,7 @@ function BraccatoLyricsView({ lyrics }: BraccatoLyricsViewProps) {
     <div className="relative flex flex-col flex-1 w-full h-full min-h-0">
       {createElement(BRACCATO_TAG, {
         ref: setElement,
-        ...(isAndroidApp() ? {} : { source: "#liner-audio" }),
+        ...(isAndroidApp() ? {} : { source: "#neritium-audio" }),
         className: "block flex-1 w-full h-full px-4 md:px-6",
         style: {
           overflowY: "auto",

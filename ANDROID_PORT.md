@@ -1,4 +1,4 @@
-# Liner for Android
+# Neritium for Android
 
 The desktop application in this repository now also ships as a native Android app.
 The Electron renderer is reused unchanged; a thin platform boundary supplies the
@@ -7,11 +7,11 @@ Media3 playback service.
 
 ```
 desktop (unchanged)                     android
-Electron main/preload  ──┐              MainActivity (WebView) + LinerBridge
-                         ├─ window.linerElectron ─┐
-LinerBridge (Kotlin)   ──┘                       ├─ React/TS renderer (same code)
+Electron main/preload  ──┐              MainActivity (WebView) + NeritiumBridge
+                         ├─ window.neritiumElectron ─┐
+NeritiumBridge (Kotlin)   ──┘                       ├─ React/TS renderer (same code)
                                                  │
-                       window.LinerAndroid ──────┘
+                       window.NeritiumAndroid ──────┘
                                 │
                 ┌───────────────┼────────────────┬──────────────┐
          PlaybackService   CorsProxy          Http (OkHttp)   AudioCache
@@ -37,9 +37,9 @@ cd android
 Release signing is read from `android/keystore.properties` (gitignored):
 
 ```properties
-storeFile=liner-release.jks
+storeFile=neritium-release.jks
 storePassword=…
-keyAlias=liner
+keyAlias=neritium
 keyPassword=…
 ```
 
@@ -57,11 +57,11 @@ adb install -r android/app/build/outputs/apk/release/app-release.apk
 | Desktop (Electron) | Android implementation |
 | --- | --- |
 | `signRequest`, `signCoverUrl`, `syncServerTime` (native) | the same production WASM signer, bundled into the renderer (`src/platform/signerWasm.ts`) |
-| `net.fetch` through the main process | `LinerBridge.httpRequest` (OkHttp, async response events) for POST/PUT/PATCH/DELETE and YouTube hosts; `shouldInterceptRequest` (`CorsProxy.kt`) rewrites duplicated `Access-Control-Allow-Origin` headers for GET/HEAD and streams SSE lyrics |
+| `net.fetch` through the main process | `NeritiumBridge.httpRequest` (OkHttp, async response events) for POST/PUT/PATCH/DELETE and YouTube hosts; `shouldInterceptRequest` (`CorsProxy.kt`) rewrites duplicated `Access-Control-Allow-Origin` headers for GET/HEAD and streams SSE lyrics |
 | localStorage / IndexedDB | the same WebView storage; the app cache is exposed through `getCacheStats`, `clearCoversCache`, `clearAudioCache`, `clearHttpCache` |
 | `HTMLAudioElement` + Web Audio + pitch shifter | `PlaybackService` (Media3 `ExoPlayer` + `MediaLibraryService`), audio focus, wake lock, headphone unplug, notification/lockscreen/Bluetooth controls, Android Auto browse tree |
 | `shell.openExternal`, clipboard, share | `openExternal`, `copyText`, `shareText` |
-| deep links via `liner://` protocol handler | `liner://` intent filter → `__linerAndroidEmit("deeplink", …)` |
+| deep links via `neritium://` protocol handler | `neritium://` intent filter → `__neritiumAndroidEmit("deeplink", …)` |
 | window controls, Hyprland overlay, Touch Bar sync | not applicable on Android (no dead code is shipped in their place) |
 
 Request signing is unchanged: the Android build runs the exact WASM module the
@@ -90,7 +90,7 @@ nonce. Nothing is signed with a secret baked into the APK.
   station refill the queue from the Innertube `next` endpoint. YouTube Music
   sends no CORS headers, so the renderer sends that request through the
   platform HTTP layer (`platformFetch`): on Android it leaves through
-  `LinerBridge.httpRequest` (OkHttp), which mirrors the target's own `Origin`
+  `NeritiumBridge.httpRequest` (OkHttp), which mirrors the target's own `Origin`
   header — YouTube answers "Origin doesn't match Host" otherwise. The plain
   browser `fetch` is only used on the desktop, where Electron runs without
   CORS restrictions.
@@ -120,12 +120,12 @@ nonce. Nothing is signed with a secret baked into the APK.
 
 | Feature | State |
 | --- | --- |
-| Email/password login and registration, real Liner backend | verified |
+| Email/password login and registration, real Neritium backend | verified |
 | Home / discovery, popular tracks, daily mixes, radio wave | verified (real data) |
 | Search | verified through the app API layer (35 real results for a live query) |
 | Artist / album / playlist / library pages | reused unchanged; library and playlist pages verified rendering real account data |
 | Player: play, pause, seek, next, previous, repeat, shuffle, queue edits | verified (native ExoPlayer is the source of truth) |
-| Autoplay similar tracks / radio queue refill | wired through the native Innertube bridge (`platformFetch` → `LinerBridge.httpRequest`), the same path the radio wave uses |
+| Autoplay similar tracks / radio queue refill | wired through the native Innertube bridge (`platformFetch` → `NeritiumBridge.httpRequest`), the same path the radio wave uses |
 | Synchronized lyrics (line + word level) | verified: active line follows position (42.6 s → "Ай, а-а-а", 48.1 s → "Услышь, как шумит моя кожа") with line/word highlight classes |
 | Background playback, notification, lock screen, Bluetooth buttons | verified |
 | Audio focus, headphone unplug, interruptions | handled by ExoPlayer (`setAudioAttributes`, `setHandleAudioBecomingNoisy`) |
@@ -134,9 +134,9 @@ nonce. Nothing is signed with a secret baked into the APK.
 | WebGL visualizer (Kawarp shader) | runs in the WebView with a live WebGL context |
 | Settings (two-level menus: grouped categories → one category screen at a time) and persistence | verified across a full reload |
 | System back, dialogs, rotation, safe areas, font scale | verified |
-| Deep links `liner://` | wired through the same handler as desktop |
+| Deep links `neritium://` | wired through the same handler as desktop |
 | Discord Rich Presence | verified (v2): the renderer pushes the desktop-parity state/settings payloads into `DiscordRpc.kt` (WebSocket to the signed-in Discord client's local endpoint, ports 6463-6472, `10.0.2.2` on the emulator); presence follows song transitions, artwork, status format and button settings exactly like desktop |
-| Last.fm scrobbling | verified: fully client-side scrobbler (`src/features/lastfm`) — Liner's own Last.fm app is built in (custom key/secret optional), out-of-band authorization, now-playing on first playing tick, scrobble at ≥ min(duration/2, 4 min) for tracks ≥ 30 s with the playback start timestamp; settings under Playback → Last.fm |
+| Last.fm scrobbling | verified: fully client-side scrobbler (`src/features/lastfm`) — Neritium's own Last.fm app is built in (custom key/secret optional), out-of-band authorization, now-playing on first playing tick, scrobble at ≥ min(duration/2, 4 min) for tracks ≥ 30 s with the playback start timestamp; settings under Playback → Last.fm |
 | Android Auto | verified (CDP smoke on the release APK): `MediaLibraryService` with renderer-backed browse tree (Recents, Playlists, Queue, search) and play-through-the-renderer pipeline — queue and recents queries answered by the renderer (recents returned real server history with title/artists/artwork) and an `autoPlay` event with a served media id started normal playback (MiniPlayer playing with queue context); see "Android Auto" above |
 | Listen party (no backend) | client-side only: WebRTC data channel, host-authoritative sync (5 s heartbeat + 2 s guest drift tick, 2.5 s tolerance). Invite/answer SDP codes are deflate+base64url (`linerparty1.` prefix) and travel through the share sheet/clipboard; STUN-only ICE (no TURN relay — nothing to host). Guests' transport is disabled in the UI and guarded in the engine, including the Android notification/Bluetooth buttons. Unit-verified (26 tests: drift math, code round-trip/rejection, lock + nested bypass) |
 | UI smoothness pass | progress fills animate with `transform: scaleX` instead of width (TimelineSlider, MiniPlayer); Android drops `filter: blur()` from page transitions; the Auto renderer poll backs off 150 ms → 1000 ms while idle; cadence snap-back after natural track end |
@@ -151,7 +151,7 @@ losing 4 tests — a tooling memory limit, not a test failure), `./gradlew
 
 Android Auto (CDP smoke against the running release APK): an `autoBrowseQuery`
 for the queue folder was answered by the renderer (`{items:[]}` on an empty
-queue), a `recents` query returned real server history (`liner.track:` items
+queue), a `recents` query returned real server history (`neritium.track:` items
 with title, artists and artwork URL), and an `autoPlay` event carrying a served
 media id started playback through the normal pipeline (MiniPlayer showing the
 track playing with its queue context). The smoke also caught and led to a fix:
@@ -194,7 +194,7 @@ confirmed pre-existing by reproducing the hang in a clean worktree at HEAD
    apps. This is a per-app network restriction of that device's OS, not an app
    error; the app reports the failure through its normal error states. Runtime
    verification was completed on the emulator instead. Allow network access for
-   `app.tryliner.android` in MIUI's data-usage settings on such devices.
+   `app.neritium.android` in MIUI's data-usage settings on such devices.
 2. **Expired stream URLs.** A CDN can reject a resolved URL with an HTTP status
    after it expires. The player surfaces the error and the queue advances to the
    next track; a transparent re-resolve/retry is not implemented yet.

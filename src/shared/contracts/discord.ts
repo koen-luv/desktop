@@ -3,7 +3,7 @@
 // The desktop app talks to the local Discord client directly (electron/discord.ts,
 // DiscordRpc.kt on Android); mobile cannot, because Discord's local RPC only
 // exists next to a desktop client. The cloud path mirrors PreMiD's model: the
-// app links the user's Discord account to their Liner account, then reports the
+// app links the user's Discord account to their Neritium account, then reports the
 // playback state to the backend (`/v1/me/discord/*`), which maintains the
 // presence through Discord's Social SDK on the user's behalf.
 //

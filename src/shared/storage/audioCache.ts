@@ -1,7 +1,7 @@
-import { linerDb } from "./linerDb";
+import { neritiumDb } from "./neritiumDb";
 import { getAndroidBridge } from "@/platform";
 
-export const AUDIO_CACHE_LIMIT_STORAGE_KEY = "liner_audio_cache_limit_bytes";
+export const AUDIO_CACHE_LIMIT_STORAGE_KEY = "neritium_audio_cache_limit_bytes";
 export const DEFAULT_AUDIO_CACHE_LIMIT_BYTES = 3 * 1024 * 1024 * 1024;
 export const MIN_AUDIO_CACHE_LIMIT_BYTES = 250 * 1024 * 1024;
 
@@ -48,14 +48,14 @@ class AudioCache {
     const limit = customLimit !== undefined ? customLimit : this.getLimitBytes();
     if (limit <= 0) return 0;
 
-    const totalBytes = await linerDb.getTotalAudioBytes();
+    const totalBytes = await neritiumDb.getTotalAudioBytes();
     if (totalBytes <= limit) return 0;
 
     const targetBytes = Math.floor(limit * 0.9);
     const bytesToEvict = totalBytes - targetBytes;
     let evictedBytes = 0;
 
-    const oldest = await linerDb.getOldestAudioRecords();
+    const oldest = await neritiumDb.getOldestAudioRecords();
     for (const item of oldest) {
       if (evictedBytes >= bytesToEvict) break;
       const size = item.byteSize || item.blob?.size || 0;
@@ -68,14 +68,14 @@ class AudioCache {
 
   async getAudioSrc(trackId: string): Promise<string | null> {
     if (this.activeUrls.has(trackId)) {
-      void linerDb.touchAudio(trackId);
+      void neritiumDb.touchAudio(trackId);
       return this.activeUrls.get(trackId)!;
     }
 
-    const record = await linerDb.getAudio(trackId);
+    const record = await neritiumDb.getAudio(trackId);
     if (!record) return null;
 
-    void linerDb.touchAudio(trackId);
+    void neritiumDb.touchAudio(trackId);
 
     if (typeof URL !== "undefined" && URL.createObjectURL) {
       const objectUrl = URL.createObjectURL(record.blob);
@@ -93,7 +93,7 @@ class AudioCache {
     generation?: number,
   ): Promise<boolean> {
     if (generation !== undefined && generation !== this.generation) return false;
-    await linerDb.putAudio(trackId, blob, mimeType);
+    await neritiumDb.putAudio(trackId, blob, mimeType);
     await this.enforceCacheLimit();
     return true;
   }
@@ -113,12 +113,12 @@ class AudioCache {
   }
 
   async hasAudio(trackId: string): Promise<boolean> {
-    return linerDb.hasAudio(trackId);
+    return neritiumDb.hasAudio(trackId);
   }
 
   async deleteAudio(trackId: string): Promise<void> {
     this.revokeTrackUrl(trackId);
-    await linerDb.deleteAudio(trackId);
+    await neritiumDb.deleteAudio(trackId);
   }
 
   revokeTrackUrl(trackId: string): void {

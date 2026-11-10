@@ -20,8 +20,8 @@ const DEFAULT_SETTINGS: OverlaySettings = {
 };
 
 function notifyElectron(patch: Partial<OverlaySettings>) {
-  if (typeof window !== "undefined" && window.linerElectron?.updateOverlaySettings) {
-    window.linerElectron.updateOverlaySettings(patch);
+  if (typeof window !== "undefined" && window.neritiumElectron?.updateOverlaySettings) {
+    window.neritiumElectron.updateOverlaySettings(patch);
   }
 }
 
@@ -52,7 +52,7 @@ export const useOverlaySettingsStore = create<OverlaySettingsState>()(
       },
     }),
     {
-      name: "liner_overlay_settings_v1",
+      name: "neritium_overlay_settings_v1",
       storage: createJSONStorage(() => localStorage),
       onRehydrateStorage: () => (state) => {
         if (state?.shortcut) {

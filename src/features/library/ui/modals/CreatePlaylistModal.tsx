@@ -10,6 +10,7 @@ import { useToast } from "@/shared/ui";
 import { useTranslation } from "@/languages";
 import { useModalStore } from "../../store/modalStore";
 import { useImportStore } from "../../store/importStore";
+import { isSpotifyAccountAvailable } from "../../services/import/sources/spotify/spotifyAccount";
 import { resolveApiErrorMessage } from "@/shared/api";
 
 type Tab = "create" | "import";
@@ -45,6 +46,7 @@ export default function CreatePlaylistModal() {
   const initialUrl = useModalStore((state) => state.createPlaylistInitialUrl);
   const pendingTrack = useModalStore((state) => state.createPlaylistPendingTrack);
   const close = useModalStore((state) => state.closeCreatePlaylist);
+  const openSettings = useModalStore((state) => state.openSettings);
 
   const [tab, setTab] = useState<Tab>("create");
   const [title, setTitle] = useState("");
@@ -281,6 +283,20 @@ export default function CreatePlaylistModal() {
               <span className="text-[12px] text-accent-primary" style={font}>
                 {importError}
               </span>
+            )}
+            {isSpotifyAccountAvailable() && (
+              <button
+                type="button"
+                onClick={() => {
+                  close();
+                  openSettings();
+                }}
+                className="self-start bg-transparent border-none p-0 text-[12px] text-text-tertiary hover:text-text-primary transition-colors cursor-pointer text-left"
+                style={font}
+              >
+                {t("settings.spotify.modal_action") ||
+                  "Import your playlists and liked songs from a connected Spotify account"}
+              </button>
             )}
             <div className="flex items-center justify-end gap-[8px] mt-[2px]">
               <Button type="button" variant="ghost" size="sm" onClick={close}>

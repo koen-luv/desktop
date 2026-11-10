@@ -20,7 +20,7 @@ describe("shortcutsStore", () => {
 
   it("updates global shortcuts and normalizes them", () => {
     const updateOverlaySettings = vi.fn();
-    (window as any).linerElectron = { updateOverlaySettings };
+    (window as any).neritiumElectron = { updateOverlaySettings };
 
     useShortcutsStore.getState().setGlobalShortcut("quickLikeSong", "Ctrl+Alt+L");
     expect(useShortcutsStore.getState().global.quickLikeSong).toBe("Control+Alt+L");
@@ -71,7 +71,7 @@ describe("shortcutsStore", () => {
 
   it("toggles isRecording and notifies Electron to pause global shortcuts", () => {
     const pauseOverlayShortcuts = vi.fn();
-    (window as any).linerElectron = { pauseOverlayShortcuts };
+    (window as any).neritiumElectron = { pauseOverlayShortcuts };
 
     useShortcutsStore.getState().setIsRecording(true);
     expect(useShortcutsStore.getState().isRecording).toBe(true);

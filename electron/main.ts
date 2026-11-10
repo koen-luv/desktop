@@ -34,6 +34,7 @@ import {
 } from "./netdiag.js";
 import { TouchBarManager } from "./touchbar.js";
 import { registerAuthSessionIpc } from "./auth-session-ipc.js";
+import { connectSpotifyAccount, refreshSpotifyTokens } from "./spotify-oauth.js";
 import { ThumbarController } from "./thumbar.js";
 import { OverlayManager } from "./overlay.js";
 import { BundleManager } from "./bundle-manager.js";
@@ -170,7 +171,7 @@ const shutdown = createShutdown({
   watchdogMs: 4000,
 });
 
-// liner:// deeplink support (share links bounce here from link.tryliner.fun)
+// neritium:// deeplink support (share links bounce here from link.tryliner.fun)
 
 // cold-start url arrives before the window exists, stash it until renderer is ready
 let pendingDeeplink: DeeplinkTarget | null = findDeeplinkArg(process.argv)
@@ -200,7 +201,7 @@ const MIN_WINDOW_HEIGHT = 705;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    title: "Liner",
+    title: "Neritium",
     icon: path.join(process.env.VITE_PUBLIC!, "icon.png"),
     width: DEFAULT_WINDOW_WIDTH,
     height: DEFAULT_WINDOW_HEIGHT,
@@ -375,12 +376,12 @@ function createWindow() {
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   console.warn(
-    "\n\x1b[33m[Liner]\x1b[0m Another instance of Liner is already running in the background. Exiting development instance.\nTo run in development mode, please close the running Liner application first.\n"
+    "\n\x1b[33m[Neritium]\x1b[0m Another instance of Neritium is already running in the background. Exiting development instance.\nTo run in development mode, please close the running Neritium application first.\n"
   );
   app.quit();
 } else {
   app.on("second-instance", (_event, argv) => {
-    // running instance gets here when xdg-open / os launches liner:// again
+    // running instance gets here when xdg-open / os launches neritium:// again
     const raw = findDeeplinkArg(argv);
     if (shutdown.isQuitting()) {
       // this process is on its way out and can no longer show a window; the new
@@ -417,7 +418,7 @@ if (!gotTheLock) {
       });
     });
     ipcMain.handle("lan:stop-host", () => stopLanHost());
-    // register liner:// so browsers / xdg-open route share links to us
+    // register neritium:// so browsers / xdg-open route share links to us
     // (on linux the packaged .desktop carries the mime handler too)
     if (process.defaultApp && process.argv.length >= 2) {
       app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME, process.execPath, [path.resolve(process.argv[1]!)]);
@@ -589,7 +590,7 @@ if (!gotTheLock) {
           return desktopName.trim();
         }
       } catch {}
-      return "liner";
+      return "neritium";
     };
 
     const installLinuxAppIcon = async (iconName: string, png: Buffer) => {
@@ -1296,6 +1297,29 @@ if (!gotTheLock) {
       return getServerTimeOffset();
     });
 
+    // Spotify account connect: opens the system browser and captures the
+    // loopback callback. Tokens stay in the renderer session store.
+    ipcMain.handle("spotify:connect", async () => {
+      try {
+        const tokens = await connectSpotifyAccount({
+          openExternal: (url) => shell.openExternal(url),
+        });
+        return { ok: true as const, tokens };
+      } catch (error) {
+        return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      }
+    });
+    ipcMain.handle("spotify:refresh", async (_event, refreshToken: unknown) => {
+      if (typeof refreshToken !== "string" || !refreshToken) {
+        return { ok: false as const, error: "A refresh token is required." };
+      }
+      try {
+        return { ok: true as const, tokens: await refreshSpotifyTokens(refreshToken) };
+      } catch (error) {
+        return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      }
+    });
+
     const authSessions = registerAuthSessionIpc();
     overlayManager?.bindAuthSource(
       () => Boolean(authSessions.get()),
@@ -1437,7 +1461,7 @@ if (!gotTheLock) {
           try {
             req = https.get(
               url,
-              { timeout: 6000, headers: { "user-agent": "liner-connectivity/1.0" } },
+              { timeout: 6000, headers: { "user-agent": "neritium-connectivity/1.0" } },
               (res) => {
                 let body = "";
                 res.on("data", (chunk) => {

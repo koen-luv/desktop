@@ -297,7 +297,7 @@ export class DiscordRpcManager {
 
       const dur = Math.max(0, payload.durationMs || track.durationMs || 0);
 
-      let activityName = "Liner";
+      let activityName = "Neritium";
       let detailsText = title;
       let stateText = isPaused ? `${artist} (Paused)` : artist;
       let rpcStatusDisplayType = StatusDisplayType.STATE; // 1 -> "Listening to [Artist]"
@@ -310,8 +310,8 @@ export class DiscordRpcManager {
           stateText = artist;
           break;
         case "app":
-          activityName = "Liner";
-          rpcStatusDisplayType = StatusDisplayType.NAME; // 0 -> "Listening to Liner"
+          activityName = "Neritium";
+          rpcStatusDisplayType = StatusDisplayType.NAME; // 0 -> "Listening to Neritium"
           detailsText = title;
           stateText = isPaused ? `${artist} (Paused)` : artist;
           break;
@@ -337,7 +337,7 @@ export class DiscordRpcManager {
       }
 
       const activity: SetActivity & { status_display_type?: number } = {
-        name: sanitizeText(activityName) || "Liner",
+        name: sanitizeText(activityName) || "Neritium",
         type: 2, // 2 = ActivityType.Listening -> renders "Listening to" + live progress bar
         details: sanitizeText(detailsText),
         state: sanitizeText(stateText),
@@ -358,7 +358,7 @@ export class DiscordRpcManager {
       const coverImage = toDiscordImageUrl(track.coverUrl);
       if (this.settings.showArtwork && coverImage) {
         activity.largeImageKey = coverImage;
-        activity.largeImageText = sanitizeText(track.album || track.title) || "Liner";
+        activity.largeImageText = sanitizeText(track.album || track.title) || "Neritium";
       }
 
       // Small artwork (Artist photo badge)
@@ -373,14 +373,14 @@ export class DiscordRpcManager {
 
       if (this.settings.showButton && track.id) {
         buttons.push({
-          label: "Listen on Liner",
+          label: "Listen on Neritium",
           url: `https://link.tryliner.fun/track?id=${encodeURIComponent(track.id)}`,
         });
       }
 
       if (this.settings.showDownloadButton) {
         buttons.push({
-          label: "Download Liner",
+          label: "Download Neritium",
           url: "https://tryliner.fun",
         });
       }

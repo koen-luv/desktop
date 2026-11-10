@@ -65,8 +65,8 @@ export function matchesShortcut(e: KeyboardEvent, targetShortcut: string): boole
 }
 
 export function isMacPlatform(): boolean {
-  if (typeof window !== "undefined" && window.linerElectron?.platform) {
-    return window.linerElectron.platform === "darwin";
+  if (typeof window !== "undefined" && window.neritiumElectron?.platform) {
+    return window.neritiumElectron.platform === "darwin";
   }
   if (typeof navigator !== "undefined") {
     return (

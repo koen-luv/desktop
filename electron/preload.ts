@@ -39,7 +39,7 @@ export interface WindowState {
   isVisible?: boolean;
 }
 
-export interface LinerElectronApi {
+export interface NeritiumElectronApi {
   platform: string;
   isHyprland: boolean;
   minimize: () => Promise<void>;
@@ -64,6 +64,15 @@ export interface LinerElectronApi {
   getServerTimeOffset: () => Promise<number>;
   signCoverUrl: (payload: string) => Promise<string>;
   signRawPayload: (payload: number[] | Uint8Array) => Promise<string>;
+  /** Desktop-only: connect the user's own Spotify account (OAuth PKCE). */
+  spotifyConnect?: () => Promise<
+    | { ok: true; tokens: { accessToken: string; refreshToken: string; expiresAt: number; scope: string } }
+    | { ok: false; error: string }
+  >;
+  spotifyRefresh?: (refreshToken: string) => Promise<
+    | { ok: true; tokens: { accessToken: string; refreshToken: string; expiresAt: number; scope: string } }
+    | { ok: false; error: string }
+  >;
   authSession?: {
     get: () => StoredAuthSession | null;
     set: (next: { accessToken: string; refreshToken: string } | null) => Promise<StoredAuthSession | null>;
@@ -148,7 +157,7 @@ const isHyprland = Boolean(
   process.env.XDG_SESSION_DESKTOP?.toLowerCase().includes("hyprland"),
 );
 
-const api: LinerElectronApi = {
+const api: NeritiumElectronApi = {
   platform: process.platform,
   isHyprland,
   minimize: () => ipcRenderer.invoke("window:minimize"),
@@ -192,6 +201,8 @@ const api: LinerElectronApi = {
   getServerTimeOffset: () => ipcRenderer.invoke("signer:get-time-offset"),
   signCoverUrl: (payload) => ipcRenderer.invoke("signer:sign-cover-url", payload),
   signRawPayload: (payload) => ipcRenderer.invoke("signer:sign-raw-payload", payload),
+  spotifyConnect: () => ipcRenderer.invoke("spotify:connect"),
+  spotifyRefresh: (refreshToken) => ipcRenderer.invoke("spotify:refresh", refreshToken),
   authSession: {
     get: () => ipcRenderer.sendSync("auth:get-session") ?? null,
     set: (next) => ipcRenderer.invoke("auth:set-session", next),
@@ -382,5 +393,5 @@ const api: LinerElectronApi = {
 if (location.hostname === "www.youtube.com") {
   startPoTokenWorker();
 } else {
-  contextBridge.exposeInMainWorld("linerElectron", api);
+  contextBridge.exposeInMainWorld("neritiumElectron", api);
 }

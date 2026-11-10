@@ -84,7 +84,7 @@ function SongCard({
   const paddingClass = compact ? "p-[6px]" : "p-[8px]";
 
   const handleClick = (e: React.MouseEvent) => {
-    if (typeof window !== "undefined" && window.__linerWasDragging) {
+    if (typeof window !== "undefined" && window.__neritiumWasDragging) {
       e.stopPropagation();
       e.preventDefault();
       return;
@@ -107,7 +107,7 @@ function SongCard({
 
     clickTimerRef.current = setTimeout(() => {
       clickTimerRef.current = null;
-      if (typeof window !== "undefined" && window.__linerWasDragging) return;
+      if (typeof window !== "undefined" && window.__neritiumWasDragging) return;
       onPlay();
     }, 200);
   };

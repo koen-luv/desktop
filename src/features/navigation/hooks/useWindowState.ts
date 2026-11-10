@@ -15,8 +15,8 @@ const handleF11 = (event: KeyboardEvent) => {
   event.preventDefault();
   if (event.repeat) return;
 
-  if (window.linerElectron) {
-    void window.linerElectron.toggleFullScreen().catch((error: unknown) => {
+  if (window.neritiumElectron) {
+    void window.neritiumElectron.toggleFullScreen().catch((error: unknown) => {
       console.error("Failed to toggle fullscreen:", error);
     });
     return;
@@ -88,7 +88,7 @@ export function useWindowState(): WindowStateHookResult {
       }
     };
 
-    if (!window.linerElectron) {
+    if (!window.neritiumElectron) {
       checkBrowserFullscreen();
       const handleFullscreenChange = () => checkBrowserFullscreen();
       document.addEventListener("fullscreenchange", handleFullscreenChange);
@@ -109,7 +109,7 @@ export function useWindowState(): WindowStateHookResult {
 
     // Hydrate initial os window state from electron
     const initialQuerySeq = pushSeq;
-    window.linerElectron.isFullScreen?.()
+    window.neritiumElectron.isFullScreen?.()
       .then((fs) => {
         if (mounted && pushSeq === initialQuerySeq && typeof fs === "boolean") {
           setIsFullScreen(fs);
@@ -117,7 +117,7 @@ export function useWindowState(): WindowStateHookResult {
       })
       .catch(() => {});
 
-    window.linerElectron.isMaximized?.()
+    window.neritiumElectron.isMaximized?.()
       .then((max) => {
         if (mounted && pushSeq === initialQuerySeq && typeof max === "boolean") {
           setIsMaximized(max);
@@ -126,7 +126,7 @@ export function useWindowState(): WindowStateHookResult {
       .catch(() => {});
 
     // Live sync across os fullscreen transitions & maximize toggles
-    const unsubscribe = window.linerElectron.onWindowStateChange?.((state: WindowState) => {
+    const unsubscribe = window.neritiumElectron.onWindowStateChange?.((state: WindowState) => {
       if (mounted && state) {
         pushSeq++;
         setIsFullScreen(Boolean(state.isFullScreen));
@@ -142,14 +142,14 @@ export function useWindowState(): WindowStateHookResult {
         setIsFullScreen(true);
       }
       const resizeSeq = pushSeq;
-      window.linerElectron?.isMaximized?.()
+      window.neritiumElectron?.isMaximized?.()
         .then((max) => {
           if (mounted && pushSeq === resizeSeq && typeof max === "boolean") {
             setIsMaximized(max);
           }
         })
         .catch(() => {});
-      window.linerElectron?.isFullScreen?.()
+      window.neritiumElectron?.isFullScreen?.()
         .then((fs) => {
           if (mounted && pushSeq === resizeSeq && typeof fs === "boolean") {
             setIsFullScreen(fs || isDomFullscreen);
@@ -165,7 +165,7 @@ export function useWindowState(): WindowStateHookResult {
         setIsFullScreen(true);
       } else {
         const querySeq = pushSeq;
-        window.linerElectron?.isFullScreen?.()
+        window.neritiumElectron?.isFullScreen?.()
           .then((fs) => {
             if (mounted && pushSeq === querySeq && typeof fs === "boolean") {
               setIsFullScreen(fs);

@@ -1,4 +1,4 @@
--keepclassmembers class fun.tryliner.android.LinerBridge {
+-keepclassmembers class fun.neritium.android.NeritiumBridge {
     public *;
 }
 -keepattributes JavascriptInterface

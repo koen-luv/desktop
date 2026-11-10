@@ -2,7 +2,7 @@
  * Discord channel webhooks.
  *
  * Rich Presence needs a Discord client on the same machine. A channel webhook
- * needs nothing: the user pastes a webhook URL once and Liner can announce new
+ * needs nothing: the user pastes a webhook URL once and Neritium can announce new
  * songs or share a playlist from any device, including phones and the web.
  */
 
@@ -73,7 +73,7 @@ export async function sendNowPlayingWebhook(
 ): Promise<void> {
   const description = [track.artist, track.album].filter(Boolean).join(" · ");
   await postDiscordWebhook(url, {
-    username: "Liner",
+    username: "Neritium",
     embeds: [
       {
         title: track.title,
@@ -81,7 +81,7 @@ export async function sendNowPlayingWebhook(
         description: description || undefined,
         color: EMBED_COLOR,
         ...(track.coverUrl ? { thumbnail: { url: track.coverUrl } } : {}),
-        footer: { text: "Now playing on Liner" },
+        footer: { text: "Now playing on Neritium" },
         timestamp: new Date().toISOString(),
       },
     ],
@@ -104,7 +104,7 @@ export async function sendPlaylistWebhook(
       ? `${playlist.trackCount} ${playlist.trackCount === 1 ? "track" : "tracks"}`
       : undefined;
   await postDiscordWebhook(url, {
-    username: "Liner",
+    username: "Neritium",
     embeds: [
       {
         title: playlist.title,
@@ -116,7 +116,7 @@ export async function sendPlaylistWebhook(
         description,
         color: EMBED_COLOR,
         ...(playlist.coverUrl ? { thumbnail: { url: playlist.coverUrl } } : {}),
-        footer: { text: "Shared from Liner" },
+        footer: { text: "Shared from Neritium" },
       },
     ],
   });
@@ -124,7 +124,7 @@ export async function sendPlaylistWebhook(
 
 export async function sendTestWebhook(url: string): Promise<void> {
   await postDiscordWebhook(url, {
-    username: "Liner",
-    content: "Liner is connected to this channel.",
+    username: "Neritium",
+    content: "Neritium is connected to this channel.",
   });
 }

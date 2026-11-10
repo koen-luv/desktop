@@ -120,8 +120,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: async () => {
     await clearPlayback();
     try {
-      window.linerElectron?.closeOverlay?.();
-      window.linerElectron?.sendOverlayAction?.({ type: "closeOverlay" });
+      window.neritiumElectron?.closeOverlay?.();
+      window.neritiumElectron?.sendOverlayAction?.({ type: "closeOverlay" });
     } catch {}
     if (typeof window !== "undefined" && window.location.hash.includes("/player")) {
       window.location.hash = "#/";

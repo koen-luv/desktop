@@ -1,12 +1,14 @@
 /**
  * Platform audio codec capability probing.
  *
- * Liner resolves streams from providers that can serve either WebM/Opus or
+ * Neritium resolves streams from providers that can serve either WebM/Opus or
  * MP4/AAC depending on the client. Browsers such as Safari cannot decode
  * WebM/Opus at all — historically that surfaced as "song fails to play" with an
  * endless spinner. Providers consult this probe so an undecodable codec is
  * never requested in the first place.
  */
+
+import { canCallYoutubeDirectly } from "@/platform/capabilities";
 
 const probeCache = new Map<string, boolean>();
 
@@ -65,12 +67,7 @@ let directPlanSupport: boolean | null = null;
  */
 export function canExecuteDirectInnertubePlans(): boolean {
   if (directPlanSupport !== null) return directPlanSupport;
-  if (typeof window === "undefined") {
-    directPlanSupport = false;
-    return false;
-  }
-  const w = window as unknown as { linerElectron?: unknown; LinerAndroid?: unknown };
-  directPlanSupport = Boolean(w.linerElectron || w.LinerAndroid);
+  directPlanSupport = canCallYoutubeDirectly();
   return directPlanSupport;
 }
 

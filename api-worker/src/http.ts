@@ -10,6 +10,8 @@ export interface Env {
   ACCESS_TOKEN_TTL_SECONDS?: string;
   REFRESH_TOKEN_TTL_DAYS?: string;
   ALLOWED_ORIGINS?: string;
+  /** Signs short-lived /v1/stream tokens. Falls back to JWT_SECRET. */
+  STREAM_SIGNING_SECRET?: string;
 }
 
 export class HttpError extends Error {
@@ -139,7 +141,7 @@ export function getRequestId(request: Request): string {
   return crypto.randomUUID();
 }
 
-function corsHeaders(request: Request, env: Env): Record<string, string> {
+export function corsHeaders(request: Request, env: Env): Record<string, string> {
   const configured = (env.ALLOWED_ORIGINS ?? "*")
     .split(",")
     .map((value) => value.trim())

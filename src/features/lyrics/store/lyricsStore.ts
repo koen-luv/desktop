@@ -86,7 +86,7 @@ export interface LyricsState {
   reset: () => void;
 }
 
-const LYRICS_SESSION_STORAGE_KEY = "liner_lyrics_session_v1";
+const LYRICS_SESSION_STORAGE_KEY = "neritium_lyrics_session_v1";
 
 export const useLyricsStore = create<LyricsState>()(
   persist(

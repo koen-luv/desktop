@@ -5,7 +5,12 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: false,
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "electron/**/*.test.ts"],
+    include: [
+      "src/**/*.test.ts",
+      "src/**/*.test.tsx",
+      "electron/**/*.test.ts",
+      "api-worker/src/**/*.test.ts",
+    ],
   },
   resolve: {
     alias: {

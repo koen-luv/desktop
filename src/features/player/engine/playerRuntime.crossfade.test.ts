@@ -57,7 +57,7 @@ describe("PlayerRuntime crossfade handover", () => {
       transitionPreset: "auto",
     });
     runtime.audio = initialAudio;
-    runtime.audio.id = "liner-audio";
+    runtime.audio.id = "neritium-audio";
     runtime.audio.volume = 1;
     runtime.currentTrackId = t1.id;
     runtime.attachedTrackId = t1.id;
@@ -69,7 +69,7 @@ describe("PlayerRuntime crossfade handover", () => {
     runtime.currentSessionExpiresAt = null;
     runtime.recoveryAttempts = 0;
     runtime.recoveryHoldUntilMs = null;
-    (window as any).__liner_audio = initialAudio;
+    (window as any).__neritium_audio = initialAudio;
   });
 
   afterEach(() => {
@@ -82,7 +82,7 @@ describe("PlayerRuntime crossfade handover", () => {
     runtime.endFadeTrackId = null;
     runtime.activeBlobUrl = null;
     runtime.xAudio = null;
-    (window as any).__liner_audio = initialAudio;
+    (window as any).__neritium_audio = initialAudio;
     usePlayerStore.setState({
       status: "idle",
       currentTrack: null,

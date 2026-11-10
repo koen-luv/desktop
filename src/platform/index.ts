@@ -1,4 +1,7 @@
-import type { LinerElectronApi, DeeplinkTarget } from "../../electron/preload";
+import type { NeritiumElectronApi, DeeplinkTarget } from "../../electron/preload";
+import { installWebPlatform } from "./web";
+
+export { installWebPlatform, isWebApp } from "./web";
 import {
   getServerTimeOffset,
   signCoverUrl as wasmSignCoverUrl,
@@ -8,10 +11,10 @@ import {
 } from "./signerWasm";
 
 /**
- * Native bridge exposed by the Android host WebView as `window.LinerAndroid`.
+ * Native bridge exposed by the Android host WebView as `window.NeritiumAndroid`.
  * Every method is implemented in Kotlin; none are placeholders.
  */
-export interface LinerAndroidBridge {
+export interface NeritiumAndroidBridge {
   getVersion(): string;
   getPlatform(): string;
   /**
@@ -85,7 +88,7 @@ export interface LinerAndroidBridge {
    * song on a hidden second ExoPlayer (audible only at volume), then
    * `audioCrossfadeStart` runs the equal-power blend + EQ sweep natively over
    * `durationMs` and, at the end, promotes the incoming player to main (the
-   * MediaSession follows via LinerForwardingPlayer) and emits a
+   * MediaSession follows via NeritiumForwardingPlayer) and emits a
    * `crossfadeCompleted` event with the new track id. `audioCrossfadeCancel`
    * aborts the blend and restores the main player's volume.
    */
@@ -130,19 +133,19 @@ let mediaCommandHandler: ((command: NativeMediaCommand) => void) | null = null;
 let backHandler: (() => boolean) | null = null;
 
 export function isAndroidApp(): boolean {
-  return typeof window !== "undefined" && Boolean(window.LinerAndroid);
+  return typeof window !== "undefined" && Boolean(window.NeritiumAndroid);
 }
 
 export function isWindowsDesktop(): boolean {
   return (
     typeof window !== "undefined" &&
-    Boolean(window.linerElectron) &&
+    Boolean(window.neritiumElectron) &&
     /Windows/i.test(navigator.userAgent)
   );
 }
 
-export function getAndroidBridge(): LinerAndroidBridge | null {
-  return typeof window !== "undefined" ? (window.LinerAndroid ?? null) : null;
+export function getAndroidBridge(): NeritiumAndroidBridge | null {
+  return typeof window !== "undefined" ? (window.NeritiumAndroid ?? null) : null;
 }
 
 export function onNativeEvent(type: string, listener: NativeEventListener): () => void {
@@ -181,13 +184,13 @@ function emitNative(type: string, rawPayload: string): void {
 
 declare global {
   interface Window {
-    LinerAndroid?: LinerAndroidBridge;
+    NeritiumAndroid?: NeritiumAndroidBridge;
     /** Called by the native host for hardware/gesture back. Returns true when consumed. */
-    __linerHandleBack?: () => boolean;
+    __neritiumHandleBack?: () => boolean;
     /** Called by the native host to deliver events (deeplinks, media buttons). */
-    __linerAndroidEmit?: (type: string, payload: string) => void;
+    __neritiumAndroidEmit?: (type: string, payload: string) => void;
     /** Registered by the Android playback runtime for notification/media-button commands. */
-    __linerAndroidMediaCommand?: (command: string, payload: string) => void;
+    __neritiumAndroidMediaCommand?: (command: string, payload: string) => void;
   }
 }
 
@@ -245,12 +248,12 @@ function measureLocalStorageBytes(): number {
  * Android the same contract is served by Kotlin plus the original WASM signer.
  */
 export function installAndroidPlatform(): void {
-  if (typeof window === "undefined" || !window.LinerAndroid) return;
+  if (typeof window === "undefined" || !window.NeritiumAndroid) return;
 
-  const bridge = window.LinerAndroid;
+  const bridge = window.NeritiumAndroid;
   const deeplinkListeners = new Set<(target: DeeplinkTarget) => void>();
 
-  window.__linerAndroidEmit = (type, payload) => {
+  window.__neritiumAndroidEmit = (type, payload) => {
     if (type === "insets") {
       applyNativeInsets(payload);
       return;
@@ -291,7 +294,7 @@ export function installAndroidPlatform(): void {
     emitNative(type, payload);
   };
 
-  window.__linerHandleBack = () => {
+  window.__neritiumHandleBack = () => {
     if (backHandler) return backHandler();
     if (window.history.length > 1) {
       window.history.back();
@@ -300,7 +303,7 @@ export function installAndroidPlatform(): void {
     return false;
   };
 
-  const compatibility: Partial<LinerElectronApi> = {
+  const compatibility: Partial<NeritiumElectronApi> = {
     platform: "android",
     isHyprland: false,
     signMonitorRequest: async (input) => {
@@ -446,7 +449,7 @@ export function installAndroidPlatform(): void {
     },
   };
 
-  window.linerElectron = compatibility as LinerElectronApi;
+  window.neritiumElectron = compatibility as NeritiumElectronApi;
   document.documentElement.dataset.platform = "android";
   document.documentElement.classList.add("platform-android");
 

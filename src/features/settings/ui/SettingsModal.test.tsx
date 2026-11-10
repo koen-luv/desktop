@@ -77,8 +77,8 @@ describe("SettingsModal two-level menus", () => {
     document.body.appendChild(container);
     root = createRoot(container);
     useModalStore.setState({ settingsOpen: true });
-    delete (window as { LinerAndroid?: unknown }).LinerAndroid;
-    delete (window as { linerElectron?: unknown }).linerElectron;
+    delete (window as { NeritiumAndroid?: unknown }).NeritiumAndroid;
+    delete (window as { neritiumElectron?: unknown }).neritiumElectron;
   });
 
   afterEach(async () => {
@@ -87,8 +87,8 @@ describe("SettingsModal two-level menus", () => {
     });
     container.parentNode?.removeChild(container);
     useModalStore.setState({ settingsOpen: false });
-    delete (window as { LinerAndroid?: unknown }).LinerAndroid;
-    delete (window as { linerElectron?: unknown }).linerElectron;
+    delete (window as { NeritiumAndroid?: unknown }).NeritiumAndroid;
+    delete (window as { neritiumElectron?: unknown }).neritiumElectron;
     vi.restoreAllMocks();
   });
 
@@ -141,8 +141,34 @@ describe("SettingsModal two-level menus", () => {
     expect(bodyText()).not.toContain(tEn("settings.autoplay_similar.title"));
   });
 
-  it("leaves the desktop-only overlay category out on Android", async () => {
-    (window as { LinerAndroid?: unknown }).LinerAndroid = {};
+  it("offers Spotify account import when the desktop OAuth bridge exists", async () => {
+    (window as { neritiumElectron?: unknown }).neritiumElectron = {
+      spotifyConnect: () => Promise.resolve({ ok: false, error: "cancelled" }),
+    };
+
+    await act(async () => {
+      root.render(<SettingsModal />);
+    });
+
+    await click(buttonIncluding(CATEGORY_TITLES[0]), "Playback & Audio category");
+
+    expect(bodyText()).toContain(tEn("settings.tabs.spotify"));
+    expect(bodyText()).toContain(tEn("settings.spotify.account.title"));
+    expect(buttonIncluding(tEn("settings.spotify.connect"))).toBeTruthy();
+  });
+
+  it("hides Spotify account import when no desktop bridge is installed", async () => {
+    await act(async () => {
+      root.render(<SettingsModal />);
+    });
+
+    await click(buttonIncluding(CATEGORY_TITLES[0]), "Playback & Audio category");
+
+    expect(bodyText()).not.toContain(tEn("settings.tabs.spotify"));
+    expect(bodyText()).not.toContain(tEn("settings.spotify.account.title"));
+  });
+
+  it("leaves the desktop-only overlay category out on Android", async () => {    (window as { NeritiumAndroid?: unknown }).NeritiumAndroid = {};
 
     await act(async () => {
       root.render(<SettingsModal />);
@@ -156,8 +182,8 @@ describe("SettingsModal two-level menus", () => {
   it("keeps the category on Android when the native Discord bridge exists", async () => {
     // Android always installs the compatibility shim (main.tsx), which is what
     // exposes the discord* methods; simulate both halves of the host here.
-    (window as { LinerAndroid?: unknown }).LinerAndroid = {};
-    (window as { linerElectron?: unknown }).linerElectron = {
+    (window as { NeritiumAndroid?: unknown }).NeritiumAndroid = {};
+    (window as { neritiumElectron?: unknown }).neritiumElectron = {
       discordUpdateState: () => {},
     };
 

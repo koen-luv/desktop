@@ -18,20 +18,20 @@ const LINER_API_HOST = /(^|\.)tryliner\.fun$/i;
  * these hosts must use the native bridge because the WebView proxy cannot
  * forward request bodies.
  */
-let linerApiHostOverride: string | null = null;
+let neritiumApiHostOverride: string | null = null;
 try {
-  linerApiHostOverride = new URL(getApiBaseUrl()).hostname.toLowerCase();
+  neritiumApiHostOverride = new URL(getApiBaseUrl()).hostname.toLowerCase();
 } catch {
-  linerApiHostOverride = null;
+  neritiumApiHostOverride = null;
 }
 
-function isLinerApiHost(host: string): boolean {
+function isNeritiumApiHost(host: string): boolean {
   const normalized = host.toLowerCase();
   if (LINER_API_HOST.test(normalized)) return true;
-  if (!linerApiHostOverride) return false;
+  if (!neritiumApiHostOverride) return false;
   return (
-    linerApiHostOverride === normalized ||
-    normalized.endsWith(`.${linerApiHostOverride}`)
+    neritiumApiHostOverride === normalized ||
+    normalized.endsWith(`.${neritiumApiHostOverride}`)
   );
 }
 
@@ -71,7 +71,7 @@ function abortError(): DOMException {
 }
 
 async function nativeFetch(
-  bridge: NonNullable<typeof window.LinerAndroid>,
+  bridge: NonNullable<typeof window.NeritiumAndroid>,
   method: string,
   url: string,
   init: RequestInit,
@@ -156,7 +156,7 @@ export async function platformFetch(
 
   const method = (init.method || "GET").toUpperCase();
   const nativeOnly =
-    NATIVE_ONLY_HOST.test(host) || (isLinerApiHost(host) && method !== "GET");
+    NATIVE_ONLY_HOST.test(host) || (isNeritiumApiHost(host) && method !== "GET");
 
   if (!bridge || !nativeOnly || !/^https?:/i.test(url)) {
     return fetch(input, init);

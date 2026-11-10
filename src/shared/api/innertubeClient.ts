@@ -4,10 +4,10 @@ import { getClientVisitorData } from "./visitorSession";
 /**
  * Client-side Innertube extraction — the same technique yt-dlp uses.
  *
- * Instead of asking Liner's backend for a playback plan, the client builds and
+ * Instead of asking Neritium's backend for a playback plan, the client builds and
  * executes the Innertube `player` request itself. These clients return *direct*
  * (unciphered) streaming URLs, so no signature deciphering is needed. Because
- * no Liner backend is involved, playback keeps working even when
+ * no Neritium backend is involved, playback keeps working even when
  * `api.tryliner.fun` is down.
  *
  * The VISIONOS client goes first because of how googlevideo treats its URLs:

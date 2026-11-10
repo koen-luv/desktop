@@ -8,7 +8,7 @@ vi.mock("@/shared/media/soundcloud", async (importOriginal) => {
   return { ...actual, resolveSoundCloudStream: mocks.resolveSoundCloudStream };
 });
 
-import { linerDb } from "@/shared/storage";
+import { neritiumDb } from "@/shared/storage";
 import { playerRuntime } from "./playerRuntime";
 
 function soundCloudTrack(id: string): Track {
@@ -46,7 +46,7 @@ describe("PlayerRuntime with soundcloud streams", () => {
 
     expect(URL.createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
     expect(playerRuntime!.hasLoadedSourceFor(track.id)).toBe(true);
-    expect(await linerDb.getAudio(track.id)).toBeFalsy();
+    expect(await neritiumDb.getAudio(track.id)).toBeFalsy();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -56,7 +56,7 @@ describe("PlayerRuntime with soundcloud streams", () => {
 
     await playerRuntime!.preloadTrack(soundCloudTrack("sc:102"));
 
-    expect(await linerDb.getAudio("sc:102")).toBeFalsy();
+    expect(await neritiumDb.getAudio("sc:102")).toBeFalsy();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 

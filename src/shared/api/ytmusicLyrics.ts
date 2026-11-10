@@ -3,7 +3,7 @@ import { postInnertube } from "@/shared/media/innertube/innertubeClient";
 /**
  * Plain lyrics fallback from YouTube Music.
  *
- * The Liner backend aggregates several lyric providers, but some tracks only
+ * The Neritium backend aggregates several lyric providers, but some tracks only
  * have lyrics on YouTube Music itself. The watch-next response carries a
  * `musicDescriptionShelfRenderer` for the "Lyrics" tab; it is plain text (no
  * timestamps), so it is only used when no synced provider was found.

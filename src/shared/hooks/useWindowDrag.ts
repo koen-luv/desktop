@@ -53,7 +53,7 @@ const WINDOW_DRAG_STRIP_ID = "window-drag-strip";
 
 // wayland ignores client-side setPosition, so linux hands the drag to the compositor via css app-region
 function usesNativeWindowDrag(): boolean {
-  return window.linerElectron?.platform === "linux";
+  return window.neritiumElectron?.platform === "linux";
 }
 
 // app-region only applies to real boxes, so the top drag strip the js path
@@ -124,7 +124,7 @@ export function useWindowDrag({
         }
         isDragging = true;
         // signal main process to lock cursor origin for smooth wayland drag
-        window.linerElectron?.dragStart?.();
+        window.neritiumElectron?.dragStart?.();
       }
 
       const deltaX = e.screenX - lastScreenX;
@@ -134,14 +134,14 @@ export function useWindowDrag({
 
       if (deltaX !== 0 || deltaY !== 0) {
         lastWindowDragTime = Date.now();
-        window.linerElectron?.dragMove(deltaX, deltaY);
+        window.neritiumElectron?.dragMove(deltaX, deltaY);
       }
     };
 
     const handlePointerUp = () => {
       if (isDragging) {
         lastWindowDragTime = Date.now();
-        window.linerElectron?.dragEnd?.();
+        window.neritiumElectron?.dragEnd?.();
       }
       window.removeEventListener("pointermove", handlePointerMove, { capture: true });
       window.removeEventListener("pointerup", handlePointerUp, { capture: true });
@@ -182,7 +182,7 @@ export function useWindowDrag({
       if (!isInDraggableRegion(target, e.clientY)) return;
       if (isInteractive(target)) return;
 
-      window.linerElectron?.toggleMaximize();
+      window.neritiumElectron?.toggleMaximize();
     };
 
     window.addEventListener("pointerdown", handlePointerDown, { capture: true });

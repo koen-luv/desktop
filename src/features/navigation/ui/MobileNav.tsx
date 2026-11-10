@@ -1,43 +1,51 @@
 import { memo } from "react";
 import { Link, useLocation } from "react-router-dom";
-import {
-  BookmarksFill,
-  Home7Fill,
-  Music2Fill,
-  Search3Fill,
-  Settings4Fill,
-} from "@mingcute/react";
+import { Home7Fill, Search3Fill, BookmarksFill, Settings4Fill, Music2Fill } from "@mingcute/react";
 import { useTranslation } from "@/languages";
 import { useModalStore } from "@/features/library";
 import { usePlayerStore } from "@/features/player";
 import { usePlayerState } from "@/features/player/hooks/usePlayerState";
+import { useCoverSrc } from "@/features/covers";
+import SleeveEdge from "./SleeveEdge";
 
-interface MobileNavProps {
+interface MobileDockProps {
   searchOpen: boolean;
   onSearchToggle: () => void;
 }
 
 /**
- * Android phone/tablet bottom navigation. Mirrors the desktop sidebar feature
- * set (home, search, library, settings) and adds direct access to the
- * now-playing screen so the mobile layout never hides a feature.
+ * Phone navigation.
+ *
+ * Four destinations and the now-playing sleeve in the middle. The centre button
+ * is the one thing a thumb reaches without moving the hand, so the current cover
+ * lives there: it is the app's identity, the player's state, and the way into
+ * the full player — one target instead of three.
+ *
+ * Nothing here depends on hover, every target is at least 48px, and the labels
+ * sit under the icons so the dock is readable at a glance without a tooltip.
  */
-function MobileNav({ searchOpen, onSearchToggle }: MobileNavProps) {
+function MobileDock({ searchOpen, onSearchToggle }: MobileDockProps) {
   const { pathname } = useLocation();
   const { t } = useTranslation();
   const settingsOpen = useModalStore((state) => state.settingsOpen);
   const toggleSettings = useModalStore((state) => state.toggleSettings);
   const setFullscreen = usePlayerStore((state) => state.setFullscreen);
   const player = usePlayerState();
+  const coverSrc = useCoverSrc(player.currentTrack?.coverUrl ?? undefined);
   const hasTrack = Boolean(player.currentTrack);
+  const isPlaying = player.status === "playing" || player.status === "loading";
 
-  const itemClass = (active: boolean) =>
-    `flex flex-1 min-w-0 h-[48px] flex-col items-center justify-center gap-[2px] rounded-lg border-0 bg-transparent cursor-pointer transition-colors active:scale-[0.97] ${
-      active ? "text-text-primary" : "text-text-tertiary"
+  const name = (key: string, fallback: string) => t(`common.sidebar.${key}`) || fallback;
+
+  const tabClass = (active: boolean) =>
+    `relative flex min-h-[48px] min-w-0 flex-1 flex-col items-center justify-center gap-[3px] rounded-[14px] border-0 bg-transparent px-1 cursor-pointer transition-colors duration-150 active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/70 ${
+      active ? "text-accent-primary" : "text-text-secondary"
     }`;
 
-  const iconClass = (active: boolean) =>
-    active ? "opacity-100" : "opacity-65";
+  const activePill = (active: boolean) =>
+    active
+      ? "absolute inset-x-1 top-1 bottom-1 rounded-[12px] bg-bg-selected"
+      : "hidden";
 
   const homeActive = pathname === "/" || pathname === "/home";
   const libraryActive = pathname === "/library" || pathname.startsWith("/library/");
@@ -45,68 +53,110 @@ function MobileNav({ searchOpen, onSearchToggle }: MobileNavProps) {
   return (
     <nav
       aria-label={t("common.navigation") || "Navigation"}
-      className="md:hidden shrink-0 w-full border-t border-border-primary/60 bg-bg-primary/95 backdrop-blur-xl"
+      className="relative mt-2 shrink-0 rounded-[22px] border border-border-primary/60 bg-bg-surface/98 md:hidden"
       style={{
-        paddingBottom:
-          "max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))",
+        paddingBottom: "max(env(safe-area-inset-bottom), var(--inset-bottom, 0px))",
       }}
     >
-      <div className="flex items-stretch px-1.5 pt-1" style={{ minHeight: 52 }}>
-        <Link to="/" aria-current={homeActive ? "page" : undefined} className={itemClass(homeActive)}>
-          <Home7Fill size={21} className={iconClass(homeActive)} />
-          <span className="text-[10px] leading-none font-medium">
-            {t("common.sidebar.home") || "Home"}
+      {/* The edge is clipped to the dock's corners; the nav itself must not clip,
+          or the raised now-playing button would be cut off. */}
+      <div className="overflow-hidden rounded-t-[22px]">
+        <SleeveEdge orientation="horizontal" />
+      </div>
+
+      <div className="flex items-end gap-[2px] px-[6px] pb-[6px] pt-[6px]">
+        <Link
+          to="/"
+          aria-label={name("home", "Home")}
+          aria-current={homeActive ? "page" : undefined}
+          className={tabClass(homeActive)}
+        >
+          <span className={activePill(homeActive)} aria-hidden="true" />
+          <Home7Fill size={22} className="relative z-[1]" />
+          <span className="relative z-[1] text-[10px] font-[500] leading-none">
+            {name("home", "Home")}
           </span>
         </Link>
 
         <button
           type="button"
+          aria-label={name("search", "Search")}
           aria-pressed={searchOpen}
           onClick={onSearchToggle}
-          className={itemClass(searchOpen)}
+          className={tabClass(searchOpen)}
         >
-          <Search3Fill size={21} className={iconClass(searchOpen)} />
-          <span className="text-[10px] leading-none font-medium">
-            {t("common.sidebar.search") || "Search"}
+          <span className={activePill(searchOpen)} aria-hidden="true" />
+          <Search3Fill size={22} className="relative z-[1]" />
+          <span className="relative z-[1] text-[10px] font-[500] leading-none">
+            {name("search", "Search")}
           </span>
+        </button>
+
+        {/* Now playing: the sleeve itself, raised out of the dock. */}
+        <button
+          type="button"
+          disabled={!hasTrack}
+          aria-label={name("now_playing", "Now playing")}
+          aria-pressed={player.fullscreen}
+          onClick={() => {
+            if (hasTrack) setFullscreen(true);
+          }}
+          className={`group relative mx-[2px] flex h-[56px] w-[56px] shrink-0 items-center justify-center overflow-hidden rounded-[16px] border border-border-primary/60 bg-bg-panel shadow-e2 transition-transform duration-150 active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/70 ${
+            hasTrack ? "" : "opacity-60"
+          }`}
+        >
+          {coverSrc ? (
+            <img
+              src={coverSrc}
+              alt=""
+              draggable={false}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          ) : (
+            <Music2Fill size={24} className="relative z-[1] text-text-secondary" />
+          )}
+          {hasTrack && (
+            <span
+              aria-hidden="true"
+              className={`absolute inset-0 bg-black/25 transition-opacity duration-200 ${
+                isPlaying ? "opacity-100" : "opacity-60"
+              }`}
+            />
+          )}
+          {hasTrack && (
+            <Music2Fill
+              size={22}
+              className={`relative z-[1] drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)] ${
+                isPlaying ? "text-white" : "text-white/70"
+              }`}
+            />
+          )}
         </button>
 
         <Link
           to="/library"
+          aria-label={name("library", "Library")}
           aria-current={libraryActive ? "page" : undefined}
-          className={itemClass(libraryActive)}
+          className={tabClass(libraryActive)}
         >
-          <BookmarksFill size={21} className={iconClass(libraryActive)} />
-          <span className="text-[10px] leading-none font-medium">
-            {t("common.sidebar.library") || "Library"}
+          <span className={activePill(libraryActive)} aria-hidden="true" />
+          <BookmarksFill size={22} className="relative z-[1]" />
+          <span className="relative z-[1] text-[10px] font-[500] leading-none">
+            {name("library", "Library")}
           </span>
         </Link>
 
         <button
           type="button"
-          disabled={!hasTrack}
-          aria-disabled={!hasTrack}
-          aria-label={t("common.sidebar.now_playing") || "Now playing"}
-          onClick={() => {
-            if (hasTrack) setFullscreen(true);
-          }}
-          className={`${itemClass(player.fullscreen)} ${hasTrack ? "" : "opacity-35"}`}
-        >
-          <Music2Fill size={21} className={iconClass(player.fullscreen)} />
-          <span className="text-[10px] leading-none font-medium">
-            {t("common.sidebar.now_playing") || "Playing"}
-          </span>
-        </button>
-
-        <button
-          type="button"
+          aria-label={name("settings", "Settings")}
           aria-pressed={settingsOpen}
           onClick={toggleSettings}
-          className={itemClass(settingsOpen)}
+          className={tabClass(settingsOpen)}
         >
-          <Settings4Fill size={21} className={iconClass(settingsOpen)} />
-          <span className="text-[10px] leading-none font-medium">
-            {t("common.sidebar.settings") || "Settings"}
+          <span className={activePill(settingsOpen)} aria-hidden="true" />
+          <Settings4Fill size={22} className="relative z-[1]" />
+          <span className="relative z-[1] text-[10px] font-[500] leading-none">
+            {name("settings", "Settings")}
           </span>
         </button>
       </div>
@@ -114,4 +164,4 @@ function MobileNav({ searchOpen, onSearchToggle }: MobileNavProps) {
   );
 }
 
-export default memo(MobileNav);
+export default memo(MobileDock);

@@ -29,7 +29,7 @@ export interface SearchHistoryState {
   clearHistory: () => void;
 }
 
-const SEARCH_HISTORY_STORAGE_KEY = "liner_search_history";
+const SEARCH_HISTORY_STORAGE_KEY = "neritium_search_history";
 const MAX_HISTORY_ITEMS = 30;
 
 export const useSearchHistoryStore = create<SearchHistoryState>()(

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Liner</string>
+    <string name="app_name">Neritium</string>
     <string name="playback_channel_name">Playback</string>
-    <string name="playback_channel_description">Liner playback controls and current track</string>
+    <string name="playback_channel_description">Neritium playback controls and current track</string>
     <string name="playback_preparing">Preparing playback…</string>
     <string name="notification_previous">Previous</string>
     <string name="notification_next">Next</string>

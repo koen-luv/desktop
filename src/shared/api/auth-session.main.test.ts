@@ -29,7 +29,7 @@ function installBridge(stored: AuthTokens | null) {
       for (const cb of listeners) cb(next);
     },
   };
-  (window as unknown as { linerElectron: unknown }).linerElectron = { authSession: bridge };
+  (window as unknown as { neritiumElectron: unknown }).neritiumElectron = { authSession: bridge };
   return bridge;
 }
 
@@ -44,7 +44,7 @@ describe("auth-session backed by the main process", () => {
   });
 
   afterEach(() => {
-    delete (window as unknown as { linerElectron?: unknown }).linerElectron;
+    delete (window as unknown as { neritiumElectron?: unknown }).neritiumElectron;
     vi.restoreAllMocks();
   });
 
@@ -57,21 +57,21 @@ describe("auth-session backed by the main process", () => {
   });
 
   it("moves a legacy localStorage session into main and wipes the plain copy", async () => {
-    localStorage.setItem("liner_auth_session", JSON.stringify(session("rt_legacy")));
+    localStorage.setItem("neritium_auth_session", JSON.stringify(session("rt_legacy")));
     const bridge = installBridge(null);
     const auth = await loadModule();
     expect(auth.getAuthSession()?.refreshToken).toBe("rt_legacy");
     expect(bridge.set).toHaveBeenCalledWith(expect.objectContaining({ refreshToken: "rt_legacy" }));
-    expect(localStorage.getItem("liner_auth_session")).toBeNull();
+    expect(localStorage.getItem("neritium_auth_session")).toBeNull();
   });
 
   it("prefers main over a stale legacy copy", async () => {
-    localStorage.setItem("liner_auth_session", JSON.stringify(session("rt_stale")));
+    localStorage.setItem("neritium_auth_session", JSON.stringify(session("rt_stale")));
     const bridge = installBridge(session("rt_main"));
     const auth = await loadModule();
     expect(auth.getAuthSession()?.refreshToken).toBe("rt_main");
     expect(bridge.set).not.toHaveBeenCalled();
-    expect(localStorage.getItem("liner_auth_session")).toBeNull();
+    expect(localStorage.getItem("neritium_auth_session")).toBeNull();
   });
 
   it("saves through main and never writes the token to localStorage", async () => {
@@ -79,7 +79,7 @@ describe("auth-session backed by the main process", () => {
     const auth = await loadModule();
     auth.setAuthSession(session("rt_login"));
     expect(bridge.set).toHaveBeenCalledWith(expect.objectContaining({ refreshToken: "rt_login" }));
-    expect(localStorage.getItem("liner_auth_session")).toBeNull();
+    expect(localStorage.getItem("neritium_auth_session")).toBeNull();
   });
 
   it("delegates refresh to main and adopts the result", async () => {

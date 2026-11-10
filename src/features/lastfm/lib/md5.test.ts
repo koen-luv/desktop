@@ -18,7 +18,7 @@ describe("md5", () => {
   });
 
   it("hashes UTF-8 input (non-ASCII and astral code points)", () => {
-    expect(md5("Liner-привет-🎵")).toBe("c8f624c58fee4fc11f8abb3173a6b174");
+    expect(md5("Neritium-привет-🎵")).toBe("bad6d966e749a6bf764a57eecd40cb23");
   });
 
   it("signs a Last.fm-style parameter string", () => {

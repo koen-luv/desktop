@@ -100,7 +100,7 @@ export class TouchBarManager {
     });
 
     this.nativeTrackLabel = new TouchBarLabel({
-      label: "Liner",
+      label: "Neritium",
     });
 
     this.nativeLyricsLabel = new TouchBarLabel({
@@ -135,7 +135,7 @@ export class TouchBarManager {
         if (this.nativeTrackLabel) {
           this.nativeTrackLabel.label = state.track
             ? `${state.track.title} - ${state.track.artist}`
-            : "Liner";
+            : "Neritium";
         }
         if (this.nativeLyricsLabel) {
           this.nativeLyricsLabel.label = state.activeLyricText || "";

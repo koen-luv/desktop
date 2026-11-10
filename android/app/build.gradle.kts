@@ -13,15 +13,15 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "app.tryliner.android"
+    namespace = "app.neritium.android"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "app.tryliner.android"
+        applicationId = "app.neritium.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 15
-        versionName = "0.1.54"
+        versionCode = 16
+        versionName = "0.1.55"
         resourceConfigurations += listOf("en", "es", "ru", "uk")
     }
 

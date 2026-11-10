@@ -106,7 +106,7 @@ export function useDiscordSync() {
   // Sync settings on mount
   useEffect(() => {
     const s = useDiscordSettingsStore.getState();
-    window.linerElectron?.discordUpdateSettings?.({
+    window.neritiumElectron?.discordUpdateSettings?.({
       enabled: s.enabled,
       statusDisplayType: s.statusDisplayType,
       showArtwork: s.showArtwork,
@@ -123,7 +123,7 @@ export function useDiscordSync() {
     const handleAuthChange = () => {
       const session = getAuthSession();
       if (!session) {
-        window.linerElectron?.discordUpdateState?.({
+        window.neritiumElectron?.discordUpdateState?.({
           status: "idle",
           track: null,
           positionMs: 0,
@@ -172,7 +172,7 @@ export function useDiscordSync() {
 
   // Push updates to Electron, or to the backend when the account is linked
   useEffect(() => {
-    if (!cloudLinked && !window.linerElectron?.discordUpdateState) return;
+    if (!cloudLinked && !window.neritiumElectron?.discordUpdateState) return;
 
     const trackId = currentTrack?.id ?? null;
     const coverUrl = effectiveCover || currentTrack?.coverUrl;
@@ -243,7 +243,7 @@ export function useDiscordSync() {
     if (cloudLinked) {
       if (enabled) cloudPresence.queue(buildPresenceNotification(payload, useDiscordSettingsStore.getState()));
     } else {
-      window.linerElectron?.discordUpdateState?.(payload);
+      window.neritiumElectron?.discordUpdateState?.(payload);
     }
   }, [
     player.status,

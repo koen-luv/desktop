@@ -46,7 +46,7 @@ export function AudioTab({ searchQuery }: { searchQuery?: string }) {
   const qualityDescription =
     quality === "lossless"
       ? t("settings.audio.lossless_description") ||
-        "Plays the lossless master (FLAC/ALAC) when Liner has one; other tracks use the best available stream."
+        "Plays the lossless master (FLAC/ALAC) when Neritium has one; other tracks use the best available stream."
       : t("settings.audio.description");
 
   return (
@@ -144,10 +144,10 @@ export function AudioTab({ searchQuery }: { searchQuery?: string }) {
                   type="button"
                   onClick={async () => {
                     const targetPath = useConnectivityStore.getState().lastSavedDumpPath || undefined;
-                    if (window.linerElectron?.openExportFolder) {
-                      await window.linerElectron.openExportFolder(targetPath);
-                    } else if (window.linerElectron?.openDownloads) {
-                      await window.linerElectron.openDownloads(targetPath);
+                    if (window.neritiumElectron?.openExportFolder) {
+                      await window.neritiumElectron.openExportFolder(targetPath);
+                    } else if (window.neritiumElectron?.openDownloads) {
+                      await window.neritiumElectron.openDownloads(targetPath);
                     } else {
                       toast(t("settings.connection.open_folder"), "info");
                     }

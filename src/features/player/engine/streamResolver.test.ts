@@ -6,6 +6,11 @@ const mocks = vi.hoisted(() => ({
   resolveDirectAudioStream: vi.fn(),
   searchRaw: vi.fn(),
   resolveSoundCloudStream: vi.fn(),
+  resolveProxyInnertubeStream: vi.fn(),
+}));
+
+vi.mock("./streamResolverLegacy", () => ({
+  resolveProxyInnertubeStream: mocks.resolveProxyInnertubeStream,
 }));
 
 vi.mock("@/shared/media/innertube", async (importOriginal) => {
@@ -18,8 +23,19 @@ vi.mock("@/shared/media/soundcloud", async (importOriginal) => {
   return { ...actual, resolveSoundCloudStream: mocks.resolveSoundCloudStream };
 });
 
-import { resolvePlaybackStream } from "./streamResolver";
+import { isWebPlaybackUnsupported, resolvePlaybackStream } from "./streamResolver";
 import { clearYoutubeStandInCache } from "./youtubeStandIn";
+import { resetCodecProbeCache } from "../sources/codecSupport";
+
+/**
+ * The resolver is platform-dependent: a native shell (Electron / Android) may
+ * call Innertube directly, a browser may not. These suites describe the native
+ * behaviour, so they declare a desktop shell.
+ */
+function installDesktopShell() {
+  (window as unknown as { neritiumElectron?: unknown }).neritiumElectron = { platform: "linux" };
+  resetCodecProbeCache();
+}
 
 const directStream = {
   url: "https://rr1.googlevideo.com/videoplayback?itag=251",
@@ -40,14 +56,18 @@ function searchTrack(id: string, title: string, artist: string, durationMs: numb
 
 afterEach(() => {
   vi.restoreAllMocks();
+  delete (window as unknown as { neritiumElectron?: unknown }).neritiumElectron;
+  resetCodecProbeCache();
   mocks.resolveDirectAudioStream.mockReset();
   mocks.searchRaw.mockReset();
   mocks.resolveSoundCloudStream.mockReset();
+  mocks.resolveProxyInnertubeStream.mockReset();
   clearYoutubeStandInCache();
 });
 
 describe("resolvePlaybackStream for youtube ids", () => {
   it("plays youtube tracks straight from googlevideo", async () => {
+    installDesktopShell();
     mocks.resolveDirectAudioStream.mockResolvedValue(directStream);
 
     const stream = await resolvePlaybackStream(track("dQw4w9WgXcQ"));
@@ -57,6 +77,7 @@ describe("resolvePlaybackStream for youtube ids", () => {
   });
 
   it("surfaces the innertube error when youtube cannot play the track", async () => {
+    installDesktopShell();
     mocks.resolveDirectAudioStream.mockRejectedValue(new Error("LOGIN_REQUIRED"));
 
     await expect(resolvePlaybackStream(track("dQw4w9WgXcQ"))).rejects.toThrow("LOGIN_REQUIRED");
@@ -65,6 +86,7 @@ describe("resolvePlaybackStream for youtube ids", () => {
 
 describe("resolvePlaybackStream for ids of unknown sources", () => {
   it("plays the matching youtube track", async () => {
+    installDesktopShell();
     mocks.searchRaw.mockResolvedValue([searchTrack("4NRXx6U8ABQ", "Blinding Lights", "The Weeknd", 200_040)]);
     mocks.resolveDirectAudioStream.mockResolvedValue(directStream);
 
@@ -78,5 +100,34 @@ describe("resolvePlaybackStream for ids of unknown sources", () => {
     mocks.searchRaw.mockResolvedValue([]);
 
     await expect(resolvePlaybackStream(track("local-file-2"))).rejects.toThrow("No matching YouTube track found");
+  });
+});
+
+describe("resolvePlaybackStream in a browser (no native shell)", () => {
+  it("resolves through the backend instead of calling YouTube", async () => {
+    mocks.resolveProxyInnertubeStream.mockResolvedValue({
+      url: "https://liner-api.example.com/v1/stream/abc",
+      mimeType: "audio/mp4",
+      codec: "aac",
+      bitrate: 128_000,
+      expiresAtMs: null,
+    });
+
+    const stream = await resolvePlaybackStream(track("dQw4w9WgXcQ"));
+
+    expect(stream.url).toBe("https://liner-api.example.com/v1/stream/abc");
+    expect(mocks.resolveProxyInnertubeStream).toHaveBeenCalledTimes(1);
+    // The browser must never attempt the CORS-blocked direct path.
+    expect(mocks.resolveDirectAudioStream).not.toHaveBeenCalled();
+  });
+
+  it("reports a capability failure instead of an unplayable track", async () => {
+    mocks.resolveProxyInnertubeStream.mockRejectedValue(new Error("CLIENT_ONLY"));
+
+    await expect(resolvePlaybackStream(track("dQw4w9WgXcQ"))).rejects.toSatisfy(
+      (error: unknown) => isWebPlaybackUnsupported(error),
+    );
+    expect(mocks.resolveDirectAudioStream).not.toHaveBeenCalled();
+    expect(mocks.searchRaw).not.toHaveBeenCalled();
   });
 });

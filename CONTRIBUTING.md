@@ -1,8 +1,8 @@
-# Contributing to Liner
+# Contributing to Neritium
 
 This file is for people sending a change to [tryliner/desktop](https://github.com/tryliner/desktop). Setup for just running the app is in the [README](./README.md).
 
-Read [LICENSE](./LICENSE) before you open a pull request. Liner is source-available. It is not an open-source license. You may fork and modify the code in order to send a fix, a feature, or a docs change back to this repository. You may not publish a competing app, ship your own installer, or lift the signer, lyrics, shader, or interface work into another product. Sending a pull request gives the maintainers the rights described in section 3 of the license, including the right to ship your change inside Liner.
+Read [LICENSE](./LICENSE) before you open a pull request. Neritium is source-available. It is not an open-source license. You may fork and modify the code in order to send a fix, a feature, or a docs change back to this repository. You may not publish a competing app, ship your own installer, or lift the signer, lyrics, shader, or interface work into another product. Sending a pull request gives the maintainers the rights described in section 3 of the license, including the right to ship your change inside Neritium.
 
 Questions and bug reports go in [issues](https://github.com/tryliner/desktop/issues). Longer design talk can go in [discussions](https://github.com/tryliner/desktop/discussions).
 
@@ -22,7 +22,7 @@ Search the issue list first. If it is already open, add what you know there.
 
 If you open a new issue, include:
 
-- Liner version (the app version, or the commit you built)
+- Neritium version (the app version, or the commit you built)
 - Operating system
 - What you did
 - What you expected

@@ -62,7 +62,7 @@ describe("DiscordRpcManager", () => {
     vi.useRealTimers();
   });
 
-  it("connects with Liner's built-in application id by default", async () => {
+  it("connects with Neritium's built-in application id by default", async () => {
     delete process.env.LINER_DISCORD_CLIENT_ID;
     const manager = new DiscordRpcManager();
     await vi.advanceTimersByTimeAsync(1_000);

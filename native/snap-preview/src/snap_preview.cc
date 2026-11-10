@@ -1,4 +1,4 @@
-// Liner snap preview (windows).
+// Neritium snap preview (windows).
 //
 // The drag-to-top "maximize" preview, done the way windows' own snap preview is:
 // a popup window whose content is a Windows.UI.Composition visual tree that lives in
@@ -194,7 +194,7 @@ bool Init() {
     wc.cbSize = sizeof(wc);
     wc.lpfnWndProc = WndProc;
     wc.hInstance = instance;
-    wc.lpszClassName = L"LinerSnapPreview";
+    wc.lpszClassName = L"NeritiumSnapPreview";
     RegisterClassExW(&wc);  // fails harmlessly if already registered
 
     g.hwnd = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, wc.lpszClassName,

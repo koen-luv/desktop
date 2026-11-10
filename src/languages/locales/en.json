@@ -44,7 +44,7 @@
   "common": {
     "navigation": "Navigation",
     "app": {
-      "name": "Liner",
+      "name": "Neritium",
       "description": "More of what you like",
       "version": "Version 0.1.0"
     },
@@ -213,7 +213,7 @@
     "dailyMixes": "Daily Mixes",
     "dailyMixesSubtitle": "Fresh playlists curated around your favorite artists and genres",
     "recap": {
-      "label": "Liner recap",
+      "label": "Neritium recap",
       "cardTitle": "Your {year} in music",
       "cardDescription": "A personal look back at what you listened to",
       "close": "Close",
@@ -237,12 +237,12 @@
       "topMonth": "Top month",
       "longestDay": "Longest listening day",
       "artistsExplored": "Artists explored",
-      "shareTitle": "My {year} in music on Liner",
+      "shareTitle": "My {year} in music on Neritium",
       "shareListening": "{time} listened across {count} plays",
       "shareDiscoveries": "{tracks} tracks and {artists} artists",
       "shareTopArtist": "Top artist: {artist}",
       "shareTopTrack": "Most played: {track}",
-      "shareTag": "#LinerRecap",
+      "shareTag": "#NeritiumRecap",
       "copied": "Recap copied to clipboard",
       "shareFailed": "Could not share or copy the recap on this device.",
       "shareUnavailable": "Sharing isn’t available on this device.",
@@ -288,15 +288,15 @@
   "login": {
     "forgot_password": "Forgot password?",
     "recover_title": "Reset your password",
-    "recover_subtitle": "Liner support emails a one-time link to your account address.",
-    "recover_body": "Password resets are handled with a single-use link sent by Liner support. Opening that link on this device brings you straight to the new password screen; it works whether you are signed in or out.",
-    "recover_contact": "Email Liner support",
+    "recover_subtitle": "Neritium support emails a one-time link to your account address.",
+    "recover_body": "Password resets are handled with a single-use link sent by Neritium support. Opening that link on this device brings you straight to the new password screen; it works whether you are signed in or out.",
+    "recover_contact": "Email Neritium support",
     "recover_hint": "For your security we never say whether an address has an account.",
     "welcome_back": "Welcome back",
     "sign_in_to_account": "Sign in to your account",
     "auth_title_login": "Your music, your way",
     "auth_subtitle_login": "Sign in and pick up right where you left off.",
-    "auth_title_register": "Join Liner",
+    "auth_title_register": "Join Neritium",
     "auth_subtitle_register": "Create an account and start building your personal library.",
     "profile_setup_title": "Set up your profile",
     "profile_setup_subtitle": "Choose your unique handle and display name.",
@@ -367,7 +367,7 @@
       "email_invalid": "Enter a valid email address.",
       "password_min_8": "Password must contain at least 8 characters.",
       "server_unavailable": "Unable to reach the server. Please check your connection.",
-      "server_error": "Liner's servers are having trouble right now. Please try again in a few minutes.",
+      "server_error": "Neritium's servers are having trouble right now. Please try again in a few minutes.",
       "rate_limited": "Too many attempts. Wait a few minutes and try again.",
       "invalid_credentials": "Email or password is incorrect.",
       "email_already_used": "This email is already in use.",
@@ -394,7 +394,7 @@
       "verification_canceled": "Verification canceled.",
       "human_check_cancelled": "Finish the human check to continue.",
       "human_check_failed": "The human check didn't go through. Please try again.",
-      "edge_challenge": "Cloudflare blocked the request before it reached Liner. Turn off any VPN or proxy and try again."
+      "edge_challenge": "Cloudflare blocked the request before it reached Neritium. Turn off any VPN or proxy and try again."
     },
     "toasts": {
       "login_successful": "Login successful",
@@ -604,7 +604,7 @@
     "nearby_title": "Nearby on this Wi-Fi",
     "scan": "Scan",
     "scanning": "Scanning…",
-    "no_nearby": "No Liner devices found on this Wi-Fi yet.",
+    "no_nearby": "No Neritium devices found on this Wi-Fi yet.",
     "allow_wifi": "Allow control on this Wi-Fi",
     "allow_wifi_desc": "No code needed. Phones on the same network find this computer automatically while this is on.",
     "waiting_wifi": "Waiting for a phone on this Wi-Fi…",
@@ -622,7 +622,7 @@
     "error_timeout": "Timed out waiting for the other device.",
     "error_host_left": "The computer closed the remote session.",
     "error_unsupported": "This device can't open a peer-to-peer connection.",
-    "default_name": "Liner device",
+    "default_name": "Neritium device",
     "discover": "Find devices",
     "searching": "Searching…",
     "local_network": "Same Wi-Fi network",
@@ -689,6 +689,7 @@
       "overlay": "Overlay",
       "discord": "Discord RPC",
       "lastfm": "Last.fm",
+      "spotify": "Spotify",
       "privacy": "Privacy"
     },
     "playback": {
@@ -697,9 +698,9 @@
     "shortcuts": {
       "description": "Customize global system-wide and player keyboard shortcuts.",
       "global_section": "Global Shortcuts (System-wide)",
-      "global_desc": "Work from any application across your computer, even when Liner is minimized or not focused.",
+      "global_desc": "Work from any application across your computer, even when Neritium is minimized or not focused.",
       "main_app_section": "Main Application",
-      "main_app_desc": "Active when the main Liner window is open and focused.",
+      "main_app_desc": "Active when the main Neritium window is open and focused.",
       "miniplayer_section": "Miniplayer Mode",
       "miniplayer_desc": "Active when the desktop overlay miniplayer is focused.",
       "toggle_overlay": "Toggle miniplayer overlay",
@@ -779,7 +780,7 @@
       },
       "auto_show_on_minimize": {
         "title": "Auto-show on minimize",
-        "description": "Automatically show the overlay when Liner is minimized."
+        "description": "Automatically show the overlay when Neritium is minimized."
       },
       "always_on_top": {
         "title": "Always on top",
@@ -796,22 +797,22 @@
       },
       "api_key": {
         "title": "API Key",
-        "description": "Uses Liner's built-in Last.fm application by default; paste your own key to override."
+        "description": "Uses Neritium's built-in Last.fm application by default; paste your own key to override."
       },
       "api_secret": {
         "title": "API Secret",
-        "description": "Shared secret of your Last.fm application (Liner's built-in one is used by default)."
+        "description": "Shared secret of your Last.fm application (Neritium's built-in one is used by default)."
       },
       "account": {
         "title": "Last.fm Account",
-        "description": "Authorize Liner to submit plays to your profile.",
+        "description": "Authorize Neritium to submit plays to your profile.",
         "connected_description": "Scrobbling as {user}."
       },
       "connect": "Connect to Last.fm",
       "connect_finish": "I've authorized — connect",
       "connecting": "Connecting…",
       "disconnect": "Disconnect",
-      "authorize_hint": "Allow Liner on Last.fm in the opened page (or via the link below), then press Connect.",
+      "authorize_hint": "Allow Neritium on Last.fm in the opened page (or via the link below), then press Connect.",
       "authorize_link": "Open the Last.fm authorization page",
       "error_prefix": "Error",
       "status": {
@@ -822,11 +823,49 @@
         "disabled": "Disabled"
       }
     },
+    "spotify": {
+      "description": "Import your Spotify playlists and liked songs into Neritium.",
+      "desktop_only": "Connecting a Spotify account is only available in the desktop app.",
+      "modal_action": "Import your playlists and liked songs from a connected Spotify account",
+      "redirect_hint": "In your Spotify app settings, add http://127.0.0.1:43821/callback as a redirect URI. Neritium opens your browser and catches the callback on your own machine.",
+      "section_account": "Account",
+      "section_import": "Import",
+      "account": {
+        "title": "Spotify Account",
+        "description": "Authorize Neritium to read your playlists and liked songs. Nothing on Spotify is changed.",
+        "connected_description": "Pick a playlist or your liked songs to import below."
+      },
+      "connect": "Connect Spotify",
+      "connecting": "Waiting for Spotify…",
+      "disconnect": "Disconnect",
+      "liked": {
+        "title": "Liked Songs",
+        "description": "Import every song you have liked on Spotify into Neritium."
+      },
+      "playlists": {
+        "title": "Your Playlists",
+        "description": "Import any playlist from your account, including private ones.",
+        "loading": "Loading your playlists…",
+        "empty": "No playlists were found on this account.",
+        "count": "{count} playlists",
+        "refresh": "Refresh",
+        "track_count": "{count} songs",
+        "import": "Import",
+        "importing": "Importing…"
+      },
+      "status": {
+        "connected": "Connected to Spotify",
+        "disconnected": "Not connected to Spotify",
+        "ready": "Ready to import",
+        "waiting": "Waiting for account"
+      },
+      "error_prefix": "Error"
+    },
     "devices": {
       "section_title": "Device control",
       "section_desc": "Pair your phone and computer to control playback and the queue from either one.",
       "controller_title": "Control another device",
-      "controller_desc": "Find a Liner desktop on the same Wi-Fi network and control it without a code.",
+      "controller_desc": "Find a Neritium desktop on the same Wi-Fi network and control it without a code.",
       "host_title": "Control from your phone",
       "host_desc": "Let devices on the same Wi-Fi network control this player without pairing codes.",
       "show_code": "Enable local control",
@@ -848,7 +887,7 @@
         "song": "Song Title",
         "artist_song": "Artist - Song",
         "song_artist": "Song - Artist",
-        "app": "Liner (App name)"
+        "app": "Neritium (App name)"
       },
       "show_timeline": {
         "title": "Playback Timeline",
@@ -868,10 +907,10 @@
       },
       "show_button": {
         "title": "'Listen Along' Button",
-        "description": "Add an interactive button linking to the song on Liner."
+        "description": "Add an interactive button linking to the song on Neritium."
       },
       "show_download_button": {
-        "title": "'Download Liner' Button",
+        "title": "'Download Neritium' Button",
         "description": "Add an interactive button linking to tryliner.fun to download the app."
       },
       "status": {
@@ -886,7 +925,7 @@
         "title": "Link your Discord account",
         "description": "Link Discord once so your activity also shows when you listen on your phone.",
         "linked": "Linked as {user}",
-        "linked_hint": "Liner updates your Discord activity from the cloud, on every device.",
+        "linked_hint": "Neritium updates your Discord activity from the cloud, on every device.",
         "link": "Link Discord account",
         "unlink": "Unlink",
         "waiting": "Finish the sign-in in your browser…",
@@ -1056,8 +1095,8 @@
       "title": "Cache & Storage",
       "description": "Storage breakdown, local cache analytics and media files.",
       "usage_title": "Storage Usage",
-      "device_usage": "Liner is currently using {size} of local storage.",
-      "device_usage_raw": "Liner is currently using {size} of local storage.",
+      "device_usage": "Neritium is currently using {size} of local storage.",
+      "device_usage_raw": "Neritium is currently using {size} of local storage.",
       "audio_cache_limit": "Cache size limit",
       "audio_cache_limit_desc": "Older files and media are automatically removed when full",
       "cache_limit": "Cache size limit",
@@ -1073,7 +1112,7 @@
       "empty_storage": "Cache is squeaky clean!",
       "cloud_disclaimer": "All media, covers and tracks stay in the cloud and will be re-downloaded seamlessly when played.",
       "clearing_title": "Clearing cache...",
-      "clearing_subtitle": "Please keep this window open while Liner is cleaning your cache.",
+      "clearing_subtitle": "Please keep this window open while Neritium is cleaning your cache.",
       "cleared_title": "Storage Cleared",
       "cleared_subtitle": "Your cache has been swept clean. New media will stream and cache automatically.",
       "done_button": "Done",
@@ -1124,7 +1163,7 @@
       "standard": "Standard Quality (Opus 64kbps / MP3 128kbps)",
       "high": "High Quality (AAC 256kbps)",
       "lossless": "Lossless (FLAC/ALAC)",
-      "lossless_description": "Plays the lossless master (FLAC/ALAC) when Liner has one; other tracks use the best available stream."
+      "lossless_description": "Plays the lossless master (FLAC/ALAC) when Neritium has one; other tracks use the best available stream."
     },
     "equalizer": {
       "title": "Equalizer",
@@ -1144,7 +1183,7 @@
       "title": "Profile",
       "signed_in_as": "Signed in as",
       "not_signed_in": "Not currently signed in to a recognized session.",
-      "sign_in": "Sign in to Liner",
+      "sign_in": "Sign in to Neritium",
       "sign_out": "Sign out",
       "sign_out_confirm": "Are you sure you want to sign out?",
       "edit_profile": "Edit profile",
@@ -1155,7 +1194,7 @@
       "stat_active": "Active",
       "no_bio": "No bio yet",
       "details_section": "Profile Details",
-      "details_subtitle": "Customize your public appearance across Liner",
+      "details_subtitle": "Customize your public appearance across Neritium",
       "username_label": "Username",
       "username_hint": "3-30 lowercase characters (a-z, 0-9, _). Must be unique.",
       "username_invalid": "Username must be 3-30 lowercase letters, numbers, or underscores.",
@@ -1172,7 +1211,7 @@
       "saved_success": "Profile updated successfully",
       "save_failed": "Failed to update profile",
       "privacy_section": "Privacy & Social",
-      "privacy_subtitle": "Control your visibility and social presence across Liner",
+      "privacy_subtitle": "Control your visibility and social presence across Neritium",
       "public_profile": {
         "title": "Public profile",
         "description": "Allow others to search for your profile and view your public information."
@@ -1197,7 +1236,7 @@
       "badge_private": "Private"
     },
     "about": {
-      "liner": "Liner",
+      "neritium": "Neritium",
       "telegram": "Channel",
       "support": "Support",
       "github": "GitHub",
@@ -1230,7 +1269,7 @@
       "report_issue_desc": "Submit bug reports, feature suggestions, or feedback on GitHub.",
       "special_thanks": "Special Thanks",
       "special_thanks_desc": "@braccato/core, @kawarp/react, Solar Icons and MingCute Icons.",
-      "license_notice": "Distributed under Liner Source-Available & Non-Commercial License."
+      "license_notice": "Distributed under Neritium Source-Available & Non-Commercial License."
     },
     "connection": {
       "title": "Connection",
@@ -1313,7 +1352,7 @@
   },
   "error_screen": {
     "title": "Something went wrong",
-    "subtitle": "An unexpected error occurred in Liner. You can reload the app or try again.",
+    "subtitle": "An unexpected error occurred in Neritium. You can reload the app or try again.",
     "reload": "Reload app",
     "try_again": "Try again",
     "go_home": "Go to home",
@@ -1340,13 +1379,13 @@
   },
   "connectivity": {
     "wall_title": "Connection failed",
-    "wall_subtitle": "Liner can't reach its servers. Your music and library are safe.",
-    "wall_title_server": "Liner's servers are having trouble",
+    "wall_subtitle": "Neritium can't reach its servers. Your music and library are safe.",
+    "wall_title_server": "Neritium's servers are having trouble",
     "wall_subtitle_server": "Your connection is fine, the server answered with an error. Your music and library are safe, try again in a few minutes.",
     "steps_title": "Quick fixes worth trying",
     "step_net": "Check that Wi-Fi or cable is connected and pages open in a browser.",
     "step_vpn": "Pause VPN, proxy or DNS filters for a minute — they often block the app.",
-    "step_firewall": "Allow Liner through the firewall and antivirus network shields.",
+    "step_firewall": "Allow Neritium through the firewall and antivirus network shields.",
     "step_router": "Restart the router, then press Retry below.",
     "retry": "Retry",
     "retrying": "Checking…",
@@ -1376,13 +1415,13 @@
   },
   "updater": {
     "modal_title": "New Update Available",
-    "modal_desc": "A new version of Liner (v{version}) is ready to download.",
+    "modal_desc": "A new version of Neritium (v{version}) is ready to download.",
     "view_changelog": "Changelog",
     "skip_button": "Skip",
     "update_button": "Update",
     "downloading_title": "Downloading update…",
     "downloaded_title": "Update downloaded",
-    "downloaded_desc": "Restart Liner to install version {version}.",
+    "downloaded_desc": "Restart Neritium to install version {version}.",
     "install_button": "Install",
     "error_title": "Update failed"
   },
@@ -1396,7 +1435,7 @@
   },
   "human_check": {
     "title": "Confirm you're not a bot",
-    "description": "A quick Cloudflare check keeps bots away from Liner accounts. It usually passes on its own in a second.",
+    "description": "A quick Cloudflare check keeps bots away from Neritium accounts. It usually passes on its own in a second.",
     "expired": "The check timed out and is starting again.",
     "failed": "The check didn't load. Check your connection and try again.",
     "waiting": "Checking…",
@@ -1407,9 +1446,9 @@
 ,
   "reset_password": {
     "title": "Reset password",
-    "subtitle": "Choose a new password for your Liner account.",
+    "subtitle": "Choose a new password for your Neritium account.",
     "brand_done_title": "All set",
-    "brand_done_subtitle": "Your Liner password was changed.",
+    "brand_done_subtitle": "Your Neritium password was changed.",
     "brand_invalid_title": "Link expired",
     "brand_invalid_subtitle": "Reset links work once and only for a limited time.",
     "account": "Account",
@@ -1421,8 +1460,8 @@
     "done_title": "Password changed",
     "done_text": "You can sign in with your new password now. For your security, every device that was signed in has been signed out.",
     "invalid_title": "This link can't be used",
-    "invalid_text": "It has expired or was already used. Ask Liner support to send you a new reset link.",
-    "offline_title": "Can't reach Liner",
+    "invalid_text": "It has expired or was already used. Ask Neritium support to send you a new reset link.",
+    "offline_title": "Can't reach Neritium",
     "offline_text": "Check your connection and try again.",
     "btn_retry": "Try again",
     "btn_back_to_sign_in": "Back to sign in",

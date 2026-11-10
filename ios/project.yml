@@ -1,6 +1,6 @@
-name: Liner
+name: Neritium
 options:
-  bundleIdPrefix: app.tryliner
+  bundleIdPrefix: app.neritium
   deploymentTarget:
     iOS: "15.0"
   createIntermediateGroups: true
@@ -9,26 +9,26 @@ settings:
   base:
     SWIFT_VERSION: "5.0"
     IPHONEOS_DEPLOYMENT_TARGET: "15.0"
-    MARKETING_VERSION: "0.1.51"
-    CURRENT_PROJECT_VERSION: "11"
+    MARKETING_VERSION: "0.1.55"
+    CURRENT_PROJECT_VERSION: "12"
     ENABLE_USER_SCRIPT_SANDBOXING: NO
     CLANG_ENABLE_MODULES: YES
 
 targets:
-  Liner:
+  Neritium:
     type: application
     platform: iOS
     deploymentTarget: "15.0"
     sources:
-      - path: Liner
+      - path: Neritium
       - path: Web
         type: folder
         buildPhase: resources
     info:
       path: Info.plist
       properties:
-        CFBundleDisplayName: Liner
-        CFBundleName: Liner
+        CFBundleDisplayName: Neritium
+        CFBundleName: Neritium
         CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
         CFBundleExecutable: $(EXECUTABLE_NAME)
         CFBundlePackageType: APPL
@@ -57,9 +57,9 @@ targets:
               NSExceptionAllowsInsecureHTTPLoads: true
               NSIncludesSubdomains: false
         CFBundleURLTypes:
-          - CFBundleURLName: app.tryliner.ios
+          - CFBundleURLName: app.neritium.ios
             CFBundleURLSchemes:
-              - liner
+              - neritium
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
@@ -71,8 +71,8 @@ targets:
           - UIInterfaceOrientationLandscapeRight
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: app.tryliner.ios
-        PRODUCT_NAME: Liner
+        PRODUCT_BUNDLE_IDENTIFIER: app.neritium.ios
+        PRODUCT_NAME: Neritium
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_STYLE: Automatic
         SUPPORTS_MACCATALYST: NO
@@ -80,10 +80,10 @@ targets:
         DEVELOPMENT_TEAM: ""
 
 schemes:
-  Liner:
+  Neritium:
     build:
       targets:
-        Liner: all
+        Neritium: all
     run:
       config: Debug
     archive:

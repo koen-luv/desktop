@@ -3,9 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0a0a0a" />
+    <title>Neritium</title>
+    <meta
+      name="description"
+      content="Neritium plays the music library you own — playlists, synced lyrics, downloads and background playback."
+    />
     <meta name="referrer" content="no-referrer" />
-    <title>Liner</title>
+
+    <!-- Browser build: paint the system UI in the app's own surface colour. -->
+    <meta name="theme-color" content="#fbfaf8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#101014" media="(prefers-color-scheme: dark)" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Neritium" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/icon.png" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -21,10 +37,17 @@
         --font-inter: 'Inter', sans-serif;
         --font-geist-sans: 'Geist', sans-serif;
         --font-geist-mono: 'Geist Mono', monospace;
+        color-scheme: light dark;
+      }
+      /* The shell owns all padding (safe areas, window gaps), so the document
+         background is transparent and never adds a second inset. */
+      html,
+      body {
+        background: transparent;
       }
     </style>
   </head>
-  <body class="h-full w-full bg-transparent overflow-hidden p-1">
+  <body class="h-full w-full bg-transparent overflow-hidden">
     <div id="root" class="h-full w-full"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

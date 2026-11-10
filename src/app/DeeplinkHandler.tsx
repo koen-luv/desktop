@@ -16,12 +16,12 @@ function isUserPlaylistId(id: string): boolean {
   );
 }
 
-// opens shared entities arriving via liner:// deeplinks (main pre-validates)
+// opens shared entities arriving via neritium:// deeplinks (main pre-validates)
 export default function DeeplinkHandler() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const off = window.linerElectron?.onDeeplink((target: DeeplinkTarget) => {
+    const off = window.neritiumElectron?.onDeeplink((target: DeeplinkTarget) => {
       void (async () => {
         try {
           switch (target.type) {

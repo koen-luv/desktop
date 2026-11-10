@@ -7,9 +7,9 @@ vi.mock("@/shared/api/baseUrl", () => ({
 }));
 
 interface TestWindow {
-  LinerAndroid?: unknown;
-  linerElectron?: unknown;
-  __linerAndroidEmit?: (type: string, payload: string) => void;
+  NeritiumAndroid?: unknown;
+  neritiumElectron?: unknown;
+  __neritiumAndroidEmit?: (type: string, payload: string) => void;
 }
 
 const win = window as unknown as TestWindow;
@@ -21,7 +21,7 @@ describe("platformFetch", () => {
     httpRequest = vi.fn(
       (id: string, _method: string, _url: string, _headersJson: string, _body: string | null) => {
         setTimeout(() => {
-          win.__linerAndroidEmit?.(
+          win.__neritiumAndroidEmit?.(
             "httpResponse",
             JSON.stringify({
               id,
@@ -34,7 +34,7 @@ describe("platformFetch", () => {
         }, 0);
       },
     );
-    win.LinerAndroid = {
+    win.NeritiumAndroid = {
       getInsets: () => "{}",
       setLightSystemBars: () => {},
       httpRequest,
@@ -43,9 +43,9 @@ describe("platformFetch", () => {
   });
 
   afterEach(() => {
-    delete win.LinerAndroid;
-    delete win.linerElectron;
-    delete win.__linerAndroidEmit;
+    delete win.NeritiumAndroid;
+    delete win.neritiumElectron;
+    delete win.__neritiumAndroidEmit;
     vi.restoreAllMocks();
   });
 
@@ -109,7 +109,7 @@ describe("platformFetch", () => {
   });
 
   it("uses the browser fetch when no native bridge is installed", async () => {
-    delete win.LinerAndroid;
+    delete win.NeritiumAndroid;
     const browserFetch = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response("{}", { status: 200 }));

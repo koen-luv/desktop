@@ -4,6 +4,8 @@ compatibility_date = "2025-09-01"
 
 # Secrets (set with `npx wrangler secret put <NAME>`):
 #   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, JWT_SECRET, TURNSTILE_SECRET
+# Optional: STREAM_SIGNING_SECRET signs /v1/stream tokens (falls back to
+# JWT_SECRET). Setting it lets you rotate stream URLs independently.
 
 [vars]
 # off | optional | required. Turnstile only becomes active when both

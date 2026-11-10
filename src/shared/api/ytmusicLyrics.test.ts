@@ -9,7 +9,7 @@ describe("YouTube Music lyrics fallback", () => {
   it("accepts raw and prefixed video ids", () => {
     expect(youtubeMusicVideoId("dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
     expect(youtubeMusicVideoId("ytmusic:dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
-    expect(youtubeMusicVideoId("liner-track-uuid")).toBeNull();
+    expect(youtubeMusicVideoId("neritium-track-uuid")).toBeNull();
     expect(youtubeMusicVideoId(undefined)).toBeNull();
   });
 

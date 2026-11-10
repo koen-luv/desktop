@@ -315,7 +315,7 @@ export function OverlayTab({ searchQuery }: { searchQuery?: string }) {
           }
           description={
             t("settings.overlay.auto_show_on_minimize.description") ||
-            "Automatically show the overlay when Liner is minimized."
+            "Automatically show the overlay when Neritium is minimized."
           }
           titleKey="settings.overlay.auto_show_on_minimize.title"
           descKey="settings.overlay.auto_show_on_minimize.description"

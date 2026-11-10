@@ -11,6 +11,7 @@ import {
   Widget5,
   Book2,
   QuestionCircle,
+  Vinyl,
 } from "@solar-icons/react";
 import Dialog from "@/shared/ui/Dialog";
 import { UserAvatar } from "@/shared/ui";
@@ -29,9 +30,11 @@ import {
   OverlayTab,
   DiscordTab,
   LastFmTab,
+  SpotifyTab,
   DevicesTab,
   ListeningTab,
 } from "./tabs";
+import { isSpotifyAccountAvailable } from "@/features/library/services/import/sources/spotify/spotifyAccount";
 
 /**
  * Settings is a two-level menu.
@@ -47,6 +50,7 @@ type SectionId =
   | "Overlay"
   | "Discord"
   | "LastFm"
+  | "Spotify"
   | "Appearance"
   | "Customization"
   | "Audio"
@@ -63,6 +67,7 @@ const SECTION_ICONS: Record<SectionId, typeof Play> = {
   Overlay: Widget5,
   Discord: DiscordFill,
   LastFm: MusicLine,
+  Spotify: Vinyl,
   Appearance: Palette,
   Customization: Gallery,
   Audio: HeadphonesRound,
@@ -78,6 +83,7 @@ const SECTION_COMPONENTS: Record<SectionId, ComponentType<{ searchQuery?: string
   Overlay: OverlayTab,
   Discord: DiscordTab,
   LastFm: LastFmTab,
+  Spotify: SpotifyTab,
   Appearance: AppearanceTab,
   Customization: CustomizationTab,
   Audio: AudioTab,
@@ -88,7 +94,7 @@ const SECTION_COMPONENTS: Record<SectionId, ComponentType<{ searchQuery?: string
 };
 
 const CATEGORIES: { id: CategoryId; group: GroupId; sections: SectionId[] }[] = [
-  { id: "playback", group: "preferences", sections: ["Playback", "Shortcuts", "Audio", "LastFm", "Devices"] },
+  { id: "playback", group: "preferences", sections: ["Playback", "Shortcuts", "Audio", "LastFm", "Spotify", "Devices"] },
   { id: "appearance", group: "preferences", sections: ["Appearance", "Customization"] },
   { id: "overlay", group: "preferences", sections: ["Overlay", "Discord"] },
   { id: "storage", group: "application", sections: ["Storage"] },
@@ -138,6 +144,11 @@ const SETTING_ITEMS: { sectionId: SectionId; titleKey: string; descKey?: string;
   { sectionId: "LastFm", titleKey: "settings.lastfm.enable.title", descKey: "settings.lastfm.enable.description" },
   { sectionId: "LastFm", titleKey: "settings.lastfm.account.title", descKey: "settings.lastfm.account.description" },
 
+  // Spotify account import
+  { sectionId: "Spotify", titleKey: "settings.spotify.account.title", descKey: "settings.spotify.account.description" },
+  { sectionId: "Spotify", titleKey: "settings.spotify.liked.title", descKey: "settings.spotify.liked.description" },
+  { sectionId: "Spotify", titleKey: "settings.spotify.playlists.title", descKey: "settings.spotify.playlists.description" },
+
   // Device control
   { sectionId: "Devices", titleKey: "settings.devices.section_title", descKey: "settings.devices.section_desc" },
 
@@ -167,7 +178,7 @@ const SETTING_ITEMS: { sectionId: SectionId; titleKey: string; descKey?: string;
   { sectionId: "Listening", titleKey: "home.recap.topArtist" },
 
   // About
-  { sectionId: "About", titleKey: "settings.about.liner", descKey: "common.app.version" },
+  { sectionId: "About", titleKey: "settings.about.neritium", descKey: "common.app.version" },
   { sectionId: "About", titleKey: "settings.notifications.test_button" },
 ];
 
@@ -177,6 +188,7 @@ const SECTION_LABEL_KEYS: Record<SectionId, string> = {
   Overlay: "settings.tabs.overlay",
   Discord: "settings.tabs.discord",
   LastFm: "settings.tabs.lastfm",
+  Spotify: "settings.tabs.spotify",
   Appearance: "settings.theme.title",
   Customization: "settings.tabs.customization",
   Audio: "settings.tabs.audio",
@@ -192,6 +204,7 @@ const SECTION_DESC_KEYS: Record<SectionId, string> = {
   Overlay: "settings.overlay.description",
   Discord: "settings.discord.description",
   LastFm: "settings.lastfm.description",
+  Spotify: "settings.spotify.description",
   Appearance: "settings.theme.description",
   Customization: "settings.customization.description",
   Audio: "settings.audio.description",
@@ -258,6 +271,7 @@ export default function SettingsModal() {
     Overlay: t("settings.tabs.overlay") || "Overlay",
     Discord: t("settings.tabs.discord") || "Discord RPC",
     LastFm: t("settings.tabs.lastfm") || "Last.fm",
+    Spotify: t("settings.tabs.spotify") || "Spotify",
     Appearance: t("settings.tabs.appearance"),
     Customization: t("settings.tabs.customization") || "Customization",
     Audio: t("settings.tabs.audio"),
@@ -273,6 +287,7 @@ export default function SettingsModal() {
     Overlay: t("settings.overlay.description") || "Desktop overlay behavior, position and lyrics display.",
     Discord: t("settings.discord.description") || "Show what you're listening to on Discord with artwork, artist badge and progress bar.",
     LastFm: t("settings.lastfm.description") || "Scrobble what you listen to to your Last.fm profile.",
+    Spotify: t("settings.spotify.description") || "Import your Spotify playlists and liked songs into Neritium.",
     Appearance: t("settings.theme.description"),
     Customization: t("settings.customization.description") || "Window background wallpaper, transparency and block blur effects.",
     Audio: t("settings.audio.description"),
@@ -298,6 +313,7 @@ export default function SettingsModal() {
 
     (Object.keys(SECTION_LABEL_KEYS) as SectionId[]).forEach((sectionId) => {
       if (android && (sectionId === "Overlay" || sectionId === "Shortcuts")) return;
+      if (sectionId === "Spotify" && !isSpotifyAccountAvailable()) return;
       const texts = [
         ...getTranslationsForAllLocales(SECTION_LABEL_KEYS[sectionId]),
         ...getTranslationsForAllLocales(SECTION_DESC_KEYS[sectionId]),
@@ -332,7 +348,7 @@ export default function SettingsModal() {
     () =>
       CATEGORIES.filter((cat) => {
         if (cat.id !== "overlay" || !isAndroidApp()) return true;
-        return Boolean(window.linerElectron?.discordUpdateState);
+        return Boolean(window.neritiumElectron?.discordUpdateState);
       }),
     [],
   );
@@ -384,7 +400,7 @@ export default function SettingsModal() {
     user?.displayName ||
     user?.username ||
     user?.email?.split("@")[0] ||
-    "Liner";
+    "Neritium";
   const handle = user?.username ? `@${user.username}` : (user?.email ?? t("settings.manage_account"));
 
   const closeIcon = (
@@ -543,6 +559,8 @@ export default function SettingsModal() {
           // Overlay and Shortcuts are desktop-only; Android renders the
           // Discord section of the overlay category instead.
           if (isAndroidApp() && (sectionId === "Overlay" || sectionId === "Shortcuts")) return false;
+          // Spotify account import needs the Electron OAuth bridge.
+          if (sectionId === "Spotify" && !isSpotifyAccountAvailable()) return false;
           return !matchingSections.size || matchingSections.has(sectionId);
         })
         .map((sectionId, index) => {

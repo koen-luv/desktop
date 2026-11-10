@@ -8,7 +8,7 @@ describe("updaterStore", () => {
   });
 
   it("handles check for updates when update is available", async () => {
-    window.linerElectron = {
+    window.neritiumElectron = {
       checkForUpdates: vi.fn().mockResolvedValue({
         available: true,
         version: "0.1.28",
@@ -26,7 +26,7 @@ describe("updaterStore", () => {
   });
 
   it("handles skipping an update", async () => {
-    window.linerElectron = {
+    window.neritiumElectron = {
       checkForUpdates: vi.fn().mockResolvedValue({
         available: true,
         version: "0.1.28",
@@ -47,7 +47,7 @@ describe("updaterStore", () => {
 
   it("initiates download and tracks status transitions", async () => {
     const downloadMock = vi.fn().mockResolvedValue({ success: true });
-    window.linerElectron = {
+    window.neritiumElectron = {
       downloadUpdate: downloadMock,
     } as any;
 
@@ -67,7 +67,7 @@ describe("updaterStore", () => {
 
   it("triggers quit and install action", async () => {
     const installMock = vi.fn().mockResolvedValue(true);
-    window.linerElectron = {
+    window.neritiumElectron = {
       quitAndInstall: installMock,
     } as any;
 

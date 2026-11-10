@@ -19,7 +19,7 @@ export const useDiscordWebhookStore = create<DiscordWebhookState>()(
       setUrl: (url) => set({ url }),
     }),
     {
-      name: "liner_discord_webhook_v1",
+      name: "neritium_discord_webhook_v1",
       storage: createJSONStorage(() => debouncedStorage),
       partialize: (state): DiscordWebhookSettings => ({
         enabled: state.enabled,

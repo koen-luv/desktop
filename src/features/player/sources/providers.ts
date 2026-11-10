@@ -12,18 +12,18 @@ import {
 import type { ResolveContext, ResolvedStream, SourceProvider } from "./types";
 
 /**
- * Legitimate playback sources for Liner.
+ * Legitimate playback sources for Neritium.
  *
  * Every provider resolves streams through the app's existing signed playback
  * session API (`POST /v1/tracks/:id/playback`). No stream URL is invented and
  * no provider endpoint is scraped:
  *
- *  - `liner-auto`         — one session request, server-selected transport and
+ *  - `neritium-auto`         — one session request, server-selected transport and
  *                           codec. This is the app's historical behaviour and
  *                           the most reliable path.
- *  - `liner-direct-aac`   — direct Innertube player request, MP4/AAC.
- *  - `liner-direct-opus`  — direct Innertube player request, WebM/Opus.
- *  - `liner-proxy-aac`    — Liner's own proxy transport (explicit request).
+ *  - `neritium-direct-aac`   — direct Innertube player request, MP4/AAC.
+ *  - `neritium-direct-opus`  — direct Innertube player request, WebM/Opus.
+ *  - `neritium-proxy-aac`    — Neritium's own proxy transport (explicit request).
  *
  * Providers are ranked by expected reliability and codec compatibility, so a
  * browser that cannot decode Opus (e.g. Safari) never receives an Opus stream.
@@ -31,7 +31,7 @@ import type { ResolveContext, ResolvedStream, SourceProvider } from "./types";
  * (Electron / Android native bridge); elsewhere the proxy fallback serves.
  */
 
-interface LinerProviderConfig {
+interface NeritiumProviderConfig {
   id: string;
   label: string;
   priority: number;
@@ -47,7 +47,7 @@ interface LinerProviderConfig {
   requiresDirectExecution?: boolean;
 }
 
-function createLinerProvider(config: LinerProviderConfig): SourceProvider {
+function createNeritiumProvider(config: NeritiumProviderConfig): SourceProvider {
   return {
     id: config.id,
     priority: config.priority,
@@ -104,17 +104,17 @@ function createLinerProvider(config: LinerProviderConfig): SourceProvider {
 /** Server-selected transport — one round-trip, handles either response shape. */
 // The auto provider asks the server for the stream, so when the backend keeps a
 // lossless master it is the only source that can serve it.
-export const linerAutoProvider = createLinerProvider({
-  id: "liner-auto",
-  label: "Liner",
+export const neritiumAutoProvider = createNeritiumProvider({
+  id: "neritium-auto",
+  label: "Neritium",
   priority: 100,
   transport: "auto",
   losslessCapable: true,
 });
 
-export const linerDirectAacProvider = createLinerProvider({
-  id: "liner-direct-aac",
-  label: "Liner (direct, MP4/AAC)",
+export const neritiumDirectAacProvider = createNeritiumProvider({
+  id: "neritium-direct-aac",
+  label: "Neritium (direct, MP4/AAC)",
   priority: 90,
   transport: "direct",
   preferredCodec: "aac",
@@ -123,9 +123,9 @@ export const linerDirectAacProvider = createLinerProvider({
   requiresDirectExecution: true,
 });
 
-export const linerDirectOpusProvider = createLinerProvider({
-  id: "liner-direct-opus",
-  label: "Liner (direct, WebM/Opus)",
+export const neritiumDirectOpusProvider = createNeritiumProvider({
+  id: "neritium-direct-opus",
+  label: "Neritium (direct, WebM/Opus)",
   priority: 85,
   transport: "direct",
   preferredCodec: "opus",
@@ -134,9 +134,9 @@ export const linerDirectOpusProvider = createLinerProvider({
   requiresDirectExecution: true,
 });
 
-export const linerProxyAacProvider = createLinerProvider({
-  id: "liner-proxy-aac",
-  label: "Liner (proxy transport)",
+export const neritiumProxyAacProvider = createNeritiumProvider({
+  id: "neritium-proxy-aac",
+  label: "Neritium (proxy transport)",
   priority: 70,
   transport: "proxy",
   preferredCodec: "aac",
@@ -146,10 +146,10 @@ export const linerProxyAacProvider = createLinerProvider({
 
 /**
  * Client-side Innertube extraction (the yt-dlp technique). Runs the Innertube
- * `player` request directly from the renderer, so it needs no Liner backend and
+ * `player` request directly from the renderer, so it needs no Neritium backend and
  * keeps working when `api.tryliner.fun` is down. Highest priority: it resolves
  * from the exact videoId (track.id), so the recording is always the one asked
- * for. The Liner providers below remain as fallbacks.
+ * for. The Neritium providers below remain as fallbacks.
  */
 export const innertubeClientProvider: SourceProvider = {
   id: "innertube-client",
@@ -193,8 +193,8 @@ export const innertubeClientProvider: SourceProvider = {
 /** Default ordered provider list. Ordering is by priority (descending). */
 export const defaultSourceProviders: SourceProvider[] = [
   innertubeClientProvider,
-  linerAutoProvider,
-  linerDirectAacProvider,
-  linerDirectOpusProvider,
-  linerProxyAacProvider,
+  neritiumAutoProvider,
+  neritiumDirectAacProvider,
+  neritiumDirectOpusProvider,
+  neritiumProxyAacProvider,
 ];

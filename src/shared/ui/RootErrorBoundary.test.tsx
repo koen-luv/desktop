@@ -180,7 +180,7 @@ describe("RootErrorBoundary", () => {
     });
 
     expect(writeTextMock).toHaveBeenCalledTimes(1);
-    expect(writeTextMock.mock.calls[0][0]).toContain("Liner Desktop Client Error Report");
+    expect(writeTextMock.mock.calls[0][0]).toContain("Neritium Desktop Client Error Report");
     expect(writeTextMock.mock.calls[0][0]).toContain("Simulated component explosion");
   });
 });

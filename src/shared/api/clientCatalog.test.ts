@@ -9,7 +9,12 @@ vi.mock("@/shared/media/innertube", () => ({
 import { clientCatalog } from "./clientCatalog";
 
 describe("clientCatalog.resolveSnapshot", () => {
-  beforeEach(() => getTrack.mockReset());
+  beforeEach(() => {
+    getTrack.mockReset();
+    // Snapshots are resolved client-side only where direct YouTube access is
+    // allowed (the desktop shell); the website skips straight past them.
+    (window as unknown as { neritiumElectron?: unknown }).neritiumElectron = { platform: "linux" };
+  });
 
   it("keeps the requested id even when the catalog returns a different one", async () => {
     getTrack.mockResolvedValue({

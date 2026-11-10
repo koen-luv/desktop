@@ -51,6 +51,7 @@ function translate(key: string, vars?: Record<string, string | number>) {
 }
 
 import { getApiBaseUrl } from "./baseUrl";
+import { streamLrclibLyrics } from "./lyricsFallback";
 import {
   PowTimeoutError,
   SUPPORTED_POW_ALGORITHM,
@@ -400,7 +401,7 @@ async function executeRequest<T>(
     const apiErr = new ApiError(
       res.status,
       edgeChallenge
-        ? "Cloudflare blocked the request before it reached Liner."
+        ? "Cloudflare blocked the request before it reached Neritium."
         : typeof body.message === "string"
           ? body.message
           : res.statusText,
@@ -485,7 +486,7 @@ export function resolveApiErrorMessage(
   return t(fallbackKey);
 }
 
-// ---- Types from @liner/contracts --------------------------------------------
+// ---- Types from @neritium/contracts --------------------------------------------
 
 export type {
   SearchType,
@@ -735,7 +736,7 @@ export const api = {
     return result;
   },
 
-  // one-time links Liner support emails (liner://reset-password?id=<token>)
+  // one-time links Neritium support emails (neritium://reset-password?id=<token>)
   getPasswordReset(
     token: string,
   ): Promise<{ maskedEmail: string; expiresAt: string }> {
@@ -1106,6 +1107,7 @@ export const api = {
     signal?: AbortSignal,
     transport?: "proxy" | "direct_innertube",
     quality?: AudioQuality,
+    integrity?: { poToken?: string; visitorData?: string },
   ): Promise<PlaybackSession> {
     return request<PlaybackSession>(
       `/v1/tracks/${encodeURIComponent(id)}/playback`,
@@ -1118,6 +1120,11 @@ export const api = {
           // "high" is the historical default and stays implicit; other tiers ask
           // the server for a specific master (lossless = FLAC/ALAC).
           ...(quality && quality !== "high" ? { quality } : {}),
+          // A PO token proves the request came from a real client; the desktop
+          // app mints one per track and the browser does the same through the
+          // API's integrity relays.
+          ...(integrity?.poToken ? { poToken: integrity.poToken } : {}),
+          ...(integrity?.visitorData ? { visitorData: integrity.visitorData } : {}),
         }),
       },
     );
@@ -1126,7 +1133,7 @@ export const api = {
   /**
    * Executes a signed direct_innertube plan returned by `createPlaybackSession`
    * from the client. The signed plan is posted to Innertube verbatim; the
-   * resulting media URL is played directly (never proxied through Liner).
+   * resulting media URL is played directly (never proxied through Neritium).
    */
   executePlaybackEndpoint(
     plan: InnertubePlan,
@@ -1188,6 +1195,13 @@ export const api = {
 
     if (!res.ok || !res.body) {
       const respReqId = res.headers?.get?.("x-request-id") || requestId;
+      // A backend that leaves lyrics to the client (the self-hosted Worker
+      // answers CLIENT_ONLY) must not leave the player lyric-less: fall back to
+      // a public provider the browser can reach directly.
+      if (res.status === 404) {
+        yield* streamLrclibLyrics(id, hint, signal);
+        return;
+      }
       throw new ApiError(res.status, res.statusText, undefined, respReqId);
     }
 

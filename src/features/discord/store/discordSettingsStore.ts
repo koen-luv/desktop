@@ -19,8 +19,8 @@ interface DiscordSettingsState extends DiscordRpcSettings {
 }
 
 function notifyElectron(patch: Partial<DiscordRpcSettings>) {
-  if (typeof window !== "undefined" && window.linerElectron?.discordUpdateSettings) {
-    window.linerElectron.discordUpdateSettings(patch);
+  if (typeof window !== "undefined" && window.neritiumElectron?.discordUpdateSettings) {
+    window.neritiumElectron.discordUpdateSettings(patch);
   }
 }
 
@@ -70,7 +70,7 @@ export const useDiscordSettingsStore = create<DiscordSettingsState>()(
       },
     }),
     {
-      name: "liner_discord_settings_v1",
+      name: "neritium_discord_settings_v1",
       storage: createJSONStorage(() => debouncedStorage),
       partialize: (state): DiscordRpcSettings => ({
         enabled: state.enabled,

@@ -21,6 +21,13 @@ vi.mock("@/shared/media/soundcloud", async (importOriginal) => {
 import { SoundCloudUnavailableError } from "@/shared/media/soundcloud";
 import { resolvePlaybackStream } from "./streamResolver";
 import { clearYoutubeStandInCache } from "./youtubeStandIn";
+import { resetCodecProbeCache } from "../sources/codecSupport";
+
+/** These suites describe the native shell, which may call Innertube directly. */
+function installDesktopShell() {
+  (window as unknown as { neritiumElectron?: unknown }).neritiumElectron = { platform: "linux" };
+  resetCodecProbeCache();
+}
 
 const directStream = {
   url: "https://rr1.googlevideo.com/videoplayback?itag=251",
@@ -41,6 +48,8 @@ function searchTrack(id: string, title: string, artist: string, durationMs: numb
 
 afterEach(() => {
   vi.restoreAllMocks();
+  delete (window as unknown as { neritiumElectron?: unknown }).neritiumElectron;
+  resetCodecProbeCache();
   mocks.resolveDirectAudioStream.mockReset();
   mocks.searchRaw.mockReset();
   mocks.resolveSoundCloudStream.mockReset();
@@ -69,6 +78,7 @@ describe("resolvePlaybackStream for soundcloud ids", () => {
   });
 
   it("finds the same song on youtube when soundcloud cannot play it", async () => {
+    installDesktopShell();
     mocks.resolveSoundCloudStream.mockRejectedValue(new SoundCloudUnavailableError("preview_only"));
     mocks.searchRaw.mockResolvedValue([
       searchTrack("aaaaaaaaaa1", "Blinding Lights (Live)", "The Weeknd", 260_000),
@@ -83,6 +93,7 @@ describe("resolvePlaybackStream for soundcloud ids", () => {
   });
 
   it("remembers the youtube stand-in so the next resolve skips the search", async () => {
+    installDesktopShell();
     mocks.resolveSoundCloudStream.mockRejectedValue(new Error("network down"));
     mocks.searchRaw.mockResolvedValue([searchTrack("4NRXx6U8ABQ", "Blinding Lights", "The Weeknd", 200_040)]);
     mocks.resolveDirectAudioStream.mockResolvedValue(directStream);

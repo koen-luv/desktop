@@ -1,6 +1,7 @@
 import { innertubeCatalog } from "@/shared/media/innertube";
 import { isSoundCloudCatalogId, isSoundCloudUrl, resolveSoundCloudUrl, soundcloudCatalog } from "@/shared/media/soundcloud";
 import { isAbortError } from "@/shared/utils/abort";
+import { canCallYoutubeDirectly } from "@/platform/capabilities";
 import { log } from "@/shared/utils/logger";
 import type {
   AlbumDetails,
@@ -18,6 +19,9 @@ export function isClientCatalogId(id: string): boolean {
 }
 
 async function preferClient<T>(label: string, client: () => Promise<T>, server: () => Promise<T>): Promise<T> {
+  // A browser cannot read YouTube (CORS): go straight to the backend instead of
+  // burning a failed preflight on every catalog request.
+  if (!canCallYoutubeDirectly()) return server();
   try {
     return await client();
   } catch (error) {
@@ -30,6 +34,9 @@ async function preferClient<T>(label: string, client: () => Promise<T>, server: 
 const SNAPSHOT_TIMEOUT_MS = 4000;
 
 async function resolveSnapshot(id: string): Promise<Track | undefined> {
+  // No direct YouTube access (the website): there is no snapshot to resolve and
+  // the queued track already carries what the catalogue needs.
+  if (!isSoundCloudCatalogId(id) && !canCallYoutubeDirectly()) return undefined;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SNAPSHOT_TIMEOUT_MS);
   const catalog = isSoundCloudCatalogId(id) ? soundcloudCatalog : innertubeCatalog;
@@ -83,6 +90,7 @@ export const clientCatalog = {
 
   async getArtistImage(id: string): Promise<string | undefined> {
     if (isSoundCloudCatalogId(id)) return soundcloudCatalog.getArtistImage(id).catch(() => undefined);
+    if (!canCallYoutubeDirectly()) return undefined;
     return innertubeCatalog.getArtistImage(id).catch(() => undefined);
   },
 

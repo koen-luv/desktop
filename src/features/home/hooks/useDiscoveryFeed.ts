@@ -92,7 +92,7 @@ function toPlaylistItem(playlist: PlaylistResult): PopularItem {
     item: {
       id: playlist.id,
       title: playlist.title,
-      owner: playlist.author ?? "Liner",
+      owner: playlist.author ?? "Neritium",
       coverUrl: playlistCoverUrl(playlist),
       totalTracks: 0,
     },

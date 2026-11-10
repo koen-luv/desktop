@@ -39,7 +39,7 @@ describe("EnvironmentWarning", () => {
     mounts = [];
     vi.stubGlobal("localStorage", createStorage());
     vi.stubGlobal("sessionStorage", createStorage());
-    delete (window as unknown as Record<string, unknown>).linerElectron;
+    delete (window as unknown as Record<string, unknown>).neritiumElectron;
   });
 
   afterEach(() => {
@@ -47,7 +47,7 @@ describe("EnvironmentWarning", () => {
       act(() => root.unmount());
       host.remove();
     }
-    delete (window as unknown as Record<string, unknown>).linerElectron;
+    delete (window as unknown as Record<string, unknown>).neritiumElectron;
     vi.unstubAllGlobals();
   });
 
@@ -60,12 +60,12 @@ describe("EnvironmentWarning", () => {
     act(() => {
       banner!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    expect(sessionStorage.getItem("liner:env-warning-skipped")).toBe("1");
+    expect(sessionStorage.getItem("neritium:env-warning-skipped")).toBe("1");
     expect(mounted.host.textContent).toBe("");
   });
 
   it("stays silent inside electron", () => {
-    (window as unknown as Record<string, unknown>).linerElectron = {};
+    (window as unknown as Record<string, unknown>).neritiumElectron = {};
     const mounted = renderWarning();
     mounts.push(mounted);
     expect(mounted.host.textContent).toBe("");

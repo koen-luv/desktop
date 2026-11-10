@@ -11,6 +11,10 @@ export default defineConfig(({ command, mode }) => {
     if (devSigningSecret) process.env.LINER_DEV_SIGNING_SECRET = devSigningSecret;
   }
 
+  // `vite --mode web` builds the website port: the same renderer, without the
+  // Electron main/preload bundles it would never load.
+  const webOnly = mode === "web";
+
   return {
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
@@ -18,7 +22,7 @@ export default defineConfig(({ command, mode }) => {
   plugins: [
     react(),
     tailwindcss(),
-    electron({
+    ...(webOnly ? [] : [electron({
       main: {
         entry: "electron/main.ts",
       },
@@ -35,7 +39,7 @@ export default defineConfig(({ command, mode }) => {
           },
         },
       },
-    }),
+    })]),
   ],
   clearScreen: false,
   resolve: {

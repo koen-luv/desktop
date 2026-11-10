@@ -12,8 +12,8 @@ const mockDict: TranslationDict = {
 
 describe("flatten", () => {
   it("flattens nested object with prefix", () => {
-    const result = flatten({ name: "Liner", nested: { key: "val" } }, "common");
-    expect(result).toEqual({ "common.name": "Liner", "common.nested.key": "val" });
+    const result = flatten({ name: "Neritium", nested: { key: "val" } }, "common");
+    expect(result).toEqual({ "common.name": "Neritium", "common.nested.key": "val" });
   });
 
   it("handles empty objects", () => {
@@ -95,7 +95,7 @@ describe("createTranslatorSync with plurals", () => {
 
   it("falls back to English when key is missing in target locale", () => {
     const tRu = createTranslatorSync("ru");
-    expect(tRu("common.app.name")).toBe("Liner");
+    expect(tRu("common.app.name")).toBe("Neritium");
   });
 
   it("translates the connected-accounts label in every supported locale", () => {

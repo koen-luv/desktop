@@ -33,7 +33,7 @@ describe("useWindowDrag", () => {
     mockDragMove = vi.fn();
     mockToggleMaximize = vi.fn();
 
-    (window as any).linerElectron = {
+    (window as any).neritiumElectron = {
       dragMove: mockDragMove,
       toggleMaximize: mockToggleMaximize,
     };
@@ -43,7 +43,7 @@ describe("useWindowDrag", () => {
     await act(async () => {
       root.unmount();
     });
-    delete (window as any).linerElectron;
+    delete (window as any).neritiumElectron;
     if (container.parentNode) {
       container.parentNode.removeChild(container);
     }
@@ -296,7 +296,7 @@ describe("useWindowDrag", () => {
 
   describe("on linux", () => {
     beforeEach(() => {
-      (window as any).linerElectron.platform = "linux";
+      (window as any).neritiumElectron.platform = "linux";
     });
 
     it("hands the drag to the compositor instead of moving the window manually", async () => {

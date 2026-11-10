@@ -1,6 +1,6 @@
 import type { ResolvedAudioStream } from "@/shared/media/innertube";
 import type { ResolvedSoundCloudStream } from "@/shared/media/soundcloud";
-import type { LinerAudioStream } from "@/shared/media/liner/linerPlayback";
+import type { NeritiumAudioStream } from "@/shared/media/neritium/neritiumPlayback";
 import type { Track } from "@/shared/types";
 
 interface PlaybackStreamFormat {
@@ -56,7 +56,7 @@ export function fromSoundCloudStream(stream: ResolvedSoundCloudStream): Playback
   };
 }
 
-export function fromLinerStream(stream: LinerAudioStream, track: PlayableTrack): PlaybackStream {
+export function fromNeritiumStream(stream: NeritiumAudioStream, track: PlayableTrack): PlaybackStream {
   const seconds = track.durationMs ? track.durationMs / 1000 : 0;
   return {
     url: stream.url,

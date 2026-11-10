@@ -24,7 +24,7 @@ type Stage =
   | { kind: "invalid" }
   | { kind: "offline" };
 
-// opened from liner://reset-password?id=<token> (a link Liner support emailed)
+// opened from neritium://reset-password?id=<token> (a link Neritium support emailed)
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();

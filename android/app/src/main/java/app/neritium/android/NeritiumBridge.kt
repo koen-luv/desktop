@@ -1,0 +1,602 @@
+package app.neritium.android
+
+import android.Manifest
+import android.app.DownloadManager
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.ContentValues
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.provider.Settings
+import android.view.WindowManager
+import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import java.io.File
+import java.util.Locale
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+
+class NeritiumBridge(private val activity: MainActivity) {
+    @Volatile private var reportedLocalStorageBytes = 0L
+    @Volatile private var reportedIndexedDbBytes = 0L
+    private val httpExecutor = Executors.newFixedThreadPool(4) { runnable ->
+        Thread(runnable, "neritium-http").apply { isDaemon = true }
+    }
+
+    @JavascriptInterface
+    fun getVersion(): String = BuildConfig.VERSION_NAME
+
+    @JavascriptInterface
+    fun getPlatform(): String = "android"
+
+    /** Cached update check; refreshes from the GitHub release in the background. */
+    @JavascriptInterface
+    fun updaterCheck(): String = AppUpdater.check(activity)
+
+    /** Downloads the APK found by [updaterCheck] and opens the system installer. */
+    @JavascriptInterface
+    fun updaterInstall() = AppUpdater.install(activity)
+
+    @JavascriptInterface
+    fun getInsets(): String = activity.insetsJson()
+
+    @JavascriptInterface
+    fun setLightSystemBars(light: Boolean) {
+        activity.runOnUiThread { activity.applySystemBarAppearance(light) }
+    }
+
+    @JavascriptInterface
+    fun openExternal(url: String) {
+        if (!url.startsWith("https://") && !url.startsWith("http://")) return
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            activity.startActivity(intent)
+        } catch (_: Exception) {
+        }
+    }
+
+    @JavascriptInterface
+    fun shareText(text: String) {
+        try {
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, text)
+            }
+            activity.startActivity(Intent.createChooser(intent, null))
+        } catch (_: Exception) {
+        }
+    }
+
+    @JavascriptInterface
+    fun copyText(text: String) {
+        try {
+            val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("Neritium", text))
+        } catch (_: Exception) {
+        }
+    }
+
+    @JavascriptInterface
+    fun httpRequest(requestId: String, method: String, url: String, headersJson: String, body: String?) {
+        httpExecutor.execute {
+            val payload = executeHttpRequest(requestId, method, url, headersJson, body)
+            NativeEvents.emit("httpResponse", payload)
+        }
+    }
+
+    @JavascriptInterface
+    fun lanDiscover(requestId: String) {
+        httpExecutor.execute {
+            val payload = LanControl.discover(requestId)
+            NativeEvents.emit("lanDiscovery", payload)
+        }
+    }
+
+    @JavascriptInterface
+    fun lanRequest(requestId: String, method: String, url: String, body: String?) {
+        httpExecutor.execute {
+            NativeEvents.emit("lanResponse", LanControl.request(requestId, method, url, body))
+        }
+    }
+
+    @JavascriptInterface
+    fun autoBrowseResponse(requestId: String, payloadJson: String) {
+        AutoBrowse.deliver(requestId, payloadJson)
+    }
+
+    private fun executeHttpRequest(
+        requestId: String,
+        method: String,
+        url: String,
+        headersJson: String,
+        body: String?,
+    ): String {
+        return try {
+            val uri = Uri.parse(url)
+            val host = uri.host?.lowercase(Locale.ROOT) ?: ""
+            if (uri.scheme != "https" || !isAllowedHost(host)) {
+                return errorJson(requestId, "Blocked host: $host")
+            }
+            val builder = Request.Builder().url(url)
+            var hasUserAgent = false
+            var headers: JSONObject? = null
+            try {
+                headers = JSONObject(headersJson.ifBlank { "{}" })
+            } catch (_: Exception) {
+            }
+            headers?.keys()?.forEach { key ->
+                val value = headers.optString(key)
+                val lower = key.lowercase(Locale.ROOT)
+                if (lower in setOf(
+                        "host", "connection", "content-length", "accept-encoding",
+                        "origin", "referer", "cookie", "sec-fetch-mode", "sec-fetch-site",
+                    )
+                ) {
+                    return@forEach
+                }
+                if (lower == "user-agent") hasUserAgent = true
+                builder.header(key, value)
+            }
+            if (!hasUserAgent) builder.header("User-Agent", Http.userAgent)
+            builder.header("Accept-Language", "en-US,en;q=0.9")
+            // only our own api may hold cookies; sending the playback hosts a
+            // cookie they never got before would change their answers
+            val neritiumApi = host.endsWith("tryliner.fun") || host.endsWith(".workers.dev")
+            if (neritiumApi) {
+                cookiesFor(url)?.takeIf { it.isNotBlank() }?.let { builder.header("Cookie", it) }
+            }
+            if (host.endsWith("youtube.com")) {
+                builder.header("Origin", "https://$host")
+                builder.header("Referer", "https://$host/")
+            }
+
+            val upperMethod = method.uppercase(Locale.ROOT)
+            when (upperMethod) {
+                "GET", "HEAD" -> builder.method(upperMethod, null)
+                else -> {
+                    val mediaType = "application/json; charset=utf-8".toMediaType()
+                    builder.method(upperMethod, (body ?: "").toRequestBody(mediaType))
+                }
+            }
+
+            Http.client.newCall(builder.build()).execute().use { response ->
+                if (neritiumApi) storeCookies(url, response.headers("Set-Cookie"))
+                val responseBody = response.body?.string().orEmpty()
+                if (responseBody.length > 12_000_000) {
+                    return errorJson(requestId, "Response too large")
+                }
+                val resultHeaders = JSONObject()
+                    .put("content-type", response.header("Content-Type") ?: "")
+                    .put("date", response.header("Date") ?: "")
+                    .put("location", response.header("Location") ?: "")
+                    .put("x-request-id", response.header("x-request-id") ?: "")
+                    .put("x-liner-server-time", response.header("x-liner-server-time") ?: "")
+                JSONObject()
+                    .put("id", requestId)
+                    .put("status", response.code)
+                    .put("ok", response.isSuccessful)
+                    .put("headers", resultHeaders)
+                    .put("body", responseBody)
+                    .toString()
+            }
+        } catch (error: Exception) {
+            errorJson(requestId, error.message ?: "Network request failed")
+        }
+    }
+
+    /**
+     * Cloudflare answers credentialed api routes with a managed challenge. The
+     * clearance cookie is minted for the Turnstile iframe running inside our
+     * WebView, so it only exists in the WebView jar — this OkHttp client keeps
+     * no jar of its own, so the request has to borrow it.
+     */
+    private fun cookiesFor(url: String): String? {
+        var cookie: String? = null
+        val latch = CountDownLatch(1)
+        activity.runOnUiThread {
+            cookie = try {
+                CookieManager.getInstance().getCookie(url)
+            } catch (_: Exception) {
+                null
+            }
+            latch.countDown()
+        }
+        latch.await(2, TimeUnit.SECONDS)
+        return cookie
+    }
+
+    private fun storeCookies(url: String, setCookies: List<String>) {
+        if (setCookies.isEmpty()) return
+        val latch = CountDownLatch(1)
+        activity.runOnUiThread {
+            try {
+                val manager = CookieManager.getInstance()
+                setCookies.forEach { manager.setCookie(url, it) }
+                manager.flush()
+            } catch (_: Exception) {
+            }
+            latch.countDown()
+        }
+        latch.await(2, TimeUnit.SECONDS)
+    }
+
+    private fun isAllowedHost(host: String): Boolean {
+        if (host in setOf(
+                "liner-api.lucabatarcian.workers.dev",
+                "api.tryliner.fun",
+                "covers.tryliner.fun",
+                "link.tryliner.fun",
+                "www.youtube.com",
+                "youtube.com",
+                "music.youtube.com",
+                "youtubei.googleapis.com",
+            )
+        ) {
+            return true
+        }
+        return host.endsWith(".googlevideo.com") ||
+            host.endsWith(".ytimg.com") ||
+            host.endsWith(".googleusercontent.com") ||
+            host.endsWith(".ggpht.com") ||
+            host.endsWith(".sndcdn.com")
+    }
+
+    private fun errorJson(requestId: String, message: String): String =
+        JSONObject()
+            .put("id", requestId)
+            .put("status", 0)
+            .put("ok", false)
+            .put("error", message)
+            .toString()
+
+
+    @JavascriptInterface
+    fun audioLoad(payload: String) {
+        PlaybackHolder.requestLoad(activity.applicationContext, payload)
+    }
+
+    @JavascriptInterface
+    fun audioCrossfadeLoad(payload: String) {
+        PlaybackHolder.crossfadeLoad(activity.applicationContext, payload)
+    }
+
+    @JavascriptInterface
+    fun audioCrossfadeStart(durationMs: Float) = PlaybackHolder.crossfadeStart(durationMs.toLong())
+
+    @JavascriptInterface
+    fun audioCrossfadeCancel() = PlaybackHolder.crossfadeCancel()
+
+    @JavascriptInterface
+    fun audioSetNextTrack(payload: String?, autoAdvance: Boolean) =
+        PlaybackHolder.setNextTrack(payload, autoAdvance)
+
+    @JavascriptInterface
+    fun audioSetNextQueue(payloadsJson: String?, autoAdvance: Boolean) =
+        PlaybackHolder.setNextQueue(payloadsJson, autoAdvance)
+
+    @JavascriptInterface
+    fun audioSetCrossfade(enabled: Boolean, windowMs: Double) =
+        PlaybackHolder.setCrossfade(enabled, windowMs.toLong())
+
+    @JavascriptInterface
+    fun audioSetLoopState(repeatMode: String, firstPayload: String?) =
+        PlaybackHolder.setLoopState(repeatMode, firstPayload)
+
+    @JavascriptInterface
+    fun setAppIconVariant(variant: String) {
+        AppIcon.setVariant(activity.applicationContext, variant)
+    }
+
+    @JavascriptInterface
+    fun audioSetPreviousTrack(payload: String?) = PlaybackHolder.setPreviousTrack(payload)
+
+    @JavascriptInterface
+    fun audioPause() = PlaybackHolder.pause()
+
+    @JavascriptInterface
+    fun audioResume() = PlaybackHolder.resume()
+
+    @JavascriptInterface
+    fun audioSeek(positionMs: Double) = PlaybackHolder.seek(positionMs.toLong())
+
+    @JavascriptInterface
+    fun audioStop() = PlaybackHolder.stop()
+
+    @JavascriptInterface
+    fun audioSetVolume(volume: Float) = PlaybackHolder.setVolume(volume)
+
+    @JavascriptInterface
+    fun audioSetSpeed(rate: Float) = PlaybackHolder.setSpeed(rate)
+
+    @JavascriptInterface
+    fun audioSetPitch(semitones: Float) = PlaybackHolder.setPitchSemitones(semitones)
+
+    @JavascriptInterface
+    fun audioSetReverb(level: Float) = PlaybackHolder.setReverb(level)
+
+    @JavascriptInterface
+    fun audioSetEqualizer(enabled: Boolean, gainsJson: String) {
+        PlaybackHolder.setEqualizer(enabled, gainsJson)
+    }
+
+    @JavascriptInterface
+    fun audioSleepAt(deadlineMs: Double) = PlaybackHolder.setSleepAt(deadlineMs.toLong())
+
+    @JavascriptInterface
+    fun audioState(): String = PlaybackHolder.stateJson()
+
+    @JavascriptInterface
+    fun audioCache(url: String, trackId: String, mimeType: String, limitBytes: Double) {
+        AudioCache.cache(url, trackId, mimeType.ifBlank { null }, limitBytes.toLong())
+    }
+
+    @JavascriptInterface
+    fun audioSetCacheLimit(limitBytes: Double) {
+        AudioCache.enforceLimit(limitBytes.toLong())
+    }
+
+    @JavascriptInterface
+    fun audioClearCache(): Boolean = AudioCache.clear()
+
+    @JavascriptInterface
+    fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        activity.runOnUiThread {
+            if (activity.notificationPermissionAsked) return@runOnUiThread
+            val granted = ContextCompat.checkSelfPermission(
+                activity,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                activity.notificationPermissionAsked = true
+                ActivityCompat.requestPermissions(
+                    activity,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    MainActivity.NOTIFICATION_PERMISSION_REQUEST,
+                )
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun setKeepScreenOn(on: Boolean) {
+        activity.runOnUiThread {
+            if (on) {
+                activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            } else {
+                activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+        }
+    }
+
+
+    @JavascriptInterface
+    fun saveDump(filename: String, content: String): String {
+        val safeName = safeFileName(filename) { "neritium-dump-${System.currentTimeMillis()}.json" }
+        return saveBytesToDownloads(safeName, "application/json", content.toByteArray(Charsets.UTF_8))
+    }
+
+    @JavascriptInterface
+    fun downloadAudio(requestId: String, url: String, filename: String, mimeType: String) {
+        httpExecutor.execute {
+            NativeEvents.emit(
+                "audioDownload",
+                executeAudioDownload(requestId, url, filename, mimeType),
+            )
+        }
+    }
+
+    private fun executeAudioDownload(
+        requestId: String,
+        url: String,
+        filename: String,
+        mimeType: String,
+    ): String {
+        return try {
+            val uri = Uri.parse(url)
+            val host = uri.host?.lowercase(Locale.ROOT) ?: ""
+            if (uri.scheme != "https" || !isAllowedHost(host)) {
+                return downloadError(requestId, "Blocked host: $host")
+            }
+            Http.client
+                .newCall(
+                    Request.Builder()
+                        .url(url)
+                        .header("User-Agent", Http.userAgent)
+                        .build(),
+                )
+                .execute()
+                .use { response ->
+                    if (!response.isSuccessful) {
+                        return downloadError(requestId, "Download failed (HTTP ${response.code})")
+                    }
+                    val bytes = response.body?.bytes()
+                    if (bytes == null || bytes.isEmpty()) {
+                        return downloadError(requestId, "Download returned no data")
+                    }
+                    val safeName = safeFileName(filename) {
+                        "neritium-audio-${System.currentTimeMillis()}.m4a"
+                    }
+                    val saved = saveBytesToDownloads(safeName, mimeType.ifBlank { "audio/mp4" }, bytes)
+                    JSONObject(saved).put("id", requestId).toString()
+                }
+        } catch (error: Exception) {
+            downloadError(requestId, error.message ?: "Could not download file")
+        }
+    }
+
+    private fun downloadError(requestId: String, message: String): String =
+        JSONObject()
+            .put("id", requestId)
+            .put("success", false)
+            .put("error", message)
+            .toString()
+
+    private fun safeFileName(filename: String, fallback: () -> String): String =
+        filename
+            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .take(120)
+            .ifBlank { fallback() }
+
+    private fun saveBytesToDownloads(name: String, mimeType: String, bytes: ByteArray): String {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                    put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                    put(
+                        MediaStore.MediaColumns.RELATIVE_PATH,
+                        Environment.DIRECTORY_DOWNLOADS + "/Neritium",
+                    )
+                }
+                val uri = activity.contentResolver.insert(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    values,
+                )
+                if (uri != null) {
+                    activity.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                    JSONObject()
+                        .put("success", true)
+                        .put("filePath", uri.toString())
+                        .toString()
+                } else {
+                    writeToAppDownloads(name, bytes)
+                }
+            } else {
+                writeToAppDownloads(name, bytes)
+            }
+        } catch (error: Exception) {
+            JSONObject()
+                .put("success", false)
+                .put("error", error.message ?: "Could not save file")
+                .toString()
+        }
+    }
+
+    private fun writeToAppDownloads(name: String, bytes: ByteArray): String {
+        val dir = activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            ?: File(activity.filesDir, "exports").apply { mkdirs() }
+        dir.mkdirs()
+        val file = File(dir, name)
+        file.writeBytes(bytes)
+        return JSONObject()
+            .put("success", true)
+            .put("filePath", file.absolutePath)
+            .toString()
+    }
+
+    @JavascriptInterface
+    fun openAppStorageSettings() {
+        try {
+            val intent = Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.fromParts("package", activity.packageName, null),
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            activity.startActivity(intent)
+        } catch (_: Exception) {
+        }
+    }
+
+    @JavascriptInterface
+    fun openDownloads() {
+        try {
+            val intent = Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            activity.startActivity(intent)
+        } catch (_: Exception) {
+            openAppStorageSettings()
+        }
+    }
+
+    @JavascriptInterface
+    fun clearCoversCache(): Boolean {
+        return try {
+            Http.client.cache?.evictAll()
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    @JavascriptInterface
+    fun clearHttpCache(): Boolean {
+        return try {
+            Http.client.cache?.evictAll()
+            activity.runOnUiThread { activity.webView.clearCache(true) }
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    @JavascriptInterface
+    fun reportStorageUsage(localStorageBytes: Double, indexedDbBytes: Double) {
+        reportedLocalStorageBytes = localStorageBytes.toLong().coerceAtLeast(0L)
+        reportedIndexedDbBytes = indexedDbBytes.toLong().coerceAtLeast(0L)
+    }
+
+    @JavascriptInterface
+    fun getCacheStats(): String {
+        val cacheDir = activity.cacheDir
+        val dataDir = activity.dataDir
+        val httpCache = File(cacheDir, "http_cache")
+        val codeCache = File(dataDir, "app_webview/Default/Code Cache")
+        val serviceWorker = File(dataDir, "app_webview/Default/Service Worker")
+        val audio = AudioCache.sizeBytes()
+        val http = dirSize(httpCache)
+        val code = dirSize(codeCache)
+        val sw = dirSize(serviceWorker)
+        val indexed = reportedIndexedDbBytes
+        val local = reportedLocalStorageBytes
+        val total = audio + http + code + indexed + local
+        return JSONObject()
+            .put("cacheSize", total)
+            .put("httpCacheSize", http)
+            .put("codeCacheSize", code)
+            .put("serviceWorkerSize", sw)
+            .put("indexedDbSize", indexed)
+            .put("localStorageSize", local)
+            .put("blobStorageSize", 0L)
+            .put("audioCacheSize", audio)
+            .put("cachePath", File(activity.filesDir, "audio_cache").absolutePath)
+            .toString()
+    }
+
+    private fun dirSize(dir: File): Long {
+        if (!dir.exists()) return 0L
+        return try {
+            dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+        } catch (_: Exception) {
+            0L
+        }
+    }
+
+
+    @JavascriptInterface
+    fun discordUpdateState(payloadJson: String) {
+        DiscordRpc.updateState(payloadJson)
+    }
+
+    @JavascriptInterface
+    fun discordUpdateSettings(settingsJson: String) {
+        DiscordRpc.updateSettings(settingsJson)
+    }
+
+    @JavascriptInterface
+    fun discordGetStatus(): String {
+        return DiscordRpc.getStatus()
+    }
+}

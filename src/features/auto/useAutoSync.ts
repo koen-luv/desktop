@@ -16,8 +16,8 @@ import type { Track } from "@/shared/types";
  * behaves exactly like a UI-initiated play.
  */
 
-const TRACK_PREFIX = "liner.track:";
-const PLAYLIST_PREFIX = "liner.playlist:";
+const TRACK_PREFIX = "neritium.track:";
+const PLAYLIST_PREFIX = "neritium.playlist:";
 
 interface ServedEntry {
   track: Track;

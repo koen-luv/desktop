@@ -1,11 +1,14 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { initGlobalErrorHandlers } from "@/shared/utils/globalErrorHandlers";
-import { installAndroidPlatform } from "@/platform";
+import { installAndroidPlatform, installWebPlatform } from "@/platform";
 
 // Install the native Android platform boundary before anything reads it
-// (loadRoot's dynamic imports pull in modules that touch window.LinerAndroid).
+// (loadRoot's dynamic imports pull in modules that touch window.NeritiumAndroid).
 installAndroidPlatform();
+// Website port: when neither Electron nor Android is present, back the platform
+// contract with browser APIs so the same app runs in a tab.
+installWebPlatform();
 
 // Initialize global uncaught error handlers
 initGlobalErrorHandlers();

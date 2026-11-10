@@ -36,7 +36,7 @@ describe("AuthSessionStore", () => {
     });
 
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), "liner-auth-"));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "neritium-auth-"));
     file = path.join(dir, "auth", "session.json");
     fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>();
     syncClock = vi.fn<(dateHeader: string) => void>();

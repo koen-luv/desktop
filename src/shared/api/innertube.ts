@@ -3,12 +3,12 @@ import { platformFetch } from "@/platform/http";
 /**
  * Client-side execution of a signed Innertube playback plan.
  *
- * Liner's resolver endpoint (`POST /v1/tracks/:id/playback`) can return either
+ * Neritium's resolver endpoint (`POST /v1/tracks/:id/playback`) can return either
  * a proxied stream URL or a *plan*: the exact Innertube `player` request the
  * server would have made. The client executes that request itself (with its own
  * residential-IP visitorData) and plays the resulting googlevideo URL directly.
- * Audio is never proxied through Liner and no request is signed here — the plan
- * returned by Liner's API is already complete and authorized.
+ * Audio is never proxied through Neritium and no request is signed here — the plan
+ * returned by Neritium's API is already complete and authorized.
  */
 
 const PLAN_TIMEOUT_MS = 12_000;

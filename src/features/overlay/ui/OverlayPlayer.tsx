@@ -53,11 +53,11 @@ export function OverlayPlayer() {
 
   useEffect(() => {
     if (!getAuthSession()) {
-      window.linerElectron?.closeOverlay?.();
+      window.neritiumElectron?.closeOverlay?.();
       return;
     }
 
-    window.linerElectron?.getOverlayInitialState?.().then((initial) => {
+    window.neritiumElectron?.getOverlayInitialState?.().then((initial) => {
       if (initial) {
         anchorPosRef.current = initial.positionMs;
         anchorTimeRef.current = performance.now();
@@ -66,8 +66,8 @@ export function OverlayPlayer() {
       }
     });
 
-    if (window.linerElectron?.onOverlayState) {
-      const cleanupState = window.linerElectron.onOverlayState((newState) => {
+    if (window.neritiumElectron?.onOverlayState) {
+      const cleanupState = window.neritiumElectron.onOverlayState((newState) => {
         setState(newState);
       });
       return cleanupState;
@@ -75,20 +75,20 @@ export function OverlayPlayer() {
   }, []);
 
   useEffect(() => {
-    const signal = setTimeout(() => window.linerElectron?.overlayReady?.(), 0);
+    const signal = setTimeout(() => window.neritiumElectron?.overlayReady?.(), 0);
     return () => clearTimeout(signal);
   }, []);
 
   useEffect(() => {
-    if (!window.linerElectron?.onOverlayVisibility) return;
-    const cleanupVisibility = window.linerElectron.onOverlayVisibility((visible) => {
+    if (!window.neritiumElectron?.onOverlayVisibility) return;
+    const cleanupVisibility = window.neritiumElectron.onOverlayVisibility((visible) => {
       setIsVisible(visible);
     });
     return cleanupVisibility;
   }, []);
 
   const sendAction = useCallback((action: OverlayAction) => {
-    window.linerElectron?.sendOverlayAction?.(action);
+    window.neritiumElectron?.sendOverlayAction?.(action);
   }, []);
 
   const isPlaying = state.status === "playing";

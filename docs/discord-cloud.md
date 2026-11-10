@@ -7,7 +7,7 @@ Kotlin/Swift clients can probe `127.0.0.1:6463-6472` forever and find nothing.
 
 Presence from a phone therefore has to be published by something that owns a
 Discord connection. This is the same model PreMiD's hosted service uses: the
-app reports playback to Liner's backend, and the backend keeps the activity up
+app reports playback to Neritium's backend, and the backend keeps the activity up
 to date through the [Discord Social SDK](https://docs.discord.com/developers/discord-social-sdk).
 
 The client half is implemented in `src/features/discord/cloud.ts` and
@@ -23,7 +23,7 @@ identical on desktop, Android and iOS.
    plus a poll handle.
 2. The app opens that URL in the system browser.
 3. The backend runs the Discord OAuth2 authorization-code exchange on its
-   registered redirect URI, stores the tokens for the Liner account, and marks
+   registered redirect URI, stores the tokens for the Neritium account, and marks
    the session as linked.
 4. The app polls `GET /v1/me/discord/link/{id}` until `linked`, `expired` or
    `error`, then starts reporting playback.
@@ -33,7 +33,7 @@ Discord and removes the activity.
 
 ## Endpoints
 
-All endpoints require the normal Liner bearer token and return JSON.
+All endpoints require the normal Neritium bearer token and return JSON.
 
 | Method | Path | Request | Response |
 | --- | --- | --- | --- |
@@ -85,7 +85,7 @@ clear). The backend should still tolerate repeats and out-of-order pushes.
 
 ## Backend responsibilities
 
-- Enable the Social SDK for the Liner Discord application in the Developer
+- Enable the Social SDK for the Neritium Discord application in the Developer
   Portal and ask for `identify` (and the default presence scopes,
   `sdk.social_layer_presence`) in the OAuth request.
 - Build `SET_ACTIVITY` from the notification exactly like `electron/discord.ts`

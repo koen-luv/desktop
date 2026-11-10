@@ -192,7 +192,7 @@ const TrackItem = memo(function TrackItem({
   highlight,
 }: TrackItemProps) {
   const handlePlay = useCallback(() => {
-    if (typeof window !== "undefined" && window.__linerWasDragging) return;
+    if (typeof window !== "undefined" && window.__neritiumWasDragging) return;
     const context = playlistId ? `playlist:${playlistId}` : playlistTitle;
     playerEngine.playTrack(
       track,
@@ -818,7 +818,7 @@ function LibraryPlaylistContent() {
               <div ref={heroRef} data-no-window-drag>
                 <div className="flex items-start gap-4 md:gap-[22px]">
                   <div
-                    className={`relative flex h-[112px] w-[112px] shrink-0 items-center justify-center overflow-hidden rounded-[18px] shadow-[0_12px_40px_rgba(0,0,0,0.18)] ring-1 ring-white/10 backdrop-blur-xl sm:h-[144px] sm:w-[144px] md:h-[168px] md:w-[168px] ${coverUrls.length === 0 ? "bg-white/5" : "bg-white/10"}`} 
+                    className="relative flex h-[112px] w-[112px] shrink-0 items-center justify-center overflow-hidden rounded-[14px] shadow-e2 ring-1 ring-border-primary/40 sm:h-[144px] sm:w-[144px] md:h-[168px] md:w-[168px]"
                   >
                     <PlaylistCover
                       urls={coverUrls}
@@ -829,7 +829,12 @@ function LibraryPlaylistContent() {
                   </div>
 
                   <div className="flex min-w-0 flex-1 flex-col pt-0.5 md:min-h-[168px]">
-                    <div className="min-h-[112px] sm:min-h-[144px] md:min-h-0">
+                    {/* Scrim: the page now sits on the user's wallpaper, so the
+                        title needs its own contrast floor without painting the
+                        whole surface (the wallpaper must stay visible). */}
+                    <div
+                      className="relative min-h-[112px] rounded-[12px] px-3 py-2 [text-shadow:0_1px_2px_rgb(0_0_0/0.35)] before:pointer-events-none before:absolute before:inset-x-[-10px] before:inset-y-[-8px] before:-z-10 before:rounded-[16px] before:bg-gradient-to-r before:from-black/18 before:to-transparent before:content-[''] sm:min-h-[144px] md:min-h-0"
+                    >
                     <h1
                       ref={titleRef}
                       className={`m-0 line-clamp-2 text-[32px] font-[700] leading-[1.02] tracking-[-0.03em] text-text-primary drop-shadow-sm sm:text-[38px] lg:text-[44px] ${

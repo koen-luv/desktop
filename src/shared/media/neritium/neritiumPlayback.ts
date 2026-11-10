@@ -1,0 +1,64 @@
+import { getAuthSession, getValidAccessToken } from "@/shared/api/auth-session";
+import { getApiBaseUrl } from "@/shared/api/baseUrl";
+import type { AudioQuality } from "@/features/player/store/playerStore";
+import { isAbortError } from "@/shared/utils/abort";
+import { log } from "@/shared/utils/logger";
+
+export interface NeritiumAudioStream {
+  url: string;
+  expiresAt: string;
+  mimeType: string;
+  codec?: string;
+  size: number;
+}
+
+const REQUEST_TIMEOUT_MS = 5_000;
+const UNAVAILABLE_BACKOFF_MS = 10 * 60_000;
+
+let pausedUntil = 0;
+
+function pause(ms: number, reason: string): void {
+  pausedUntil = Date.now() + ms;
+  log("yellow", "playback", `neritium audio paused for ${Math.round(ms / 1000)}s: ${reason}`);
+}
+
+// presigned r2 url, or null so the caller falls back to youtube
+export async function resolveNeritiumStream(
+  videoId: string,
+  signal?: AbortSignal,
+  quality?: AudioQuality,
+): Promise<NeritiumAudioStream | null> {
+  if (Date.now() < pausedUntil || !getAuthSession()?.accessToken) return null;
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  try {
+    const token = await getValidAccessToken();
+    if (!token) return null;
+    // "high" is the historical default (no body at all); only other tiers ask
+    // the backend for a specific master, so existing requests stay untouched.
+    const wantsTier = Boolean(quality && quality !== "high");
+    const res = await fetch(`${getApiBaseUrl()}/v1/tracks/${encodeURIComponent(videoId)}/playback`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        ...(wantsTier ? { "content-type": "application/json" } : {}),
+      },
+      ...(wantsTier ? { body: JSON.stringify({ quality }) } : {}),
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+    });
+    if (res.ok) return (await res.json()) as NeritiumAudioStream;
+
+    const body = (await res.json().catch(() => ({}))) as { code?: string; retryAfterSeconds?: number };
+    if (res.status === 404 && body.code === "PLAYBACK_NOT_FOUND") return null;
+    if (res.status === 429) pause(Math.max(1, body.retryAfterSeconds ?? 60) * 1000, "rate limited");
+    else if (res.status === 404 || res.status === 503) pause(UNAVAILABLE_BACKOFF_MS, `api answered ${res.status}`);
+    return null;
+  } catch (error) {
+    if (isAbortError(error, signal) && signal?.aborted) throw error;
+    log("yellow", "playback", `neritium audio lookup failed, using youtube: ${String(error)}`);
+    return null;
+  }
+}
+
+export function resetNeritiumPlaybackPause(): void {
+  pausedUntil = 0;
+}

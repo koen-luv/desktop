@@ -91,8 +91,8 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
     setMounted(true);
 
     const checkStatus = () => {
-      if (window.linerElectron?.getDiscordStatus) {
-        window.linerElectron.getDiscordStatus().then((status) => {
+      if (window.neritiumElectron?.getDiscordStatus) {
+        window.neritiumElectron.getDiscordStatus().then((status) => {
           if (status) setDiscordStatus(status);
         });
       }
@@ -123,7 +123,7 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
                   ? t("settings.discord.cloud.waiting") || "Finish the sign-in in your browser…"
                   : cloudLinked
                     ? t("settings.discord.cloud.linked_hint") ||
-                      "Liner updates your Discord activity from the cloud, on every device."
+                      "Neritium updates your Discord activity from the cloud, on every device."
                     : t("settings.discord.cloud.description") ||
                       "Link Discord once so your activity also shows when you listen on your phone."
             }
@@ -245,7 +245,7 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
                   },
                   {
                     value: "app",
-                    label: t("settings.discord.status_display.app") || "Liner (App name)",
+                    label: t("settings.discord.status_display.app") || "Neritium (App name)",
                   },
                 ]}
               />
@@ -334,12 +334,12 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
 
       {/* Profile Buttons */}
       <SettingSection label={t("settings.discord.section_buttons") || "Profile Buttons"}>
-        {/* Listen on Liner button */}
+        {/* Listen on Neritium button */}
         <SettingRow
-          title={t("settings.discord.show_button.title") || "'Listen on Liner' Button"}
+          title={t("settings.discord.show_button.title") || "'Listen on Neritium' Button"}
           description={
             t("settings.discord.show_button.description") ||
-            "Add an interactive button linking to the song on Liner."
+            "Add an interactive button linking to the song on Neritium."
           }
           titleKey="settings.discord.show_button.title"
           descKey="settings.discord.show_button.description"
@@ -353,9 +353,9 @@ export function DiscordTab({ searchQuery }: { searchQuery?: string }) {
           }
         />
 
-        {/* Download Liner button */}
+        {/* Download Neritium button */}
         <SettingRow
-          title={t("settings.discord.show_download_button.title") || "'Download Liner' Button"}
+          title={t("settings.discord.show_download_button.title") || "'Download Neritium' Button"}
           description={
             t("settings.discord.show_download_button.description") ||
             "Add an interactive button linking to tryliner.fun to download the app."

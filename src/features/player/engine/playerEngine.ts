@@ -30,7 +30,7 @@ import {
   type CachedLyricsItem,
 } from "@/features/lyrics";
 import { preloadCoverArt } from "@/features/covers";
-import { linerDb, type CachedLyricsRecord } from "@/shared/storage";
+import { neritiumDb, type CachedLyricsRecord } from "@/shared/storage";
 import { debouncedStorage } from "@/shared/utils/storage";
 import { showToast } from "@/shared/ui";
 import { createTranslatorSync, getStoredLocale } from "@/languages";
@@ -288,7 +288,8 @@ class PlayerEngine {
         const isRepeatOne = usePlayerStore.getState().repeat === "one";
         this.telemetry.onTrackCompleted(isRepeatOne);
       };
-      playerRuntime.onError = (info) => this.handlePlaybackError(info);
+      playerRuntime.onError = (info: { trackId: string; message: string; fatal?: boolean }) =>
+        this.handlePlaybackError(info);
     }
 
     if (typeof window !== "undefined") {
@@ -598,7 +599,7 @@ class PlayerEngine {
     if (wasLoading) {
       playerRuntime?.cancelPendingLoad();
     }
-    const audioEl = document.getElementById("liner-audio") as HTMLAudioElement | null;
+    const audioEl = document.getElementById("neritium-audio") as HTMLAudioElement | null;
     if (audioEl && !Number.isNaN(audioEl.currentTime)) {
       store.setPosition(Math.round(audioEl.currentTime * 1000));
     }
@@ -1026,12 +1027,31 @@ class PlayerEngine {
     }));
   }
 
-  private handlePlaybackError(info: { trackId: string; message: string }): void {
+  private handlePlaybackError(info: {
+    trackId: string;
+    message: string;
+    fatal?: boolean;
+  }): void {
     const store = usePlayerStore.getState();
     if (!store.currentTrack || store.currentTrack.id !== info.trackId) return;
 
     const track = store.currentTrack;
     const translate = createTranslatorSync(getStoredLocale());
+
+    // A capability failure (this client cannot resolve streams at all) is not a
+    // broken track: skipping every song would only churn the queue. Report it
+    // once, pause, and leave the queue where it is.
+    if (info.fatal) {
+      log("red", "playback", `playback unsupported here: ${info.message}`);
+      showToast(info.message, "error", {
+        description: track.artists ? `${track.title} — ${track.artists}` : track.title,
+      });
+      this.consecutiveAutoSkips = 0;
+      this.stopPlayback();
+      store.setStatus("paused");
+      return;
+    }
+
     this.consecutiveAutoSkips += 1;
 
     if (this.consecutiveAutoSkips > MAX_CONSECUTIVE_AUTO_SKIPS) {
@@ -1213,7 +1233,7 @@ class PlayerEngine {
       void this.prefetchLyrics(nextTrack.id, lyricsHint(nextTrack));
     }
 
-    void linerDb.putTrack(nextTrack);
+    void neritiumDb.putTrack(nextTrack);
 
     if (playerRuntime) {
       void playerRuntime.preloadTrack(
@@ -1234,7 +1254,7 @@ class PlayerEngine {
 
     const prefetchPromise = (async () => {
       try {
-        const existing = await linerDb.getLyrics(trackId);
+        const existing = await neritiumDb.getLyrics(trackId);
         if (existing) {
           const lastChecked = existing.lastCheckedAt || 0;
           if (Date.now() - lastChecked < SEVEN_DAYS_MS) {
@@ -1274,7 +1294,7 @@ class PlayerEngine {
 
         if (bestCandidate && shouldCacheLyricsCandidate(bestCandidate)) {
           lyricsCache.set(trackId, bestCandidate, providers);
-          void linerDb.putLyrics({
+          void neritiumDb.putLyrics({
             trackId,
             syncLevel: bestCandidate.syncLevel,
             quality: bestCandidate.quality.total,
@@ -1325,7 +1345,7 @@ class PlayerEngine {
     let cached: CachedLyricsItem | CachedLyricsRecord | null = memoryCached || null;
     if (!cached) {
       try {
-        cached = await linerDb.getLyrics(trackId);
+        cached = await neritiumDb.getLyrics(trackId);
       } catch {
         cached = null;
       }
@@ -1365,7 +1385,7 @@ class PlayerEngine {
         return;
       }
 
-      void linerDb.updateLyricsChecked(trackId);
+      void neritiumDb.updateLyricsChecked(trackId);
     } else {
       lyricsStore.setLyricsState({
         lyricsLoading: true,
@@ -1386,7 +1406,7 @@ class PlayerEngine {
       try {
         await this.inFlightLyricsPrefetches.get(trackId);
         if (token !== this.lyricsLoadToken || controller.signal.aborted) return;
-        const freshCached = lyricsCache.get(trackId) || (await linerDb.getLyrics(trackId));
+        const freshCached = lyricsCache.get(trackId) || (await neritiumDb.getLyrics(trackId));
         if (freshCached && freshCached.candidate) {
           const parsed = parseRawLyrics(
             freshCached.candidate.lyrics.content,
@@ -1461,7 +1481,7 @@ class PlayerEngine {
             });
             if (shouldCacheLyricsCandidate(candidate)) {
               lyricsCache.set(trackId, candidate, updatedProviders);
-              void linerDb.putLyrics({
+              void neritiumDb.putLyrics({
                 trackId,
                 syncLevel: candidate.syncLevel,
                 quality: candidate.quality.total,
@@ -1499,7 +1519,7 @@ class PlayerEngine {
           if (bestCandidate && shouldCacheLyricsCandidate(bestCandidate)) {
             const currentProviders = useLyricsStore.getState().availableProviders;
             lyricsCache.set(trackId, bestCandidate, currentProviders);
-            void linerDb.putLyrics({
+            void neritiumDb.putLyrics({
               trackId,
               syncLevel: bestCandidate.syncLevel,
               quality: bestCandidate.quality.total,

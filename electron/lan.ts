@@ -38,7 +38,7 @@ type AnswerHandler = (answer: string) => void;
 let hostServer: http.Server | null = null;
 let discoverySocket: dgram.Socket | null = null;
 let currentOffer = "";
-let currentName = "Liner";
+let currentName = "Neritium";
 let sessionToken = "";
 let answerHandler: AnswerHandler | null = null;
 
@@ -110,7 +110,7 @@ export async function startLanHost(
 ): Promise<LanHostInfo> {
   stopLanHost();
   currentOffer = inviteCode;
-  currentName = name.trim() || "Liner";
+  currentName = name.trim() || "Neritium";
   sessionToken = randomBytes(16).toString("hex");
   answerHandler = onAnswer;
 
@@ -131,7 +131,7 @@ export async function startLanHost(
 
     const url = new URL(req.url ?? "/", "http://localhost");
     if (req.method === "GET" && url.pathname === "/ping") {
-      json(res, 200, { app: "liner", name: currentName, port: LAN_HTTP_PORT });
+      json(res, 200, { app: "neritium", name: currentName, port: LAN_HTTP_PORT });
       return;
     }
     if (!hasValidToken(url)) {
@@ -141,7 +141,7 @@ export async function startLanHost(
       return;
     }
     if (req.method === "GET" && url.pathname === "/offer") {
-      json(res, 200, { app: "liner", name: currentName, offer: currentOffer });
+      json(res, 200, { app: "neritium", name: currentName, offer: currentOffer });
       return;
     }
     if (req.method === "POST" && url.pathname === "/answer") {
@@ -175,7 +175,7 @@ export async function startLanHost(
     if (message.toString("utf8").trim() !== DISCOVERY_TOKEN) return;
     const reply = Buffer.from(
       JSON.stringify({
-        app: "liner",
+        app: "neritium",
         name: currentName,
         port: LAN_HTTP_PORT,
         token: sessionToken,
@@ -244,10 +244,10 @@ export function discoverLanHosts(timeoutMs = 900): Promise<LanDiscoveredHost[]> 
           port?: number;
           token?: string;
         };
-        if (payload.app !== "liner" || typeof payload.port !== "number") return;
+        if (payload.app !== "neritium" || typeof payload.port !== "number") return;
         const address = rinfo.address.replace(/^::ffff:/, "");
         found.set(`${address}:${payload.port}`, {
-          name: typeof payload.name === "string" ? payload.name : "Liner",
+          name: typeof payload.name === "string" ? payload.name : "Neritium",
           address,
           port: payload.port,
           token: typeof payload.token === "string" ? payload.token : "",

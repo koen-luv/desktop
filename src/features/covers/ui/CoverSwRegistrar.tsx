@@ -8,7 +8,7 @@ export function CoverSwRegistrar() {
 
     const isElectron =
       window.location.protocol === "file:" ||
-      typeof (window as any).linerElectron !== "undefined";
+      typeof (window as any).neritiumElectron !== "undefined";
 
     if (isElectron) {
       navigator.serviceWorker.getRegistrations().then((registrations) => {

@@ -40,7 +40,7 @@ function clearConnectTimer(): void {
   connectTimer = null;
 }
 
-/** Broadcasts on the current Wi-Fi and returns the Liner desktops that answer. */
+/** Broadcasts on the current Wi-Fi and returns the Neritium desktops that answer. */
 export async function discoverLocalDevices(): Promise<LocalDeviceInfo[]> {
   const store = useDeviceControlStore.getState();
   store.setDiscovering(true);
@@ -48,8 +48,8 @@ export async function discoverLocalDevices(): Promise<LocalDeviceInfo[]> {
   try {
     let hosts: LocalDeviceInfo[] = [];
 
-    if (typeof window !== "undefined" && window.linerElectron?.discoverLanHosts) {
-      hosts = await window.linerElectron.discoverLanHosts();
+    if (typeof window !== "undefined" && window.neritiumElectron?.discoverLanHosts) {
+      hosts = await window.neritiumElectron.discoverLanHosts();
     } else {
       const bridge = getAndroidBridge();
       const lanDiscover = bridge?.lanDiscover;
@@ -120,7 +120,7 @@ interface LanHttpResult {
 
 /** HTTP to a discovered host, through whichever platform can reach it. */
 async function lanHttp(url: string, method: "GET" | "POST", body?: string): Promise<LanHttpResult> {
-  if (typeof window !== "undefined" && window.linerElectron?.discoverLanHosts) {
+  if (typeof window !== "undefined" && window.neritiumElectron?.discoverLanHosts) {
     const response = await fetch(url, {
       method,
       headers: body ? { "content-type": "text/plain" } : undefined,

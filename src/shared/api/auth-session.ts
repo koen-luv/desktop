@@ -6,11 +6,11 @@ export type { AuthTokens, AuthUser };
 
 import { getApiBaseUrl } from "./baseUrl";
  
-const STORAGE_KEY = "liner_auth_session";
+const STORAGE_KEY = "neritium_auth_session";
 const DEAD_REFRESH_CODES = new Set(["INVALID_REFRESH_TOKEN", "REFRESH_SESSION_EXPIRED"]);
 const REFRESH_ATTEMPTS = 2;
 
-type MainAuthBridge = NonNullable<NonNullable<Window["linerElectron"]>["authSession"]>;
+type MainAuthBridge = NonNullable<NonNullable<Window["neritiumElectron"]>["authSession"]>;
 
 let session: AuthTokens | null = null;
 let loadedFromMain = false;
@@ -19,7 +19,7 @@ let refreshPromise: Promise<AuthTokens | null> | null = null;
 
 function mainBridge(): MainAuthBridge | null {
   if (typeof window === "undefined") return null;
-  return window.linerElectron?.authSession ?? null;
+  return window.neritiumElectron?.authSession ?? null;
 }
 
 function readLocal(): AuthTokens | null {

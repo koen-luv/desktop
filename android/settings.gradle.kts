@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "LinerAndroid"
+rootProject.name = "NeritiumAndroid"
 include(":app")

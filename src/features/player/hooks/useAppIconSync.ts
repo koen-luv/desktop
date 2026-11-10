@@ -91,8 +91,8 @@ export function useAppIconSync() {
     void renderIconDataUrl(logoSrc, isLight, shouldInvert).then((dataUrl) => {
       if (!active || !dataUrl) return;
 
-      if (window.linerElectron?.setAppIcon) {
-        window.linerElectron.setAppIcon(dataUrl, {
+      if (window.neritiumElectron?.setAppIcon) {
+        window.neritiumElectron.setAppIcon(dataUrl, {
           isDefault: accentVariant === "default",
           variant: accentVariant,
         });

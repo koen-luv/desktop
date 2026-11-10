@@ -18,7 +18,7 @@ import type { RepeatMode } from "@/features/player/store/playerStore";
 import type { Track } from "@/shared/types";
 
 /** Distinct channel label so a device link never collides with a party. */
-export const DEVICE_CHANNEL_LABEL = "liner-remote";
+export const DEVICE_CHANNEL_LABEL = "neritium-remote";
 
 export type ControlAction =
   | { a: "toggle" }

@@ -75,7 +75,7 @@ function runningHtml(bundles: BundleManager): string {
 
 beforeEach(() => {
   env.appVersion = "0.1.35";
-  root = fs.mkdtempSync(path.join(os.tmpdir(), "liner-bundles-"));
+  root = fs.mkdtempSync(path.join(os.tmpdir(), "neritium-bundles-"));
   env.userData = path.join(root, "userData");
   builtInDist = path.join(root, "built-in");
   fs.mkdirSync(builtInDist, { recursive: true });

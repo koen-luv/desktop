@@ -1,4 +1,4 @@
--- Liner self-hosted backend schema (Supabase / Postgres).
+-- Neritium self-hosted backend schema (Supabase / Postgres).
 -- Run this once in the Supabase SQL editor. It is idempotent.
 
 create extension if not exists pgcrypto with schema extensions;

@@ -92,7 +92,7 @@ export interface SourceProvider {
   readonly id: string;
   /** Higher priority providers are attempted first. */
   readonly priority: number;
-  /** Can serve a lossless stream (Liner's own master can; YouTube never can). */
+  /** Can serve a lossless stream (Neritium's own master can; YouTube never can). */
   readonly losslessCapable?: boolean;
   /** Human readable label used in diagnostics UI. */
   readonly label: string;

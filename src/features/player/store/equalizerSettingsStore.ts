@@ -32,7 +32,7 @@ export const useEqualizerSettingsStore = create<EqualizerSettingsState>()(
       setGains: (gains) => set({ gains: normalizeEqualizerGains(gains) }),
     }),
     {
-      name: "liner_equalizer_settings_v1",
+      name: "neritium_equalizer_settings_v1",
       storage: createJSONStorage(() => debouncedStorage),
       partialize: (state) => ({ enabled: state.enabled, gains: state.gains }),
       merge: (persisted, current) => {

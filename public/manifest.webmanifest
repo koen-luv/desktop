@@ -1,0 +1,14 @@
+{
+  "name": "Neritium",
+  "short_name": "Neritium",
+  "description": "A music player for the library you own — playlists, synced lyrics and downloads.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#101014",
+  "theme_color": "#101014",
+  "icons": [
+    { "src": "/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

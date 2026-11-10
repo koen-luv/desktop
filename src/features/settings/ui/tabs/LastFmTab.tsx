@@ -17,7 +17,7 @@ function errorMessage(error: unknown): string {
 
 /**
  * Last.fm account setup: authorize through the out-of-band flow, then control
- * scrobbling. Liner's own Last.fm application is always used, so there are no
+ * scrobbling. Neritium's own Last.fm application is always used, so there are no
  * API credentials to paste. Works on Android and desktop — the authorization
  * page opens in the system browser via the native bridge.
  */
@@ -38,7 +38,7 @@ export function LastFmTab({ searchQuery }: { searchQuery?: string }) {
   const [authError, setAuthError] = useState<string | null>(null);
 
   const connected = Boolean(sessionKey);
-  // Liner's own Last.fm application — no user-provided credentials anymore.
+  // Neritium's own Last.fm application — no user-provided credentials anymore.
   const credentials = resolveLastfmCredentials("", "");
   const authUrl = pendingToken ? lastfmAuthorizeUrl(credentials.apiKey, pendingToken) : null;
 
@@ -163,7 +163,7 @@ export function LastFmTab({ searchQuery }: { searchQuery?: string }) {
               ? t("settings.lastfm.account.connected_description", { user: username || "" }) ||
                 `Scrobbling as ${username || "Last.fm"}.`
               : t("settings.lastfm.account.description") ||
-                "Authorize Liner to submit plays to your profile."
+                "Authorize Neritium to submit plays to your profile."
           }
           titleKey="settings.lastfm.account.title"
           descKey="settings.lastfm.account.description"
@@ -203,7 +203,7 @@ export function LastFmTab({ searchQuery }: { searchQuery?: string }) {
         {!connected && authUrl && (
           <div className="px-[14px] py-[10px] rounded-lg bg-border-alpha-10 text-[13px] text-text-secondary leading-[1.5]">
             {t("settings.lastfm.authorize_hint") ||
-              "Allow Liner on Last.fm in the opened page (or via the link below), then press Connect."}{" "}
+              "Allow Neritium on Last.fm in the opened page (or via the link below), then press Connect."}{" "}
             <a
               href={authUrl}
               target="_blank"

@@ -8,5 +8,6 @@ export { AboutTab } from "./AboutTab";
 export { OverlayTab } from "./OverlayTab";
 export { DiscordTab } from "./DiscordTab";
 export { LastFmTab } from "./LastFmTab";
+export { SpotifyTab } from "./SpotifyTab";
 export { DevicesTab } from "./DevicesTab";
 export { ListeningTab } from "./ListeningTab";

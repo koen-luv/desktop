@@ -71,7 +71,7 @@ const electron = vi.hoisted(() => {
       },
       screen: { getPrimaryDisplay: () => display, getDisplayMatching: () => display },
       globalShortcut: { register: () => true, unregister: () => {} },
-      app: { getPath: () => require("node:os").tmpdir() + "/liner-overlay-test-missing" },
+      app: { getPath: () => require("node:os").tmpdir() + "/neritium-overlay-test-missing" },
     },
   };
 });

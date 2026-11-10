@@ -1,7 +1,7 @@
-Liner Source-Available & Non-Commercial Contribution License
+Neritium Source-Available & Non-Commercial Contribution License
 Version 1.0 (2026)
 
-Copyright (c) 2024-2026 Liner Project Contributors & feralbureau.
+Copyright (c) 2024-2026 Neritium Project Contributors & feralbureau.
 All Rights Reserved.
 
 ================================================================================
@@ -9,9 +9,9 @@ TERMS AND CONDITIONS FOR USE, REPRODUCTION, MODIFICATION, AND CONTRIBUTION
 ================================================================================
 
 1. PREAMBLE & SOURCE-AVAILABLE STATUS
-   The source code of the Liner software ("Software") is made publicly available
+   The source code of the Neritium software ("Software") is made publicly available
    to foster transparency, enable security review, and welcome collaborative
-   community contributions to the official Liner upstream project.
+   community contributions to the official Neritium upstream project.
    
    THIS SOFTWARE IS SOURCE-AVAILABLE. IT IS NOT PUBLIC DOMAIN NOR UNRESTRICTED
    OPEN SOURCE. ANY USE, COPYING, MODIFICATION, OR REDISTRIBUTION OUTSIDE THE
@@ -30,12 +30,12 @@ TERMS AND CONDITIONS FOR USE, REPRODUCTION, MODIFICATION, AND CONTRIBUTION
    this Software for the SOLE PURPOSE of developing, preparing, and submitting
    contributions (including bug fixes, feature improvements, performance patches,
    and documentation) back to the official upstream repository:
-   https://github.com/tryliner/desktop (or official Liner project repositories).
+   https://github.com/tryliner/desktop (or official Neritium project repositories).
 
    By submitting any modification or Pull Request to the official upstream project,
    you grant the project maintainers a perpetual, irrevocable, worldwide,
    royalty-free, assignable right and license to use, incorporate, modify,
-   relicense, and distribute your contribution as part of the Liner project.
+   relicense, and distribute your contribution as part of the Neritium project.
 
 4. STRICT PROHIBITIONS & RESTRICTIONS
    Unless you have received prior express written authorization from the
@@ -54,14 +54,14 @@ TERMS AND CONDITIONS FOR USE, REPRODUCTION, MODIFICATION, AND CONTRIBUTION
 
    c) NO CODE EXTRACTION OR ASSET THEFT:
       You may NOT copy, extract, harvest, or reuse core algorithms, security
-      and cryptographic subsystems (including liner-signer), custom audio
+      and cryptographic subsystems (including neritium-signer), custom audio
       processing logic, lyrics synchronization mechanics, visual shaders, or
       distinctive user interface designs from this Software for use in separate
       third-party applications or libraries.
 
    d) TRADEMARKS AND BRANDING:
       This license does NOT grant any right to use the trade names, trademarks,
-      service marks, logos ("Liner"), product design, or branding assets of the
+      service marks, logos ("Neritium"), product design, or branding assets of the
       copyright holders.
 
 5. TERMINATION

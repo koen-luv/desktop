@@ -207,7 +207,7 @@ export default function ConnectivityWall() {
             {t("connectivity.download_dump")}
           </Button>
           <a
-            href={`mailto:${SUPPORT_MAIL}?subject=${encodeURIComponent("Liner connection problem")}`}
+            href={`mailto:${SUPPORT_MAIL}?subject=${encodeURIComponent("Neritium connection problem")}`}
             className="inline-flex h-[38px] items-center gap-[6px] px-[8px] text-[13px] font-[500] text-text-secondary hover:text-text-primary transition-colors"
             style={{ fontFamily: "var(--font-inter), sans-serif" }}
           >

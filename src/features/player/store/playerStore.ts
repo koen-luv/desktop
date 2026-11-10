@@ -128,7 +128,7 @@ export interface PlayerStore extends PlayerState {
   resetPlayback: () => void;
 }
 
-const PLAYER_SESSION_STORAGE_KEY = "liner_player_session_v2";
+const PLAYER_SESSION_STORAGE_KEY = "neritium_player_session_v2";
 
 export const usePlayerStore = create<PlayerStore>()(
   persist(
