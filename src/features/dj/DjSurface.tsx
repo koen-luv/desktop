@@ -2,6 +2,9 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePlayerStore } from "@/features/player";
 import Waveform from "./WaveformView";
 import Knob from "./Knob";
+import MidiPanel from "./midi/MidiPanel";
+import { useMidi } from "./midi/useMidi";
+import type { DjAction } from "./midi/midiMap";
 import { resolvePlaybackStream } from "@/features/player/engine/playbackSource";
 import type { Track } from "@/shared/types";
 import { log } from "@/shared/utils/logger";
@@ -381,6 +384,7 @@ function DjSurface({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [cueMode, setCueMode] = useState<"a" | "b" | null>(null);
   const [quantise, setQuantise] = useState(true);
+  const [midiOpen, setMidiOpen] = useState(false);
   const masterGainRef = useRef<GainNode | null>(null);
   const audioRef = useRef<{ a: HTMLAudioElement | null; b: HTMLAudioElement | null }>({
     a: null,
@@ -607,6 +611,12 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     element.currentTime = Math.max(0, element.currentTime + deltaMs / 1000);
   }, []);
 
+  const setTempo = useCallback((side: "a" | "b", value: number) => {
+    setDecks((prev) => ({ ...prev, [side]: { ...prev[side], tempo: value } }));
+    const element = audioRef.current[side];
+    if (element) element.playbackRate = tempoToRate(value);
+  }, []);
+
   const setEq = useCallback((side: "a" | "b", band: keyof EqBand, value: number) => {
     setDecks((prev) => ({ ...prev, [side]: { ...prev[side], eq: { ...prev[side].eq, [band]: value } } }));
   }, []);
@@ -711,11 +721,85 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     void loadTrack("b", suggestions.b);
   }, [loadTrack, suggestions.a, suggestions.b]);
 
+  // MIDI action bus: one dispatcher for every assignable control.
+  const applyMidiAction = useCallback(
+    (action: DjAction) => {
+      switch (action.kind) {
+        case "selectDeck":
+          setFocused(action.deck);
+          break;
+        case "togglePlay":
+          void toggle(action.deck);
+          break;
+        case "cue":
+          cue(action.deck);
+          break;
+        case "sync":
+          syncTempo(action.deck);
+          break;
+        case "loopBeats":
+          setLoop(action.deck, action.beats);
+          break;
+        case "exitLoop":
+          exitLoop(action.deck);
+          break;
+        case "hotcueSet":
+          setHotcue(action.deck, action.index);
+          break;
+        case "hotcueGo":
+          goToHotcue(action.deck, action.index);
+          break;
+        case "hotcueClear":
+          clearHotcue(action.deck, action.index);
+          break;
+        case "eq":
+          setEq(action.deck, action.band, action.value);
+          break;
+        case "fx":
+          setFx(action.deck, action.key, action.value);
+          break;
+        case "trim":
+          setDecks((prev) => ({
+            ...prev,
+            [action.deck]: { ...prev[action.deck], trim: action.value },
+          }));
+          break;
+        case "tempo":
+          setTempo(action.deck, action.value);
+          break;
+        case "crossfader":
+          setCrossfader(action.value);
+          break;
+        case "master":
+          setMaster(action.value);
+          break;
+        case "quantise":
+          setQuantise((prev) => !prev);
+          break;
+      }
+    },
+    [toggle, cue, syncTempo, setLoop, exitLoop, setHotcue, goToHotcue, clearHotcue, setEq, setFx, setTempo],
+  );
+
+  const midi = useMidi({ focused, onAction: applyMidiAction });
+
   return (
     <div className="absolute inset-0 z-[95] flex flex-col gap-3 bg-bg-primary/98 p-3 backdrop-blur-xl">
       <div className="flex items-center justify-between">
         <h2 className="m-0 text-[15px] font-[600]">DJ mode</h2>
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMidiOpen((prev) => !prev)}
+            aria-pressed={midiOpen}
+            className={`h-[32px] rounded-[10px] px-3 text-[12px] font-[600] ${
+              midi.connected
+                ? "bg-accent-primary text-accent-ink"
+                : "border border-border-primary text-text-secondary"
+            }`}
+          >
+            MIDI
+          </button>
           <button
             type="button"
             onClick={() => setQuantise((prev) => !prev)}
@@ -802,11 +886,7 @@ function DjSurface({ onClose }: { onClose: () => void }) {
           onToggleCueMode={() => setCueMode((prev) => (prev === "a" ? null : "a"))}
           onFx={(key, value) => setFx("a", key, value)}
           onTrim={(trim) => setDecks((prev) => ({ ...prev, a: { ...prev.a, trim } }))}
-          onTempo={(tempo) => {
-            setDecks((prev) => ({ ...prev, a: { ...prev.a, tempo } }));
-            const element = audioRef.current.a;
-            if (element) element.playbackRate = tempoToRate(tempo);
-          }}
+          onTempo={(tempo) => setTempo("a", tempo)}
         />
 
         <div className="flex w-[64px] shrink-0 flex-col items-center justify-center gap-2">
@@ -865,16 +945,14 @@ function DjSurface({ onClose }: { onClose: () => void }) {
           onToggleCueMode={() => setCueMode((prev) => (prev === "b" ? null : "b"))}
           onFx={(key, value) => setFx("b", key, value)}
           onTrim={(trim) => setDecks((prev) => ({ ...prev, b: { ...prev.b, trim } }))}
-          onTempo={(tempo) => {
-            setDecks((prev) => ({ ...prev, b: { ...prev.b, tempo } }));
-            const element = audioRef.current.b;
-            if (element) element.playbackRate = tempoToRate(tempo);
-          }}
+          onTempo={(tempo) => setTempo("b", tempo)}
         />
       </div>
 
       <audio ref={(el) => void (audioRef.current.a = el)} preload="auto" />
       <audio ref={(el) => void (audioRef.current.b = el)} preload="auto" />
+
+      {midiOpen ? <MidiPanel midi={midi} onClose={() => setMidiOpen(false)} /> : null}
     </div>
   );
 }
