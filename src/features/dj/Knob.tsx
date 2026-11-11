@@ -111,7 +111,7 @@ const Knob = memo(function Knob({
   const needleAngle = angleForNormalized(normalized);
 
   return (
-    <div className="flex w-[46px] shrink-0 flex-col items-center gap-[2px]">
+    <div className="dj-knob shrink-0">
       <div
         role="slider"
         aria-label={label}
@@ -127,17 +127,17 @@ const Knob = memo(function Knob({
         onDoubleClick={() => commit(rest)}
         onKeyDown={onKeyDown}
         onWheel={onWheel}
-        className={`relative cursor-ns-resize rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/70 touch-none ${
-          dragging ? "ring-2 ring-accent-primary/60" : ""
+        className={`relative cursor-ns-resize rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--dj-led-amber)]/70 touch-none ${
+          dragging ? "ring-2 ring-[var(--dj-led-amber)]/50" : ""
         }`}
         style={{ width: size, height: size }}
       >
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
           {/* track */}
           <path
+            className="track"
             d={arc(0, 1)}
             fill="none"
-            stroke="rgba(255,255,255,0.14)"
             strokeWidth={2.5}
             strokeLinecap="round"
           />
@@ -146,21 +146,21 @@ const Knob = memo(function Knob({
             <path
               d={arc(restNormalized, normalized)}
               fill="none"
-              stroke={bipolar ? (normalized > restNormalized ? "#8f79ff" : "#5ec8ff") : "#8f79ff"}
+              stroke={bipolar ? "#ffb020" : "#2dd4a8"}
               strokeWidth={2.5}
               strokeLinecap="round"
             />
           )}
           {/* cap */}
-          <circle cx={center} cy={center} r={radius - 3.5} fill="#1c1c22" stroke="rgba(255,255,255,0.12)" />
+          <circle className="cap" cx={center} cy={center} r={radius - 3.5} />
           {/* needle */}
           <g transform={`rotate(${needleAngle} ${center} ${center})`}>
-            <line x1={center} y1={center - radius + 5} x2={center} y2={center - 4} stroke="#f4f3f8" strokeWidth={2} strokeLinecap="round" />
+            <line className="needle" x1={center} y1={center - radius + 5} x2={center} y2={center - 4} strokeWidth={2} strokeLinecap="round" />
           </g>
         </svg>
       </div>
-      <span className="text-[9px] uppercase tracking-[0.08em] text-text-tertiary">{label}</span>
-      <span className={`font-mono text-[9px] ${dragging ? "text-text-primary" : "text-text-tertiary"}`}>
+      <span className="dj-label">{label}</span>
+      <span className={`dj-value ${dragging ? "text-text-primary" : ""}`}>
         {format ? format(value) : value.toFixed(2)}
       </span>
     </div>
