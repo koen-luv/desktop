@@ -35,6 +35,7 @@ import {
 import { TouchBarManager } from "./touchbar.js";
 import { registerAuthSessionIpc } from "./auth-session-ipc.js";
 import { connectSpotifyAccount, refreshSpotifyTokens } from "./spotify-oauth.js";
+import { registerDemucsIpc, registerStemCacheIpc } from "./stems-store.js";
 import { ThumbarController } from "./thumbar.js";
 import { OverlayManager } from "./overlay.js";
 import { BundleManager } from "./bundle-manager.js";
@@ -1323,6 +1324,9 @@ if (!gotTheLock) {
         return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
       }
     });
+
+    registerStemCacheIpc();
+    registerDemucsIpc();
 
     const authSessions = registerAuthSessionIpc();
     overlayManager?.bindAuthSource(

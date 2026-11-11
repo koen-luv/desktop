@@ -54,6 +54,7 @@ import {
 import { useCustomizationStore, getBlockStyle } from "@/features/settings/store/customizationStore";
 import { UpdateModal, UpdateToastBridge } from "@/features/updater";
 import { isAndroidApp, setBackHandler } from "@/platform";
+import { useStemsPanelStore } from "@/features/stems/store";
 
 
 // Settings is the heaviest surface in the app (its Storage tab pulls in
@@ -64,6 +65,7 @@ const SettingsModal = lazy(() => import("@/features/settings/ui/SettingsModal"))
 // The fullscreen player owns the WebGL (kawarp) background and the lyrics
 // engine, so it only ships when it is first opened.
 const DjSurface = lazy(() => import("@/features/dj/DjSurface"));
+const StemsPanel = lazy(() => import("@/features/stems/StemsPanel"));
 
 const FullscreenPlayer = lazy(() =>
   import("@/features/player/ui/FullscreenPlayer").then((m) => ({ default: m.FullscreenPlayer })),
@@ -117,6 +119,8 @@ export default function AppFrame({ children }: AppFrameProps) {
   const setFullscreenPlayerOpen = usePlayerStore((state) => state.setFullscreen);
   const djMode = usePlayerStore((state) => state.djMode);
   const setDjMode = usePlayerStore((state) => state.setDjMode);
+  const stemsTrack = useStemsPanelStore((state) => state.track);
+  const closeStems = useStemsPanelStore((state) => state.close);
   const [fullscreenEffectsReady, setFullscreenEffectsReady] = useState(false);
 
   useEffect(() => {
@@ -1152,6 +1156,12 @@ export default function AppFrame({ children }: AppFrameProps) {
         </motion.div>
       )}      </AnimatePresence>
 
+
+      {stemsTrack && !isAndroidApp() && (
+        <Suspense fallback={null}>
+          <StemsPanel track={stemsTrack} onClose={closeStems} />
+        </Suspense>
+      )}
 
       {djMode && !isAndroidApp() && (
         <Suspense fallback={null}>

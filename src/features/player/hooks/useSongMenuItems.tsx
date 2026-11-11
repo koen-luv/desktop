@@ -7,6 +7,7 @@ import {
   LuPlus,
   LuTrash2,
   LuFolderPlus,
+  LuLayers,
 } from "react-icons/lu";
 import type { DropdownMenuItem } from "@/shared/ui/DropdownMenu";
 import { playerEngine } from "../engine/playerEngine";
@@ -19,6 +20,7 @@ import {
 } from "@/features/library";
 import { useTranslation } from "@/languages";
 import { showToast } from "@/shared/ui";
+import { useStemsPanelStore } from "@/features/stems/store";
 
 export interface SongMenuContext {
   id?: string;
@@ -156,6 +158,27 @@ export function useSongMenuItems(ctx: SongMenuContext): DropdownMenuItem[] {
       }
 
       return [
+        // Desktop-only: Demucs separation runs in the main process and the stems
+        // are cached on disk, so it is offered only where that bridge exists.
+        ...(window.neritiumElectron?.stemsSeparate && id
+          ? [
+              {
+                id: "separate-stems",
+                label: "Separate stems (DJ)",
+                icon: <LuLayers size={15} />,
+                onClick: () => {
+                  useStemsPanelStore.getState().open({
+                    id: id!,
+                    title,
+                    artists,
+                    coverUrl,
+                    durationMs: durationMs ?? 0,
+                    playCount: 0,
+                  });
+                },
+              },
+            ]
+          : []),
         {
           id: "start-radio",
           label: t("common.start_radio"),

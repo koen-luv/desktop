@@ -73,6 +73,24 @@ export interface NeritiumElectronApi {
     | { ok: true; tokens: { accessToken: string; refreshToken: string; expiresAt: number; scope: string } }
     | { ok: false; error: string }
   >;
+  /** Stem cache: local files under userData, downloaded once per track. */
+  stemsCached?: (trackId: string) => Promise<{ name: string; path: string }[]>;
+  stemsEnsure?: (
+    trackId: string,
+    stems: { name: string; url: string }[],
+  ) => Promise<
+    | { ok: true; stems: { name: string; path: string }[]; cached: string[]; downloaded: string[] }
+    | { ok: false; error: string }
+  >;
+  stemsClear?: (trackId?: string) => Promise<boolean>;
+  /** Separates through Demucs in the main process and caches the four stems. */
+  stemsSeparate?: (
+    trackId: string,
+    audioUrl: string,
+    endpoint?: string,
+  ) => Promise<
+    { ok: true; stems: { name: string; path: string }[] } | { ok: false; error: string }
+  >;
   authSession?: {
     get: () => StoredAuthSession | null;
     set: (next: { accessToken: string; refreshToken: string } | null) => Promise<StoredAuthSession | null>;
@@ -203,6 +221,11 @@ const api: NeritiumElectronApi = {
   signRawPayload: (payload) => ipcRenderer.invoke("signer:sign-raw-payload", payload),
   spotifyConnect: () => ipcRenderer.invoke("spotify:connect"),
   spotifyRefresh: (refreshToken) => ipcRenderer.invoke("spotify:refresh", refreshToken),
+  stemsCached: (trackId) => ipcRenderer.invoke("stems:cached", trackId),
+  stemsEnsure: (trackId, stems) => ipcRenderer.invoke("stems:ensure", trackId, stems),
+  stemsClear: (trackId) => ipcRenderer.invoke("stems:clear", trackId),
+  stemsSeparate: (trackId, audioUrl, endpoint) =>
+    ipcRenderer.invoke("stems:separate", trackId, audioUrl, endpoint),
   authSession: {
     get: () => ipcRenderer.sendSync("auth:get-session") ?? null,
     set: (next) => ipcRenderer.invoke("auth:set-session", next),

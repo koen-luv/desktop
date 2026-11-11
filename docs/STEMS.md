@@ -21,7 +21,24 @@ has no model runtime. So the app owns everything except the model.
 - **Worker tests** (`api-worker/src/stems.test.ts`): unavailability, status,
   input validation, forwarding + filtering, too-few-stems, unreachable service.
 
-## What your service must do
+## Desktop: hosted Demucs API (default)
+
+On desktop the separation does **not** go through the Worker. The Electron main
+process does the whole job (`electron/stems-store.ts`):
+
+1. fetch the track audio, base64 it, `POST {endpoint}/predict`
+   `{ "instances": [{ "b64": "…" }] }`
+2. decode the four base64 mp3s from the response (`vocals/drums/bass/other`)
+3. write them to `userData/stems/<trackId>/` and hand the renderer local paths
+
+Default endpoint: `https://demucs-api-hwbhnojdya-uc.a.run.app` (override with
+`LINER_DEMUCS_ENDPOINT`). Cached stems are reused forever; `stemsClear(trackId)`
+removes them. The renderer then plays four media elements through one
+AudioContext with per-stem `GainNode`s (mute/solo from `mix.ts`).
+
+Entry point: song menu → **Separate stems (DJ)** (desktop only).
+
+## What a self-hosted service must do
 
 Any HTTP wrapper around `demucs` works. The contract is intentionally tiny:
 
