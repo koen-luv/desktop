@@ -5,6 +5,8 @@ import Knob from "./Knob";
 import MidiPanel from "./midi/MidiPanel";
 import { useMidi } from "./midi/useMidi";
 import type { DjAction } from "./midi/midiMap";
+import { analyzeTrack, type TrackAnalysis } from "./analysis";
+import { fadeProgress, planTransition, type TransitionPlan } from "./transition";
 import { resolvePlaybackStream } from "@/features/player/engine/playbackSource";
 import type { Track } from "@/shared/types";
 import { log } from "@/shared/utils/logger";
@@ -56,6 +58,7 @@ interface DeckState {
   fx: FxState;
   peaks: WaveformPeaks | null;
   peaksStatus: "idle" | "ready" | "unavailable";
+  analysis: TrackAnalysis | null;
 }
 
 const EMPTY_DECK: DeckState = {
@@ -76,6 +79,7 @@ const EMPTY_DECK: DeckState = {
   fx: NEUTRAL_FX,
   peaks: null,
   peaksStatus: "idle",
+  analysis: null,
 };
 
 function Deck({
@@ -507,6 +511,7 @@ function DjSurface({ onClose }: { onClose: () => void }) {
             fx: NEUTRAL_FX,
             peaks: null,
             peaksStatus: "idle",
+            analysis: null,
           },
         }));
         void analyseTrack(side, stream.url ?? null);
@@ -539,7 +544,8 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     }
   }, [ensureGraph]);
 
-  /** Decode the loaded stream once; feeds the waveform and the beatgrid. */
+  /** Decode the loaded stream once; waveform, beatgrid and structure all
+   * come from this single analysis pass. */
   const analyseTrack = useCallback(async (side: "a" | "b", url: string | null) => {
     if (!url) {
       setDecks((prev) => ({ ...prev, [side]: { ...prev[side], peaksStatus: "unavailable" } }));
@@ -551,23 +557,33 @@ function DjSurface({ onClose }: { onClose: () => void }) {
       const bytes = await response.arrayBuffer();
       const ctx = new AudioContext();
       const buffer = await ctx.decodeAudioData(bytes);
+      const sampleRate = ctx.sampleRate;
       void ctx.close().catch(() => undefined);
       const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) =>
         buffer.getChannelData(i),
       );
-      const mono = toMono(channels);
-      const peaks = computePeaks(mono, 900);
-      const estimate = detectBpm(mono, buffer.sampleRate);
+      const mono = new Float32Array(buffer.length);
+      for (let i = 0; i < buffer.length; i += 1) {
+        let sum = 0;
+        let peak = 0;
+        for (const channel of channels) {
+          const v = channel[i] ?? 0;
+          sum += v;
+          if (Math.abs(v) > Math.abs(peak)) peak = v;
+        }
+        mono[i] = Math.abs(sum / channels.length) > Math.abs(peak) ? sum / channels.length : peak;
+      }
+      const analysis = analyzeTrack(mono, sampleRate);
       setDecks((prev) => ({
         ...prev,
         [side]: {
           ...prev[side],
-          peaks,
+          peaks: analysis.peaks,
           peaksStatus: "ready",
-          bpm: prev[side].bpm ?? (estimate && estimate.confidence >= 0.2 ? estimate.bpm : null),
-          // Fold the first strong onset into one beat period so the grid
-          // starts at the top of the file.
-          anchorMs: estimate ? estimate.anchorMs % (60_000 / estimate.bpm) : 0,
+          analysis,
+          // tap tempo always wins over detection
+          bpm: prev[side].bpm ?? analysis.bpm,
+          anchorMs: analysis.anchorMs,
         },
       }));
     } catch {
@@ -721,6 +737,54 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     void loadTrack("b", suggestions.b);
   }, [loadTrack, suggestions.a, suggestions.b]);
 
+  // Auto-mix: analysis-driven transition between the two decks.
+  const [autoPlan, setAutoPlan] = useState<TransitionPlan | null>(null);
+  const [autoArmed, setAutoArmed] = useState(false);
+  const autoRef = useRef<{ phase: "ramp"; startedAt: number; from: number } | null>(null);
+  const crossfaderRef = useRef(crossfader);
+  crossfaderRef.current = crossfader;
+
+  const computedPlan = useMemo(() => {
+    const a = decks.a.analysis;
+    const b = decks.b.analysis;
+    if (!a || !b || !decks.a.track || !decks.b.track) return null;
+    return planTransition(a, b, { currentTempoA: decks.a.tempo });
+  }, [decks.a.analysis, decks.b.analysis, decks.a.track, decks.b.track, decks.a.tempo]);
+
+  useEffect(() => {
+    if (!autoArmed || !autoPlan) return;
+    const id = window.setInterval(() => {
+      const a = audioRef.current.a;
+      const b = audioRef.current.b;
+      if (!a || !b) return;
+      const phase = autoRef.current;
+      if (!phase) {
+        if (a.currentTime * 1000 >= autoPlan.triggerAtMs) {
+          b.playbackRate = tempoToRate(autoPlan.tempoMatch);
+          b.currentTime = Math.max(0, (autoPlan.bStartMs + autoPlan.beatAlignMs) / 1000);
+          void b.play().catch(() => undefined);
+          setDecks((prev) => ({
+            ...prev,
+            b: { ...prev.b, playing: true, tempo: autoPlan.tempoMatch },
+          }));
+          autoRef.current = { phase: "ramp", startedAt: performance.now(), from: crossfaderRef.current };
+          log("green", "dj", `auto-mix started: fade ${Math.round(autoPlan.crossfadeMs / 1000)}s`);
+        }
+        return;
+      }
+      const t = (performance.now() - phase.startedAt) / autoPlan.crossfadeMs;
+      setCrossfader(phase.from + (1 - phase.from) * fadeProgress(t, 1));
+      if (t >= 1) {
+        a.pause();
+        setDecks((prev) => ({ ...prev, a: { ...prev.a, playing: false } }));
+        autoRef.current = null;
+        setAutoArmed(false);
+        log("green", "dj", "auto-mix complete - deck A stopped");
+      }
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [autoArmed, autoPlan]);
+
   // MIDI action bus: one dispatcher for every assignable control.
   const applyMidiAction = useCallback(
     (action: DjAction) => {
@@ -790,6 +854,21 @@ function DjSurface({ onClose }: { onClose: () => void }) {
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
+            onClick={() => {
+              setAutoPlan(computedPlan);
+              setAutoArmed(false);
+            }}
+            disabled={!computedPlan}
+            className={`h-[32px] rounded-[10px] px-3 text-[12px] font-[600] disabled:opacity-40 ${
+              autoPlan
+                ? "border border-accent-primary text-accent-primary"
+                : "border border-border-primary text-text-secondary"
+            }`}
+          >
+            Auto Mix
+          </button>
+          <button
+            type="button"
             onClick={() => setMidiOpen((prev) => !prev)}
             aria-pressed={midiOpen}
             className={`h-[32px] rounded-[10px] px-3 text-[12px] font-[600] ${
@@ -821,6 +900,50 @@ function DjSurface({ onClose }: { onClose: () => void }) {
           </button>
         </div>
       </div>
+
+      {autoPlan ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-[12px] border border-border-primary/60 bg-bg-panel/70 px-3 py-2 text-[12px]">
+          <span className="font-[600] text-text-primary">
+            Mix at {formatDeckTime(autoPlan.triggerAtMs)} · {Math.round(autoPlan.crossfadeMs / 1000)}s fade
+          </span>
+          <span className="text-text-secondary">
+            B tempo {autoPlan.tempoMatch >= 0 ? "+" : ""}
+            {(autoPlan.tempoMatch * 100).toFixed(1)}%
+            {autoPlan.matchedBpm ? ` · ${autoPlan.matchedBpm.toFixed(1)} BPM` : ""}
+          </span>
+          <span className="text-text-tertiary">
+            B in at {formatDeckTime(autoPlan.bStartMs)} · grid {autoPlan.beatAlignMs >= 0 ? "+" : ""}
+            {Math.round(autoPlan.beatAlignMs)} ms
+          </span>
+          {autoPlan.warnings.map((warning) => (
+            <span key={warning} className="text-amber-400">
+              {warning}
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              autoRef.current = null;
+              setAutoArmed((prev) => !prev);
+            }}
+            className={`ml-auto h-[28px] rounded-[8px] px-3 text-[12px] font-[600] ${
+              autoArmed ? "bg-red-500/80 text-white" : "bg-accent-primary text-accent-ink"
+            }`}
+          >
+            {autoArmed ? "Disarm" : "Arm auto-mix"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAutoPlan(null);
+              setAutoArmed(false);
+            }}
+            className="h-[28px] rounded-[8px] border border-border-primary px-2 text-[11px] text-text-secondary"
+          >
+            Hide
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1 gap-3">
         <div className="flex w-[240px] shrink-0 flex-col gap-2 rounded-[16px] border border-border-primary/60 bg-bg-panel/70 p-3">
