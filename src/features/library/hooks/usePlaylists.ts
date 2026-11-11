@@ -3,6 +3,7 @@ import { api, getAuthSession, mediaUrl, toClientTrack, type ApiUserPlaylistItem 
 import { queryCache } from "@/shared/cache/queryCache";
 import type { Track } from "@/shared/types";
 import {
+  SharedPlaylistsUnauthorizedError,
   getSharedPlaylist,
   isSharedPlaylistId,
   listSharedPlaylists,
@@ -95,6 +96,31 @@ function snapshot() {
 
 const SERVER_SNAPSHOT = { data: EMPTY, error: undefined as unknown, isLoading: true };
 
+/**
+ * Shared (collaborative) playlists live on a separate deployment that must share
+ * the API's JWT secret. When it rejects the session the feature is simply
+ * unavailable — log once, then stop asking for the rest of the session instead
+ * of failing (and console-erroring) on every playlist load.
+ */
+let sharedPlaylistsRejected = false;
+
+async function loadSharedPlaylistsOnce() {
+  if (sharedPlaylistsRejected) return [];
+  try {
+    return await listSharedPlaylists();
+  } catch (error) {
+    if (error instanceof SharedPlaylistsUnauthorizedError) {
+      sharedPlaylistsRejected = true;
+      console.info(
+        "[Shared playlists] unavailable: the playlist service rejected this session (deploy it with the same JWT secret as the API).",
+      );
+      return [];
+    }
+    console.error("[Shared playlists] Could not load shared playlists:", error);
+    return [];
+  }
+}
+
 function load(force = false): Promise<void> {
   if (request) return request;
   const session = getAuthSession();
@@ -115,10 +141,7 @@ function load(force = false): Promise<void> {
     const coverCache = readCoverCache();
     const [response, sharedPlaylists] = await Promise.all([
       api.listPlaylists(),
-      listSharedPlaylists().catch((error: unknown) => {
-        console.error("[Shared playlists] Could not load shared playlists:", error);
-        return [];
-      }),
+      loadSharedPlaylistsOnce(),
     ]);
 
     const playlists = await Promise.all(

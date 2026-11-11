@@ -54,6 +54,16 @@ export function getSharedPlaylistId(id: string): string {
   return isSharedPlaylistId(id) ? id.slice(SHARED_PLAYLIST_PREFIX.length) : id;
 }
 
+/** The shared-playlists deployment rejected the API's access token. */
+export class SharedPlaylistsUnauthorizedError extends Error {
+  readonly code = "SHARED_PLAYLISTS_UNAUTHORIZED";
+  constructor() {
+    super(
+      "The collaborative-playlist service rejected this session. It must be deployed with the same JWT secret as the API.",
+    );
+  }
+}
+
 async function sharedRequest<T>(
   path: string,
   init: RequestInit = {},
@@ -74,6 +84,9 @@ async function sharedRequest<T>(
       ...init.headers,
     },
   });
+  if (response.status === 401) {
+    throw new SharedPlaylistsUnauthorizedError();
+  }
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as
       | { error?: unknown }
