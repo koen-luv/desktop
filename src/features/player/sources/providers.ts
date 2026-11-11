@@ -9,7 +9,7 @@ import {
   resolveSessionStream,
   streamExpiryMs,
 } from "../engine/streamResolverLegacy";
-import type { ResolveContext, ResolvedStream, SourceProvider } from "./types";
+import { SourceError, type ResolveContext, type ResolvedStream, type SourceProvider } from "./types";
 
 /**
  * Legitimate playback sources for Neritium.
@@ -76,6 +76,22 @@ function createNeritiumProvider(config: NeritiumProviderConfig): SourceProvider 
         quality: ctx.quality,
       };
       try {
+        // The proxy transport is only for clients that cannot reach YouTube
+        // themselves (a browser). On Electron/Android the backend's proxy
+        // cannot fetch googlevideo — it is refused as a datacenter client — so
+        // asking it for a stream just produces a 502 the player has to survive.
+        if (config.transport === "proxy" && canExecuteDirectInnertubePlans()) {
+          throw new SourceError(
+            "unsupported",
+            "Proxy playback is not used where the client can resolve streams itself",
+            config.id,
+          );
+        }
+        if (config.transport === "auto" && canExecuteDirectInnertubePlans()) {
+          // Same reason: a native client resolves directly instead of taking
+          // the server-selected proxy session.
+          return await resolveDirectInnertubeStream(ctx.track, options);
+        }
         if (config.transport === "auto") {
           // Let the server pick the transport — unless this renderer cannot
           // execute Innertube plans directly (plain browser, no CORS bypass),

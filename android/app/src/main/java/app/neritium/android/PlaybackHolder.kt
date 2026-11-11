@@ -154,7 +154,7 @@ object PlaybackHolder {
             // Skip unavailable / undecodable tracks without JS. Consecutive
             // errors only stop at the cap, so a bad track never wedges the
             // queue while the WebView is frozen.
-            val canSkip = playWhenReadyIntent && failedTrackId != null && queueAutoAdvance && consecutiveErrors <= 10
+            val canSkip = playWhenReadyIntent && failedTrackId != null && queueAutoAdvance && consecutiveErrors <= 3
             val next = if (canSkip) consumeNextLocked() else null
             if (next != null && failedTrackId != null) {
                 main.post {
@@ -165,6 +165,10 @@ object PlaybackHolder {
                 }
                 return
             }
+            // The cap was reached (or nothing is queued): stop trying. Without
+            // this the player stayed armed on a failed item and every poll
+            // produced another error.
+            playWhenReadyIntent = false
             updateState()
             NativeEvents.emit("playbackError", stateJson())
         }
@@ -250,10 +254,15 @@ object PlaybackHolder {
 
     fun pause() {
         playWhenReadyIntent = false
-        cancelCrossfadeLocked()
-        runOnPlayer {
-            it.volume = volume
-            it.pause()
+        // Called from the @JavascriptInterface thread: ExoPlayer may only be
+        // touched on the main thread, so the crossfade teardown (which pauses and
+        // releases players) has to move there too.
+        main.post {
+            cancelCrossfadeLocked()
+            player?.let {
+                it.volume = volume
+                it.pause()
+            }
         }
     }
 
@@ -375,10 +384,12 @@ object PlaybackHolder {
     }
 
     fun seek(positionMs: Long) {
-        cancelCrossfadeLocked()
-        runOnPlayer {
-            it.volume = volume
-            it.seekTo(positionMs.coerceAtLeast(0L))
+        main.post {
+            cancelCrossfadeLocked()
+            player?.let {
+                it.volume = volume
+                it.seekTo(positionMs.coerceAtLeast(0L))
+            }
         }
     }
 
