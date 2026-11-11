@@ -49,23 +49,42 @@ function Deck({
   side,
   state,
   gain,
+  focused,
+  canSync,
+  onFocus,
   onPlay,
   onPause,
+  onCue,
+  onSync,
   onSeek,
   onTrim,
   onTempo,
+  onNudge,
 }: {
   side: "A" | "B";
   state: DeckState;
   gain: number;
+  focused: boolean;
+  canSync: boolean;
+  onFocus: () => void;
   onPlay: () => void;
   onPause: () => void;
+  onCue: () => void;
+  onSync: () => void;
   onSeek: (ms: number) => void;
   onTrim: (value: number) => void;
   onTempo: (value: number) => void;
+  onNudge: (deltaMs: number) => void;
 }) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-3 rounded-[16px] border border-border-primary/60 bg-bg-panel/80 p-4">
+    <div
+      onClick={onFocus}
+      className={`flex min-w-0 flex-1 flex-col gap-3 rounded-[16px] border p-4 transition-colors ${
+        focused
+          ? "border-accent-primary/70 bg-bg-panel"
+          : "border-border-primary/60 bg-bg-panel/80"
+      }`}
+    >
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-[600] tracking-[0.2em] text-text-tertiary">DECK {side}</span>
         <span className="font-mono text-[11px] text-text-tertiary">{Math.round(gain * 100)}%</span>
@@ -103,9 +122,43 @@ function Deck({
           type="button"
           onClick={state.playing ? onPause : onPlay}
           disabled={!state.track || state.loading}
-          className="h-[38px] min-w-[86px] rounded-[10px] border-0 bg-accent-primary px-4 text-[13px] font-[600] text-accent-ink disabled:opacity-40"
+          className="h-[38px] min-w-[76px] rounded-[10px] border-0 bg-accent-primary px-3 text-[13px] font-[600] text-accent-ink disabled:opacity-40"
         >
           {state.loading ? "…" : state.playing ? "Pause" : "Play"}
+        </button>
+        <button
+          type="button"
+          onClick={onCue}
+          disabled={!state.track}
+          className="h-[38px] w-[52px] rounded-[10px] border border-border-primary text-[12px] font-[600] text-text-primary disabled:opacity-40"
+        >
+          Cue
+        </button>
+        <button
+          type="button"
+          onClick={onSync}
+          disabled={!canSync}
+          className="h-[38px] w-[52px] rounded-[10px] border border-border-primary text-[12px] font-[600] text-text-secondary disabled:opacity-40"
+        >
+          Sync
+        </button>
+        <button
+          type="button"
+          onClick={() => onNudge(-500)}
+          disabled={!state.track}
+          aria-label={`Deck ${side} back half second`}
+          className="h-[38px] w-[36px] rounded-[10px] border border-border-primary text-[12px] text-text-secondary disabled:opacity-40"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          onClick={() => onNudge(500)}
+          disabled={!state.track}
+          aria-label={`Deck ${side} forward half second`}
+          className="h-[38px] w-[36px] rounded-[10px] border border-border-primary text-[12px] text-text-secondary disabled:opacity-40"
+        >
+          +
         </button>
         <label className="flex flex-1 items-center gap-2 text-[11px] text-text-tertiary">
           Trim
@@ -150,6 +203,10 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     b: EMPTY_DECK,
   });
   const [crossfader, setCrossfader] = useState(0.5);
+  const [master, setMaster] = useState(1);
+  const [focused, setFocused] = useState<"a" | "b">("a");
+  const [query, setQuery] = useState("");
+  const masterGainRef = useRef<GainNode | null>(null);
   const audioRef = useRef<{ a: HTMLAudioElement | null; b: HTMLAudioElement | null }>({
     a: null,
     b: null,
@@ -166,19 +223,24 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     if (!a || !b) return null;
     const gainA = ctx.createGain();
     const gainB = ctx.createGain();
-    ctx.createMediaElementSource(a).connect(gainA).connect(ctx.destination);
-    ctx.createMediaElementSource(b).connect(gainB).connect(ctx.destination);
+    const masterGain = ctx.createGain();
+    masterGain.gain.value = master;
+    masterGain.connect(ctx.destination);
+    ctx.createMediaElementSource(a).connect(gainA).connect(masterGain);
+    ctx.createMediaElementSource(b).connect(gainB).connect(masterGain);
+    masterGainRef.current = masterGain;
     gainsRef.current = { ctx, a: gainA, b: gainB };
     return gainsRef.current;
   }, []);
 
-  // Apply fader + trim continuously.
+  // Apply fader + trim + master continuously.
   useEffect(() => {
     const graph = ensureGraph();
     if (!graph) return;
     graph.a.gain.value = deckGain(crossfade, "a", decks.a.trim);
     graph.b.gain.value = deckGain(crossfade, "b", decks.b.trim);
-  }, [crossfade, decks.a.trim, decks.b.trim, ensureGraph]);
+    if (masterGainRef.current) masterGainRef.current.gain.value = master;
+  }, [crossfade, decks.a.trim, decks.b.trim, master, ensureGraph]);
 
   // Transport clocks.
   useEffect(() => {
@@ -246,6 +308,35 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     }
   }, [ensureGraph]);
 
+  const cue = useCallback(
+    (side: "a" | "b") => {
+      const element = audioRef.current[side];
+      if (!element) return;
+      element.pause();
+      element.currentTime = 0;
+      setDecks((prev) => ({ ...prev, [side]: { ...prev[side], playing: false, positionMs: 0 } }));
+    },
+    [],
+  );
+
+  /** Matches the other deck's tempo so the two can be beat-mixed by ear. */
+  const syncTempo = useCallback(
+    (side: "a" | "b") => {
+      const other = side === "a" ? "b" : "a";
+      const tempo = decks[other].tempo;
+      setDecks((prev) => ({ ...prev, [side]: { ...prev[side], tempo } }));
+      const element = audioRef.current[side];
+      if (element) element.playbackRate = tempoToRate(tempo);
+    },
+    [decks],
+  );
+
+  const nudge = useCallback((side: "a" | "b", deltaMs: number) => {
+    const element = audioRef.current[side];
+    if (!element) return;
+    element.currentTime = Math.max(0, element.currentTime + deltaMs / 1000);
+  }, []);
+
   const close = useCallback(() => {
     for (const side of ["a", "b"] as const) {
       const element = audioRef.current[side];
@@ -259,6 +350,18 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     gainsRef.current = null;
     onClose();
   }, [onClose]);
+
+  const library = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const matches = needle
+      ? queue.filter(
+          (track) =>
+            track.title.toLowerCase().includes(needle) ||
+            (track.artists ?? "").toLowerCase().includes(needle),
+        )
+      : queue;
+    return matches.slice(0, 60);
+  }, [queue, query]);
 
   const suggestions = useMemo(() => {
     if (queue.length === 0) return { a: undefined, b: undefined };
@@ -285,10 +388,50 @@ function DjSurface({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="flex min-h-0 flex-1 gap-3">
+        <div className="flex w-[240px] shrink-0 flex-col gap-2 rounded-[16px] border border-border-primary/60 bg-bg-panel/70 p-3">
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search the queue…"
+            aria-label="Search tracks for the decks"
+            className="h-[32px] w-full rounded-[10px] border border-border-primary bg-transparent px-3 text-[12px] text-text-primary outline-none"
+          />
+          <p className="m-0 text-[10px] tracking-[0.16em] text-text-tertiary">
+            LOADING TO DECK {focused.toUpperCase()}
+          </p>
+          <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+            {library.length === 0 ? (
+              <p className="m-0 text-[11px] text-text-tertiary">Nothing queued yet.</p>
+            ) : (
+              library.map((item) => (
+                <button
+                  key={`${item.id}-${item.title}`}
+                  type="button"
+                  onClick={() => void loadTrack(focused, item)}
+                  className="flex flex-col items-start gap-[1px] rounded-[8px] px-2 py-[6px] text-left hover:bg-bg-hover"
+                >
+                  <span className="w-full truncate text-[12px] font-[500] text-text-primary">
+                    {item.title}
+                  </span>
+                  <span className="w-full truncate text-[10px] text-text-tertiary">
+                    {item.artists}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+
         <Deck
           side="A"
           state={decks.a}
           gain={deckGain(crossfade, "a", decks.a.trim)}
+          focused={focused === "a"}
+          canSync={Boolean(decks.b.track)}
+          onFocus={() => setFocused("a")}
+          onCue={() => cue("a")}
+          onSync={() => syncTempo("a")}
+          onNudge={(delta) => nudge("a", delta)}
           onPlay={() => void toggle("a")}
           onPause={() => void toggle("a")}
           onSeek={(ms) => {
@@ -317,12 +460,31 @@ function DjSurface({ onClose }: { onClose: () => void }) {
             style={{ writingMode: "vertical-lr", direction: "rtl" }}
           />
           <span className="text-[10px] tracking-[0.2em] text-text-tertiary">B</span>
+          <div className="mt-3 flex w-[46px] flex-col items-center gap-1">
+            <span className="text-[9px] tracking-[0.12em] text-text-tertiary">MASTER</span>
+            <input
+              type="range"
+              aria-label="Master volume"
+              min={0}
+              max={1}
+              step={0.01}
+              value={master}
+              onChange={(event) => setMaster(Number(event.target.value))}
+              className="w-full accent-accent-primary"
+            />
+          </div>
         </div>
 
         <Deck
           side="B"
           state={decks.b}
           gain={deckGain(crossfade, "b", decks.b.trim)}
+          focused={focused === "b"}
+          canSync={Boolean(decks.a.track)}
+          onFocus={() => setFocused("b")}
+          onCue={() => cue("b")}
+          onSync={() => syncTempo("b")}
+          onNudge={(delta) => nudge("b", delta)}
           onPlay={() => void toggle("b")}
           onPause={() => void toggle("b")}
           onSeek={(ms) => {
