@@ -66,6 +66,29 @@ import {
 } from "./humanCheck";
 import { platformFetch } from "@/platform/http";
 
+
+/**
+ * Routes this backend has declared it does not implement.
+ *
+ * The self-hosted worker intentionally answers catalog, Discord-presence and
+ * presence routes with `404 CLIENT_ONLY`. Retrying them on every render filled
+ * the console with failures for features that simply do not exist here, so a
+ * route is remembered after the first such answer and short-circuited offline.
+ */
+const unsupportedRoutes = new Set<string>();
+
+function unsupportedKey(path: string): string {
+  return stripQuery(path)
+    // collapse ids so a per-track route is remembered once, not per track
+    .replace(/\/[0-9a-f]{8}-[0-9a-f-]{20,}\//gi, "/:id/")
+    .replace(/\/[A-Za-z0-9_-]{8,}\//g, "/:id/")
+    .replace(/\/[A-Za-z0-9_-]{8,}$/g, "/:id");
+}
+
+function unsupportedRouteError(): ApiError {
+  return new ApiError(404, "This backend does not provide this route.", "CLIENT_ONLY");
+}
+
 const CLIENT_VERSION =
   (import.meta.env.VITE_CLIENT_VERSION as string | undefined) || "1.0.4-desktop";
 
@@ -259,6 +282,11 @@ async function executeRequest<T>(
     correlationHeaders["x-session-id"] = activeSessionId;
   }
 
+  const routeKey = unsupportedKey(path);
+  if (unsupportedRoutes.has(routeKey)) {
+    throw unsupportedRouteError();
+  }
+
   let res: Response;
   try {
     res = await fetchWithTimeout(
@@ -395,6 +423,10 @@ async function executeRequest<T>(
         description: translate("common.error_server"),
         requestId: resRequestId,
       });
+    }
+
+    if (res.status === 404 && body.code === "CLIENT_ONLY") {
+      unsupportedRoutes.add(routeKey);
     }
 
     const edgeChallenge = isEdgeChallengePage(raw);
