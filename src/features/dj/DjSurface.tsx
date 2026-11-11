@@ -4,6 +4,8 @@ import Waveform from "./WaveformView";
 import { resolvePlaybackStream } from "@/features/player/engine/playbackSource";
 import type { Track } from "@/shared/types";
 import { log } from "@/shared/utils/logger";
+import { createDeckChain, NEUTRAL_EQ, type EqBand } from "./deckAudio";
+import { loopedPosition, makeLoop, tapTempo } from "./loopMath";
 import {
   crossfadeGains,
   deckGain,
@@ -35,6 +37,13 @@ interface DeckState {
   positionMs: number;
   durationMs: number;
   error: string | null;
+  eq: EqBand;
+  /** Active beat loop, in ms. */
+  loop: { startMs: number; lengthMs: number } | null;
+  /** Four hotcue slots; null = unset. */
+  hotcues: (number | null)[];
+  /** Tap-tempo result for this deck. */
+  bpm: number | null;
 }
 
 const EMPTY_DECK: DeckState = {
@@ -47,6 +56,10 @@ const EMPTY_DECK: DeckState = {
   positionMs: 0,
   durationMs: 0,
   error: null,
+  eq: NEUTRAL_EQ,
+  loop: null,
+  hotcues: [null, null, null, null],
+  bpm: null,
 };
 
 function Deck({
@@ -64,6 +77,15 @@ function Deck({
   onTrim,
   onTempo,
   onNudge,
+  onEq,
+  onLoop,
+  onExitLoop,
+  onHotcueSet,
+  onHotcueClear,
+  onHotcueGo,
+  onTap,
+  cueMode,
+  onToggleCueMode,
 }: {
   side: "A" | "B";
   state: DeckState;
@@ -79,6 +101,15 @@ function Deck({
   onTrim: (value: number) => void;
   onTempo: (value: number) => void;
   onNudge: (deltaMs: number) => void;
+  onEq: (band: "low" | "mid" | "high", value: number) => void;
+  onLoop: (beats: number) => void;
+  onExitLoop: () => void;
+  onHotcueSet: (index: number) => void;
+  onHotcueClear: (index: number) => void;
+  onHotcueGo: (index: number) => void;
+  onTap: () => void;
+  cueMode: boolean;
+  onToggleCueMode: () => void;
 }) {
   return (
     <div
@@ -187,6 +218,91 @@ function Deck({
         </label>
       </div>
 
+      <div className="flex items-center gap-3">
+        {(["low", "mid", "high"] as const).map((band) => (
+          <label key={band} className="flex flex-1 flex-col gap-[2px] text-[10px] uppercase text-text-tertiary">
+            {band}
+            <input
+              type="range"
+              aria-label={`Deck ${side} ${band} EQ`}
+              min={-24}
+              max={12}
+              step={1}
+              value={state.eq[band]}
+              onChange={(event) => onEq(band, Number(event.target.value))}
+              className="w-full accent-accent-primary"
+            />
+          </label>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1">
+        {[0.5, 1, 2, 4, 8].map((beats) => (
+          <button
+            key={beats}
+            type="button"
+            onClick={() => onLoop(beats)}
+            disabled={!state.track}
+            className={`h-[26px] w-[34px] rounded-[8px] text-[11px] font-[600] ${
+              state.loop && Math.abs(state.loop.lengthMs - (60_000 / (state.bpm ?? 120)) * beats) < 1
+                ? "bg-accent-primary text-accent-ink"
+                : "border border-border-primary text-text-secondary"
+            } disabled:opacity-40`}
+          >
+            {beats < 1 ? `1/${beats * 2}` : `${beats}`}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={onExitLoop}
+          disabled={!state.loop}
+          className="h-[26px] rounded-[8px] border border-border-primary px-2 text-[11px] text-text-secondary disabled:opacity-40"
+        >
+          Exit loop
+        </button>
+        <button
+          type="button"
+          onClick={onTap}
+          disabled={!state.track}
+          className="h-[26px] rounded-[8px] border border-border-primary px-2 text-[11px] text-text-secondary disabled:opacity-40"
+        >
+          Tap {state.bpm ? `· ${state.bpm.toFixed(1)}` : ""}
+        </button>
+      </div>
+
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={onToggleCueMode}
+          aria-pressed={cueMode}
+          className={`h-[26px] rounded-[8px] px-2 text-[10px] font-[600] ${
+            cueMode ? "bg-accent-primary text-accent-ink" : "border border-border-primary text-text-secondary"
+          }`}
+        >
+          {cueMode ? "Setting cues" : "Set cues"}
+        </button>
+        {state.hotcues.map((cue, index) => (
+          <button
+            key={index}
+            type="button"
+            onClick={() => (cueMode ? onHotcueSet(index) : cue !== null ? onHotcueGo(index) : onHotcueSet(index))}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              onHotcueClear(index);
+            }}
+            disabled={!state.track}
+            aria-label={`Hotcue ${index + 1}${cue !== null ? " set" : ""}`}
+            className={`h-[26px] w-[30px] rounded-[8px] text-[11px] font-[600] disabled:opacity-40 ${
+              cue !== null
+                ? "bg-emerald-500/80 text-white"
+                : "border border-border-primary text-text-tertiary"
+            }`}
+          >
+            {index + 1}
+          </button>
+        ))}
+      </div>
+
       <label className="flex items-center gap-2 text-[11px] text-text-tertiary">
         Tempo
         <input
@@ -218,12 +334,18 @@ function DjSurface({ onClose }: { onClose: () => void }) {
   const [master, setMaster] = useState(1);
   const [focused, setFocused] = useState<"a" | "b">("a");
   const [query, setQuery] = useState("");
+  const [cueMode, setCueMode] = useState<"a" | "b" | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const audioRef = useRef<{ a: HTMLAudioElement | null; b: HTMLAudioElement | null }>({
     a: null,
     b: null,
   });
-  const gainsRef = useRef<{ ctx: AudioContext; a: GainNode; b: GainNode } | null>(null);
+  const gainsRef = useRef<{
+    ctx: AudioContext;
+    a: GainNode;
+    b: GainNode;
+    eq: { a: ReturnType<typeof createDeckChain>; b: ReturnType<typeof createDeckChain> };
+  } | null>(null);
 
   const crossfade = useMemo(() => crossfadeGains(crossfader), [crossfader]);
 
@@ -238,10 +360,13 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     const masterGain = ctx.createGain();
     masterGain.gain.value = master;
     masterGain.connect(ctx.destination);
-    ctx.createMediaElementSource(a).connect(gainA).connect(masterGain);
-    ctx.createMediaElementSource(b).connect(gainB).connect(masterGain);
+    // source → 3-band EQ → trim/crossfade gain → master
+    const eqA = createDeckChain(ctx, ctx.createMediaElementSource(a));
+    const eqB = createDeckChain(ctx, ctx.createMediaElementSource(b));
+    eqA.output.connect(gainA).connect(masterGain);
+    eqB.output.connect(gainB).connect(masterGain);
     masterGainRef.current = masterGain;
-    gainsRef.current = { ctx, a: gainA, b: gainB };
+    gainsRef.current = { ctx, a: gainA, b: gainB, eq: { a: eqA, b: eqB } };
     return gainsRef.current;
   }, []);
 
@@ -252,7 +377,9 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     graph.a.gain.value = deckGain(crossfade, "a", decks.a.trim);
     graph.b.gain.value = deckGain(crossfade, "b", decks.b.trim);
     if (masterGainRef.current) masterGainRef.current.gain.value = master;
-  }, [crossfade, decks.a.trim, decks.b.trim, master, ensureGraph]);
+    graph.eq.a.setEq(decks.a.eq);
+    graph.eq.b.setEq(decks.b.eq);
+  }, [crossfade, decks.a.trim, decks.b.trim, decks.a.eq, decks.b.eq, master, ensureGraph]);
 
   // Transport clocks.
   useEffect(() => {
@@ -277,6 +404,26 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     return () => window.clearInterval(id);
   }, []);
 
+  // Beat loops: wrap each deck back to its loop start when the end passes.
+  const loopsRef = useRef<{ a: DeckState["loop"]; b: DeckState["loop"] }>({ a: null, b: null });
+  useEffect(() => {
+    loopsRef.current = { a: decks.a.loop, b: decks.b.loop };
+  }, [decks.a.loop, decks.b.loop]);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      for (const side of ["a", "b"] as const) {
+        const element = audioRef.current[side];
+        const loop = loopsRef.current[side];
+        if (!element || !loop || element.paused) continue;
+        const wrapped = loopedPosition(element.currentTime * 1000, loop);
+        if (Math.abs(wrapped - element.currentTime * 1000) > 1) {
+          element.currentTime = wrapped / 1000;
+        }
+      }
+    }, 60);
+    return () => window.clearInterval(id);
+  }, []);
+
   const loadTrack = useCallback(
     async (side: "a" | "b", track: Track | undefined) => {
       if (!track) return;
@@ -296,6 +443,9 @@ function DjSurface({ onClose }: { onClose: () => void }) {
             loading: false,
             durationMs: 0,
             positionMs: 0,
+            loop: null,
+            hotcues: [null, null, null, null],
+            bpm: null,
           },
         }));
       } catch (error) {
@@ -356,6 +506,62 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     element.currentTime = Math.max(0, element.currentTime + deltaMs / 1000);
   }, []);
 
+  const setEq = useCallback((side: "a" | "b", band: keyof EqBand, value: number) => {
+    setDecks((prev) => ({ ...prev, [side]: { ...prev[side], eq: { ...prev[side].eq, [band]: value } } }));
+  }, []);
+
+  const setLoop = useCallback((side: "a" | "b", beats: number) => {
+    const element = audioRef.current[side];
+    if (!element) return;
+    setDecks((prev) => {
+      const deck = prev[side];
+      const bpm = deck.bpm ?? 120;
+      const loop = makeLoop(deck.positionMs, beats, bpm);
+      return { ...prev, [side]: { ...deck, loop } };
+    });
+    if (element.paused) void element.play().catch(() => undefined);
+  }, []);
+
+  const exitLoop = useCallback((side: "a" | "b") => {
+    setDecks((prev) => ({ ...prev, [side]: { ...prev[side], loop: null } }));
+  }, []);
+
+  const setHotcue = useCallback((side: "a" | "b", index: number) => {
+    setDecks((prev) => {
+      const deck = prev[side];
+      const hotcues = [...deck.hotcues];
+      hotcues[index] = deck.positionMs;
+      return { ...prev, [side]: { ...deck, hotcues } };
+    });
+  }, []);
+
+  const clearHotcue = useCallback((side: "a" | "b", index: number) => {
+    setDecks((prev) => {
+      const deck = prev[side];
+      const hotcues = [...deck.hotcues];
+      hotcues[index] = null;
+      return { ...prev, [side]: { ...deck, hotcues } };
+    });
+  }, []);
+
+  const goToHotcue = useCallback((side: "a" | "b", index: number) => {
+    const element = audioRef.current[side];
+    const cue = decks[side].hotcues[index];
+    if (!element || cue === null || cue === undefined) return;
+    element.currentTime = cue / 1000;
+  }, [decks]);
+
+  const tapsRef = useRef<{ a: number[]; b: number[] }>({ a: [], b: [] });
+  const tap = useCallback((side: "a" | "b") => {
+    const now = performance.now();
+    const taps = tapsRef.current[side];
+    // A gap longer than 2 s restarts the measurement window.
+    if (taps.length && now - taps[taps.length - 1] > 2000) taps.length = 0;
+    taps.push(now);
+    const bpm = tapTempo(taps);
+    if (bpm) setDecks((prev) => ({ ...prev, [side]: { ...prev[side], bpm } }));
+  }, []);
+
   const close = useCallback(() => {
     for (const side of ["a", "b"] as const) {
       const element = audioRef.current[side];
@@ -365,6 +571,8 @@ function DjSurface({ onClose }: { onClose: () => void }) {
         element.load();
       }
     }
+    gainsRef.current?.eq.a.dispose();
+    gainsRef.current?.eq.b.dispose();
     void gainsRef.current?.ctx.close().catch(() => undefined);
     gainsRef.current = null;
     onClose();
@@ -447,7 +655,9 @@ function DjSurface({ onClose }: { onClose: () => void }) {
           gain={deckGain(crossfade, "a", decks.a.trim)}
           focused={focused === "a"}
           canSync={Boolean(decks.b.track)}
-          onFocus={() => setFocused("a")}
+          onFocus={() => {
+            setFocused("a");
+          }}
           onCue={() => cue("a")}
           onSync={() => syncTempo("a")}
           onNudge={(delta) => nudge("a", delta)}
@@ -457,6 +667,15 @@ function DjSurface({ onClose }: { onClose: () => void }) {
             const element = audioRef.current.a;
             if (element) element.currentTime = ms / 1000;
           }}
+          onEq={(band, value) => setEq("a", band, value)}
+          onLoop={(beats) => setLoop("a", beats)}
+          onExitLoop={() => exitLoop("a")}
+          onHotcueSet={(index) => setHotcue("a", index)}
+          onHotcueClear={(index) => clearHotcue("a", index)}
+          onHotcueGo={(index) => goToHotcue("a", index)}
+          onTap={() => tap("a")}
+          cueMode={cueMode === "a"}
+          onToggleCueMode={() => setCueMode((prev) => (prev === "a" ? null : "a"))}
           onTrim={(trim) => setDecks((prev) => ({ ...prev, a: { ...prev.a, trim } }))}
           onTempo={(tempo) => {
             setDecks((prev) => ({ ...prev, a: { ...prev.a, tempo } }));
@@ -510,6 +729,15 @@ function DjSurface({ onClose }: { onClose: () => void }) {
             const element = audioRef.current.b;
             if (element) element.currentTime = ms / 1000;
           }}
+          onEq={(band, value) => setEq("b", band, value)}
+          onLoop={(beats) => setLoop("b", beats)}
+          onExitLoop={() => exitLoop("b")}
+          onHotcueSet={(index) => setHotcue("b", index)}
+          onHotcueClear={(index) => clearHotcue("b", index)}
+          onHotcueGo={(index) => goToHotcue("b", index)}
+          onTap={() => tap("b")}
+          cueMode={cueMode === "b"}
+          onToggleCueMode={() => setCueMode((prev) => (prev === "b" ? null : "b"))}
           onTrim={(trim) => setDecks((prev) => ({ ...prev, b: { ...prev.b, trim } }))}
           onTempo={(tempo) => {
             setDecks((prev) => ({ ...prev, b: { ...prev.b, tempo } }));
