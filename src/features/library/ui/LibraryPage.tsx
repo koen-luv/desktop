@@ -372,7 +372,7 @@ export default function LibraryPage() {
           }`}
         >
 
-          <div className="px-4 md:px-[32px] pt-[calc(var(--inset-top,0px)+20px)] md:pt-[28px] pb-[14px]">
+          <div className="px-4 md:px-[32px] pt-[20px] md:pt-[28px] pb-[14px]">
             <h1
               className="text-[32px] md:text-[36px] font-[650] text-text-primary tracking-[-0.042em] m-0 leading-[1.05]"
               style={{ fontFamily: "var(--font-inter), sans-serif" }}

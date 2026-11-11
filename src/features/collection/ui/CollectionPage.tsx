@@ -312,7 +312,7 @@ function CollectionContent() {
         aria-label={t("common.back")}
         data-no-tooltip="true"
         data-no-window-drag
-        className={`absolute top-[calc(var(--inset-top,0px)+12px)] md:top-[12px] left-4 md:left-[32px] z-20 group inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-full px-[12px] active:scale-[0.95] transition-all cursor-pointer select-none pointer-events-auto text-[12.5px] font-[500] tracking-[-0.006em] border-0 !border-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent-soft ${
+        className={`absolute top-[12px] md:top-[12px] left-4 md:left-[32px] z-20 group inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-full px-[12px] active:scale-[0.95] transition-all cursor-pointer select-none pointer-events-auto text-[12.5px] font-[500] tracking-[-0.006em] border-0 !border-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent-soft ${
           hasCustomBg
             ? "apple-glass-pill !border-none"
             : "bg-bg-panel/80 backdrop-blur-xl text-text-secondary hover:bg-bg-panel hover:text-text-primary border-0 !border-none"
@@ -346,7 +346,7 @@ function CollectionContent() {
           >
             <div className="relative z-10 flex flex-col md:flex-row items-stretch gap-2 md:gap-[24px] px-3 md:pl-[32px] md:pr-[20px] h-full w-full min-h-0 box-border">
               <div
-                className="shrink-0 w-full max-w-[280px] md:w-[280px] self-start pt-[calc(var(--inset-top,0px)+56px)] md:pt-[56px] pb-2 md:pb-[24px]"
+                className="shrink-0 w-full max-w-[280px] md:w-[280px] self-start pt-[56px] md:pt-[56px] pb-2 md:pb-[24px]"
                 data-no-window-drag
               >
                 <EntitySidebar

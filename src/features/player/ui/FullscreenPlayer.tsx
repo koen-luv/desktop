@@ -487,14 +487,14 @@ export function FullscreenPlayer({
       />
 
       <div className="absolute inset-0 z-10 flex flex-col landscape:flex-row md:flex-row pt-[var(--inset-top,0px)] pb-[var(--inset-bottom,0px)]">
-        <div className="w-full landscape:w-[42%] landscape:flex-none shrink-0 md:flex-1 flex flex-col items-center justify-center gap-3 landscape:gap-2 md:gap-5 px-4 landscape:px-2 pt-12 landscape:pt-0 pb-2 md:p-0">
+        <div className="w-full min-h-0 shrink landscape:w-[42%] landscape:flex-none md:flex-1 flex flex-col items-center justify-start md:justify-center gap-3 landscape:gap-2 md:gap-5 px-4 landscape:px-2 pt-12 landscape:pt-0 pb-2 md:p-0">
           {cinematicMode ? (
             <div className="flex w-full max-w-[380px] flex-col items-center gap-[18px] px-2 text-center">
               {coverUrl ? (
                 <img
                   src={kawarpSrc || coverUrl}
                   alt=""
-                  className="aspect-square w-full max-w-[min(52vh,320px)] rounded-2xl object-cover shadow-e2"
+                  className="aspect-square w-full max-w-[min(34vh,280px)] rounded-2xl object-cover shadow-e2 md:max-w-[min(52vh,320px)]"
                   draggable={false}
                 />
               ) : null}

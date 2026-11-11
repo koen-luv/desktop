@@ -784,7 +784,7 @@ function LibraryPlaylistContent() {
         aria-label={t("common.back")}
         data-no-tooltip="true"
         data-no-window-drag
-        className={`absolute left-4 top-[calc(var(--inset-top,0px)+12px)] z-20 group inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-full px-[12px] text-[13px] font-[500] transition-all duration-150 active:scale-[0.94] cursor-pointer select-none border-0 !border-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent-soft md:left-[32px] md:top-[12px] ${
+        className={`absolute left-4 top-[12px] z-20 group inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-full px-[12px] text-[13px] font-[500] transition-all duration-150 active:scale-[0.94] cursor-pointer select-none border-0 !border-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent-soft md:left-[32px] md:top-[12px] ${
           hasCustomBg
             ? "apple-glass-pill !border-none"
             : "bg-bg-panel/85 text-text-primary backdrop-blur-xl hover:bg-bg-panel border-0 !border-none"
@@ -808,7 +808,7 @@ function LibraryPlaylistContent() {
         className="relative z-1 h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain"
         style={{ willChange: "scroll-position" }}
       >
-        <div className="min-h-full w-full px-4 pb-[calc(var(--inset-bottom,0px)+96px)] pt-[calc(var(--inset-top,0px)+64px)] md:px-[32px] md:pt-[76px]">
+        <div className="min-h-full w-full px-4 pb-[calc(var(--inset-bottom,0px)+96px)] pt-[64px] md:px-[32px] md:pt-[76px]">
           {viewData && (
             <div
               className={`transition-opacity duration-200 ease-out ${
