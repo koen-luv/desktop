@@ -2,10 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { resetClientVisitorData, webRemix } = vi.hoisted(() => ({
   resetClientVisitorData: vi.fn(),
-  webRemix: { resolve: vi.fn(), reset: vi.fn() },
+  webRemix: { resolve: vi.fn(), reset: vi.fn(), canMint: vi.fn(() => true) },
 }));
 
 vi.mock("./webRemixAudio", () => ({
+  canMintContentPoToken: webRemix.canMint,
   resolveWebRemixAudioStream: webRemix.resolve,
   resetWebRemixSession: webRemix.reset,
 }));
@@ -52,6 +53,7 @@ function playerCalls(fetchSpy: ReturnType<typeof mockPlayerApi>) {
 
 beforeEach(() => {
   webRemix.resolve.mockRejectedValue(new Error("WEB_REMIX unavailable in tests"));
+  webRemix.canMint.mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -135,6 +137,18 @@ describe("resolveDirectAudioStream", () => {
   it("reports every profile failure when nothing is playable", async () => {
     mockPlayerApi([playerResponse([], "UNPLAYABLE")]);
     await expect(resolveDirectAudioStream("dQw4w9WgXcQ")).rejects.toThrow(/VISIONOS.*ANDROID_VR/);
+  });
+
+  it("skips WEB_REMIX entirely when this client cannot mint a PO token", async () => {
+    webRemix.canMint.mockReturnValue(false);
+    const fetchSpy = mockPlayerApi([playerResponse([opus])]);
+
+    const stream = await resolveDirectAudioStream("dQw4w9WgXcQ");
+
+    expect(stream.itag).toBe(251);
+    expect(webRemix.resolve).not.toHaveBeenCalled();
+    const calls = playerCalls(fetchSpy);
+    expect(JSON.parse(String(calls[0][1]?.body)).context.client.clientName).toBe("VISIONOS");
   });
 
   it("plays the WEB_REMIX stream with its po token when googlevideo accepts it past the first megabyte", async () => {

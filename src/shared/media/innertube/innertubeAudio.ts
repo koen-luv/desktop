@@ -2,7 +2,7 @@ import { InnertubeError, postInnertube, type InnertubeProfile } from "./innertub
 import { PLAYBACK_PROFILES } from "./playbackProfiles";
 import { resetClientVisitorData } from "@/shared/api/visitorSession";
 import { log } from "@/shared/utils/logger";
-import { resetWebRemixSession, resolveWebRemixAudioStream } from "./webRemixAudio";
+import { canMintContentPoToken, resetWebRemixSession, resolveWebRemixAudioStream } from "./webRemixAudio";
 import {
   extractAudioFormats,
   playabilityError,
@@ -116,10 +116,13 @@ export async function resolveDirectAudioStream(
   const videoId = toVideoId(trackId);
   if (!videoId) throw new InnertubeError(`Track ${trackId} is not a YouTube video.`, 400);
   const failures: string[] = [];
-  if (!options.profiles && Date.now() >= webRemixRetryAt) {
+  // Without a PO-token minter the WEB_REMIX attempt cannot succeed, so do not
+  // burn two requests and two error lines on every track before falling back.
+  const webRemixUsable = !options.profiles && canMintContentPoToken();
+  if (webRemixUsable && Date.now() >= webRemixRetryAt) {
     const stream = await resolveViaWebRemix(videoId, options, failures);
     if (stream) return stream;
-  } else if (!options.profiles) {
+  } else if (webRemixUsable) {
     failures.push(`WEB_REMIX paused: ${lastWebRemixError}`);
   }
   for (const profile of orderedProfiles(options.profiles ?? PLAYBACK_PROFILES)) {

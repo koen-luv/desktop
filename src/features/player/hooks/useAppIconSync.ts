@@ -74,9 +74,12 @@ async function renderIconDataUrl(
     ctx.filter = "invert(1)";
   }
 
-  // The logo art is centred in its 67x78 box; draw it so the monogram keeps the
-  // same visual weight as the packaged app icons (~60% of the tile height).
-  ctx.drawImage(img, 93.5, 66.9, 324.9, 378.2);
+  // The mark spans 46 of the SVG's 64 units. Draw the square artwork oversized
+  // and centred so the N lands at the same ~78% of the tile as the packaged
+  // app icons instead of floating small in the middle.
+  const markBox = (512 * 0.78) / (46 / 64);
+  const markOffset = (512 - markBox) / 2;
+  ctx.drawImage(img, markOffset, markOffset, markBox, markBox);
   return canvas.toDataURL("image/png");
 }
 

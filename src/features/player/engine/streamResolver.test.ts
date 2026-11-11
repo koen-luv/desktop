@@ -6,11 +6,21 @@ const mocks = vi.hoisted(() => ({
   resolveDirectAudioStream: vi.fn(),
   searchRaw: vi.fn(),
   resolveSoundCloudStream: vi.fn(),
-  resolveProxyInnertubeStream: vi.fn(),
+  createPlaybackSession: vi.fn(),
 }));
 
-vi.mock("./streamResolverLegacy", () => ({
-  resolveProxyInnertubeStream: mocks.resolveProxyInnertubeStream,
+vi.mock("@/shared/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/shared/api")>();
+  return {
+    ...actual,
+    api: { ...actual.api, createPlaybackSession: mocks.createPlaybackSession },
+  };
+});
+
+// The browser path mints a PO token before asking the backend; keep the suite
+// off the network and let it proceed anonymously.
+vi.mock("@/shared/media/innertube/poTokenClient", () => ({
+  mintPoToken: vi.fn(async () => null),
 }));
 
 vi.mock("@/shared/media/innertube", async (importOriginal) => {
@@ -61,7 +71,7 @@ afterEach(() => {
   mocks.resolveDirectAudioStream.mockReset();
   mocks.searchRaw.mockReset();
   mocks.resolveSoundCloudStream.mockReset();
-  mocks.resolveProxyInnertubeStream.mockReset();
+  mocks.createPlaybackSession.mockReset();
   clearYoutubeStandInCache();
 });
 
@@ -105,24 +115,24 @@ describe("resolvePlaybackStream for ids of unknown sources", () => {
 
 describe("resolvePlaybackStream in a browser (no native shell)", () => {
   it("resolves through the backend instead of calling YouTube", async () => {
-    mocks.resolveProxyInnertubeStream.mockResolvedValue({
-      url: "https://liner-api.example.com/v1/stream/abc",
+    mocks.createPlaybackSession.mockResolvedValue({
+      streamUrl: "https://liner-api.example.com/v1/stream/abc",
       mimeType: "audio/mp4",
       codec: "aac",
       bitrate: 128_000,
-      expiresAtMs: null,
+      expiresAt: null,
     });
 
     const stream = await resolvePlaybackStream(track("dQw4w9WgXcQ"));
 
     expect(stream.url).toBe("https://liner-api.example.com/v1/stream/abc");
-    expect(mocks.resolveProxyInnertubeStream).toHaveBeenCalledTimes(1);
+    expect(mocks.createPlaybackSession).toHaveBeenCalledTimes(1);
     // The browser must never attempt the CORS-blocked direct path.
     expect(mocks.resolveDirectAudioStream).not.toHaveBeenCalled();
   });
 
   it("reports a capability failure instead of an unplayable track", async () => {
-    mocks.resolveProxyInnertubeStream.mockRejectedValue(new Error("CLIENT_ONLY"));
+    mocks.createPlaybackSession.mockRejectedValue(new Error("CLIENT_ONLY"));
 
     await expect(resolvePlaybackStream(track("dQw4w9WgXcQ"))).rejects.toSatisfy(
       (error: unknown) => isWebPlaybackUnsupported(error),

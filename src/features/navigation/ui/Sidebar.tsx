@@ -104,10 +104,10 @@ function Sidebar({ searchOpen, onSearchToggle, isEdgeToEdge = false }: SidebarPr
           <AppImage
             src={accentVariant === "default" ? logo : brandingLogos[accentVariant]}
             alt="Neritium"
-            width={26}
+            width={30}
             height={30}
             className={
-              "h-[30px] w-[26px] " + (invertedVariants.includes(accentVariant) ? "theme-logo invert dark:invert-0" : "")
+              "h-[30px] w-[30px] " + (invertedVariants.includes(accentVariant) ? "theme-logo invert dark:invert-0" : "")
             }
             draggable={false}
           />

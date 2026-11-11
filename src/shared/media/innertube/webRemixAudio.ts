@@ -45,6 +45,12 @@ export function resetWebRemixSession(): void {
   sessionPromise = null;
 }
 
+/** Whether this client can mint the PO token WEB_REMIX needs. Older app
+ * builds and the browser shim have no `mintPoToken`, so asking is pointless. */
+export function canMintContentPoToken(): boolean {
+  return typeof window !== "undefined" && typeof window.neritiumElectron?.mintPoToken === "function";
+}
+
 async function mintContentPoToken(videoId: string): Promise<string> {
   const mint = typeof window === "undefined" ? undefined : window.neritiumElectron?.mintPoToken;
   if (!mint) throw new InnertubeError("PO tokens need a newer Neritium app version.", 501);

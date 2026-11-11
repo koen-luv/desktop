@@ -16,6 +16,10 @@ export default defineConfig(({ command, mode }) => {
   const webOnly = mode === "web";
 
   return {
+  // Electron loads the built renderer over file://, where root-absolute
+  // /assets/... URLs point at the drive root and fail. The website keeps
+  // absolute URLs so it can be served from any path.
+  base: command === "build" && !webOnly ? "./" : "/",
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
