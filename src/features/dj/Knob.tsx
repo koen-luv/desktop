@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useRef, useState } from "react";
 import {
   angleForNormalized,
   isBipolar,
@@ -8,12 +8,12 @@ import {
 } from "./knobMath";
 
 /**
- * Rotary DJ knob.
+ * Rotary knob.
  *
- * Pointer-drag (vertical, like a hardware encoder), wheel, arrows, PageUp/Down,
- * Home/End, and double-click to return to the resting value. The value arc is
- * drawn from the default, so EQ knobs read from centre and FX sends read from
- * zero. Exposed to assistive tech as a slider with live values.
+ * Pointer-drag (vertical), wheel, arrows, PageUp/Down, Home/End, double-click
+ * to return to the resting value. Drawn with the app's own tokens — the arc is
+ * the accent, the cap is a panel surface — so a knob reads as part of the same
+ * product as every other control, not as hardware cosplay.
  */
 
 interface KnobProps {
@@ -24,9 +24,8 @@ interface KnobProps {
   step?: number;
   /** Resting value for double-click reset and the arc origin. */
   defaultValue?: number;
-  /** Format the readout; default rounds to two decimals. */
   format?: (value: number) => string;
-  /** Sensitivity: pixels of drag for the full range. */
+  /** Drag distance in pixels for the full range. */
   travel?: number;
   size?: number;
   onChange: (value: number) => void;
@@ -41,7 +40,7 @@ const Knob = memo(function Knob({
   defaultValue,
   format,
   travel = 160,
-  size = 34,
+  size = 32,
   onChange,
 }: KnobProps) {
   const rest = defaultValue ?? min;
@@ -68,7 +67,9 @@ const Knob = memo(function Knob({
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag) return;
-    commit(valueFromDrag(drag.startValue, event.clientY - drag.startY, min, max, travel, event.shiftKey));
+    commit(
+      valueFromDrag(drag.startValue, event.clientY - drag.startY, min, max, travel, event.shiftKey),
+    );
   };
 
   const endDrag = () => {
@@ -92,7 +93,7 @@ const Knob = memo(function Knob({
     commit(value + (event.deltaY < 0 ? step : -step));
   };
 
-  // Arc geometry: 270° sweep from −135° to +135°.
+  // 270° sweep from −135° to +135°.
   const radius = size / 2 - 3;
   const center = size / 2;
   const arc = (fromNorm: number, toNorm: number) => {
@@ -111,7 +112,7 @@ const Knob = memo(function Knob({
   const needleAngle = angleForNormalized(normalized);
 
   return (
-    <div className="dj-knob shrink-0">
+    <div className="flex w-[42px] shrink-0 flex-col items-center gap-[3px]">
       <div
         role="slider"
         aria-label={label}
@@ -127,40 +128,44 @@ const Knob = memo(function Knob({
         onDoubleClick={() => commit(rest)}
         onKeyDown={onKeyDown}
         onWheel={onWheel}
-        className={`relative cursor-ns-resize rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--dj-led-amber)]/70 touch-none ${
-          dragging ? "ring-2 ring-[var(--dj-led-amber)]/50" : ""
+        className={`relative cursor-ns-resize rounded-full touch-none outline-none focus-visible:ring-4 focus-visible:ring-accent-soft ${
+          dragging ? "ring-4 ring-accent-soft" : ""
         }`}
         style={{ width: size, height: size }}
       >
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-          {/* track */}
           <path
-            className="track"
             d={arc(0, 1)}
             fill="none"
+            stroke="var(--border-primary)"
             strokeWidth={2.5}
             strokeLinecap="round"
           />
-          {/* value, from the resting position */}
           {Math.abs(normalized - restNormalized) > 0.001 && (
             <path
               d={arc(restNormalized, normalized)}
               fill="none"
-              stroke={bipolar ? "#ffb020" : "#2dd4a8"}
+              stroke={bipolar ? "var(--accent-secondary)" : "var(--accent-primary)"}
               strokeWidth={2.5}
               strokeLinecap="round"
             />
           )}
-          {/* cap */}
-          <circle className="cap" cx={center} cy={center} r={radius - 3.5} />
-          {/* needle */}
+          <circle cx={center} cy={center} r={radius - 3.5} fill="var(--bg-panel)" />
           <g transform={`rotate(${needleAngle} ${center} ${center})`}>
-            <line className="needle" x1={center} y1={center - radius + 5} x2={center} y2={center - 4} strokeWidth={2} strokeLinecap="round" />
+            <line
+              x1={center}
+              y1={center - radius + 5}
+              x2={center}
+              y2={center - 4}
+              stroke="var(--text-primary)"
+              strokeWidth={2}
+              strokeLinecap="round"
+            />
           </g>
         </svg>
       </div>
-      <span className="dj-label">{label}</span>
-      <span className={`dj-value ${dragging ? "text-text-primary" : ""}`}>
+      <span className="text-[10px] uppercase tracking-[0.14em] text-text-tertiary">{label}</span>
+      <span className={`font-mono text-[10px] ${dragging ? "text-text-primary" : "text-text-secondary"}`}>
         {format ? format(value) : value.toFixed(2)}
       </span>
     </div>

@@ -19,27 +19,25 @@ import {
 } from "./mixMath";
 import { createDeckChain, NEUTRAL_EQ, type EqBand } from "./deckAudio";
 import { createDeckFx, NEUTRAL_FX, type FxState } from "./fx";
-import { computePeaks, toMono, type WaveformPeaks } from "./waveform";
 import { loopedPosition, makeLoop, tapTempo } from "./loopMath";
 import { quantizePosition } from "./bpm";
-import "./dj.css";
 
 /**
- * DJ mode — "The Booth".
+ * DJ mode.
  *
- * The surface mirrors the object it imitates: two decks flanking a metal mixer
- * column, with a full-width chroma-coded waveform ribbon on top (teal deck A,
- * magenta deck B, amber playhead). Transport and pads live on the decks the way
- * they do on a CDJ; trim, EQ, filter and FX sit on the channel strips the way
- * they do on a mixer. Colour is state — amber for cued/armed, green for
- * playing — never decoration.
+ * Two decks flanking a mixer, with a waveform ribbon on top. It uses the same
+ * tokens, radii and type scale as the rest of the app — panels are `bg-bg-surface`
+ * cards, titles use the home rows' type, knobs draw with the accent — so it reads
+ * as one product rather than a themed skin dropped on top.
  *
- * It owns its own decks so a mix cannot fight the queue, and closes cleanly.
+ * It owns its own media elements so a mix cannot fight the queue, and loads
+ * each track as a same-origin blob so the audio graph is never tainted by
+ * cross-origin media (which would silently mute the decks).
  */
 
 interface DeckState {
   track: Track | null;
-  /** Stream URL the deck is playing; the ribbon decodes this. */
+  /** Same-origin blob URL for the loaded stream. */
   src: string | null;
   playing: boolean;
   loading: boolean;
@@ -54,7 +52,7 @@ interface DeckState {
   bpm: number | null;
   anchorMs: number;
   fx: FxState;
-  peaks: WaveformPeaks | null;
+  peaks: TrackAnalysis["peaks"] | null;
   peaksStatus: "idle" | "ready" | "unavailable";
   analysis: TrackAnalysis | null;
 }
@@ -82,7 +80,7 @@ const EMPTY_DECK: DeckState = {
 
 const SIDE_LABEL = { a: "A", b: "B" } as const;
 
-/* ── Deck: what a CDJ carries — transport, pads, loops, tempo ─────────────── */
+/* ── Deck panel ───────────────────────────────────────────────────────────── */
 
 function DeckPanel({
   side,
@@ -96,7 +94,6 @@ function DeckPanel({
   onCue,
   onSync,
   onNudge,
-  onSeek,
   onTempo,
   onLoop,
   onExitLoop,
@@ -117,7 +114,6 @@ function DeckPanel({
   onCue: () => void;
   onSync: () => void;
   onNudge: (deltaMs: number) => void;
-  onSeek: (ms: number) => void;
   onTempo: (value: number) => void;
   onLoop: (beats: number) => void;
   onExitLoop: () => void;
@@ -127,9 +123,6 @@ function DeckPanel({
   onTap: () => void;
   onToggleCueMode: () => void;
 }) {
-  const isA = side === "a";
-  const hueClass = isA ? "dj-deck-a" : "dj-deck-b";
-  const padSet = isA ? "dj-pad--set" : "dj-pad--set dj-pad-b";
   const loopBeats: Array<{ beats: number; label: string }> = [
     { beats: 0.5, label: "½" },
     { beats: 1, label: "1" },
@@ -138,65 +131,57 @@ function DeckPanel({
     { beats: 8, label: "8" },
   ];
 
+  const chip = "rounded-[10px] border border-border-primary px-[10px] text-[11px] font-[500] transition-colors active:scale-[0.97] disabled:opacity-35";
+
   return (
     <section
       onClick={onFocus}
       aria-label={`Deck ${SIDE_LABEL[side]}`}
-      className={`dj-panel flex min-w-0 flex-1 flex-col gap-2 p-3 transition-colors ${
-        focused ? "border-t-2" : "border-t-2 border-t-transparent"
+      className={`flex min-w-0 flex-1 flex-col gap-[10px] rounded-[16px] border bg-bg-surface p-3 transition-colors ${
+        focused ? "border-accent-primary/50" : "border-border-primary/60"
       }`}
-      style={focused ? { borderTopColor: isA ? "var(--dj-deck-a)" : "var(--dj-deck-b)" } : undefined}
     >
-      {/* identity + state LED */}
-      <div className="flex items-center gap-2">
-        <span className={`dj-deck-letter ${hueClass}`}>{SIDE_LABEL[side]}</span>
+      <div className="flex items-center gap-[6px]">
+        <span className="text-[11px] font-[600] tracking-[0.16em] text-text-tertiary">
+          DECK {SIDE_LABEL[side]}
+        </span>
         <span
           aria-hidden="true"
-          className={`dj-led ${
-            state.playing ? "dj-led--on-green" : state.track ? "dj-led--on-amber" : ""
+          className={`h-[6px] w-[6px] rounded-full ${
+            state.playing ? "bg-accent-primary" : state.track ? "bg-text-tertiary" : "bg-border-primary"
           }`}
         />
-        <span className="dj-value truncate">
-          {state.bpm ? `${state.bpm.toFixed(1)} BPM` : "— — —"}
-        </span>
       </div>
 
-      <div className="min-h-[34px]">
-        <p className="m-0 truncate text-[13px] font-[600] text-text-primary">
+      <div className="min-h-[36px]">
+        <p className="m-0 truncate text-[13.5px] font-[550] tracking-[-0.014em] text-text-primary">
           {state.track ? state.track.title : "Empty deck"}
         </p>
-        <p className="m-0 truncate text-[11px] text-text-tertiary">
-          {state.track ? state.track.artists : "Load from the library"}
+        <p className="m-0 truncate text-[13px] text-text-secondary">
+          {state.track ? state.track.artists : "Pick a track from the library"}
         </p>
       </div>
 
-      {state.error ? <p className="m-0 text-[11px] text-red-400">{state.error}</p> : null}
+      {state.error ? <p className="m-0 text-[12px] text-text-secondary">{state.error}</p> : null}
 
-      {/* time readout */}
       <div className="flex items-baseline justify-between">
-        <span className={`dj-value dj-value--big ${hueClass}`}>
+        <span className="font-mono text-[15px] tabular-nums text-text-primary">
           {formatDeckTime(state.positionMs)}
         </span>
-        <span className="dj-value">
+        <span className="font-mono text-[11px] tabular-nums text-text-tertiary">
           −{formatDeckTime(Math.max(0, state.durationMs - state.positionMs))}
         </span>
       </div>
 
-      {/* transport */}
-      <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={onCue}
-          disabled={!state.track}
-          className="dj-btn dj-btn--amber"
-        >
+      <div className="flex items-center gap-[6px]">
+        <button type="button" onClick={onCue} disabled={!state.track} className={`${chip} text-text-primary`}>
           Cue
         </button>
         <button
           type="button"
           onClick={state.playing ? onPause : onPlay}
           disabled={!state.track || state.loading}
-          className={`dj-btn flex-1 ${state.playing ? "dj-btn--green" : ""}`}
+          className={`${chip} flex-1 bg-accent-primary text-accent-ink disabled:bg-bg-panel`}
         >
           {state.loading ? "…" : state.playing ? "Pause" : "Play"}
         </button>
@@ -204,37 +189,23 @@ function DeckPanel({
           type="button"
           onClick={onSync}
           disabled={!canSync}
-          className={`dj-btn ${Math.abs(state.tempo) > 0.001 ? "dj-btn--lit" : ""}`}
+          className={`${chip} ${Math.abs(state.tempo) > 0.001 ? "bg-accent-soft text-accent-primary" : "text-text-primary"}`}
         >
           Sync
         </button>
       </div>
 
-      {/* nudges */}
-      <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => onNudge(-500)}
-          disabled={!state.track}
-          aria-label={`Deck ${SIDE_LABEL[side]} back half second`}
-          className="dj-btn flex-1"
-        >
+      <div className="flex items-center gap-[6px]">
+        <button type="button" onClick={() => onNudge(-500)} disabled={!state.track} className={`${chip} flex-1 text-text-secondary`}>
           ◄ Nudge
         </button>
-        <button
-          type="button"
-          onClick={() => onNudge(500)}
-          disabled={!state.track}
-          aria-label={`Deck ${SIDE_LABEL[side]} forward half second`}
-          className="dj-btn flex-1"
-        >
+        <button type="button" onClick={() => onNudge(500)} disabled={!state.track} className={`${chip} flex-1 text-text-secondary`}>
           Nudge ►
         </button>
       </div>
 
-      {/* loops */}
-      <div className="flex items-center gap-1">
-        <span className="dj-label w-[26px]">Loop</span>
+      <div className="flex items-center gap-[5px]">
+        <span className="w-[34px] text-[10px] uppercase tracking-[0.14em] text-text-tertiary">Loop</span>
         {loopBeats.map(({ beats, label }) => {
           const active =
             state.loop !== null &&
@@ -247,25 +218,19 @@ function DeckPanel({
               onClick={() => onLoop(beats)}
               disabled={!state.track}
               aria-label={`Deck ${SIDE_LABEL[side]} loop ${label}`}
-              className={`dj-btn h-[24px] w-[28px] p-0 ${active ? "dj-btn--amber" : ""}`}
+              className={`${chip} h-[26px] w-[30px] p-0 ${active ? "bg-accent-soft text-accent-primary" : "text-text-secondary"}`}
             >
               {label}
             </button>
           );
         })}
-        <button
-          type="button"
-          onClick={onExitLoop}
-          disabled={!state.loop}
-          className="dj-btn h-[24px] flex-1 p-0"
-        >
+        <button type="button" onClick={onExitLoop} disabled={!state.loop} className={`${chip} h-[26px] flex-1 p-0 text-text-secondary`}>
           Exit
         </button>
       </div>
 
-      {/* hot cue pads */}
-      <div className="flex items-center gap-1">
-        <span className="dj-label w-[26px]">Cue</span>
+      <div className="flex items-center gap-[5px]">
+        <span className="w-[34px] text-[10px] uppercase tracking-[0.14em] text-text-tertiary">Cue</span>
         {state.hotcues.map((cue, index) => (
           <button
             key={index}
@@ -279,7 +244,13 @@ function DeckPanel({
             }}
             disabled={!state.track}
             aria-label={`Hotcue ${index + 1}${cue !== null ? " set" : ""}`}
-            className={`dj-pad ${cue !== null ? padSet : ""} ${cueMode ? "dj-pad--arm" : ""}`}
+            className={`${chip} h-[26px] w-[30px] p-0 ${
+              cue !== null
+                ? "bg-accent-primary text-accent-ink"
+                : cueMode
+                  ? "border-accent-primary/50 text-accent-primary"
+                  : "text-text-tertiary"
+            }`}
           >
             {index + 1}
           </button>
@@ -288,17 +259,16 @@ function DeckPanel({
           type="button"
           onClick={onToggleCueMode}
           aria-pressed={cueMode}
-          className={`dj-btn h-[26px] flex-1 p-0 ${cueMode ? "dj-btn--lit" : ""}`}
+          className={`${chip} h-[26px] flex-1 p-0 ${cueMode ? "bg-accent-soft text-accent-primary" : "text-text-secondary"}`}
         >
           {cueMode ? "Arming" : "Set"}
         </button>
       </div>
 
-      {/* tempo fader (CDJ pitch slider) */}
       <div>
-        <div className="mb-1 flex items-center justify-between">
-          <span className="dj-label">Tempo</span>
-          <span className={`dj-value ${Math.abs(state.tempo) > 0.001 ? hueClass : ""}`}>
+        <div className="mb-[6px] flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-[0.14em] text-text-tertiary">Tempo</span>
+          <span className="font-mono text-[11px] tabular-nums text-text-secondary">
             {(state.tempo * 100).toFixed(1)}%
           </span>
         </div>
@@ -314,19 +284,14 @@ function DeckPanel({
         />
       </div>
 
-      <button
-        type="button"
-        onClick={onTap}
-        disabled={!state.track}
-        className="dj-btn w-full"
-      >
+      <button type="button" onClick={onTap} disabled={!state.track} className={`${chip} w-full text-text-secondary`}>
         Tap
       </button>
     </section>
   );
 }
 
-/* ── Channel strip: what a mixer carries — trim → EQ → filter → FX ────────── */
+/* ── Channel strip ────────────────────────────────────────────────────────── */
 
 function ChannelStrip({
   side,
@@ -341,89 +306,19 @@ function ChannelStrip({
   onFx: (key: keyof FxState, value: number) => void;
   onTrim: (value: number) => void;
 }) {
-  const hueClass = side === "a" ? "dj-deck-a" : "dj-deck-b";
   return (
-    <div className="flex flex-1 flex-col items-center gap-1.5">
-      <span className={`dj-deck-letter ${hueClass}`}>{SIDE_LABEL[side]}</span>
-      <Knob
-        label="Trim"
-        min={0}
-        max={1}
-        step={0.01}
-        defaultValue={1}
-        value={state.trim}
-        size={30}
-        format={(v) => `${Math.round(v * 100)}`}
-        onChange={onTrim}
-      />
-      {/* hardware order top to bottom: high, mid, low */}
-      <Knob
-        label="High"
-        min={-24}
-        max={12}
-        step={1}
-        defaultValue={0}
-        value={state.eq.high}
-        size={30}
-        format={(v) => `${v > 0 ? "+" : ""}${Math.round(v)}`}
-        onChange={(next) => onEq("high", next)}
-      />
-      <Knob
-        label="Mid"
-        min={-24}
-        max={12}
-        step={1}
-        defaultValue={0}
-        value={state.eq.mid}
-        size={30}
-        format={(v) => `${v > 0 ? "+" : ""}${Math.round(v)}`}
-        onChange={(next) => onEq("mid", next)}
-      />
-      <Knob
-        label="Low"
-        min={-24}
-        max={12}
-        step={1}
-        defaultValue={0}
-        value={state.eq.low}
-        size={30}
-        format={(v) => `${v > 0 ? "+" : ""}${Math.round(v)}`}
-        onChange={(next) => onEq("low", next)}
-      />
-      <div className="my-0.5 h-px w-[26px]" style={{ background: "var(--dj-line-strong)" }} />
-      <Knob
-        label="Filt"
-        min={0}
-        max={1}
-        step={0.01}
-        defaultValue={0.5}
-        value={state.fx.filter}
-        size={30}
-        format={(v) => `${Math.round(v * 100)}`}
-        onChange={(next) => onFx("filter", next)}
-      />
-      <Knob
-        label="Echo"
-        min={0}
-        max={1}
-        step={0.01}
-        defaultValue={0}
-        value={state.fx.echo}
-        size={30}
-        format={(v) => `${Math.round(v * 100)}`}
-        onChange={(next) => onFx("echo", next)}
-      />
-      <Knob
-        label="Verb"
-        min={0}
-        max={1}
-        step={0.01}
-        defaultValue={0}
-        value={state.fx.reverb}
-        size={30}
-        format={(v) => `${Math.round(v * 100)}`}
-        onChange={(next) => onFx("reverb", next)}
-      />
+    <div className="flex flex-1 flex-col items-center gap-[6px]">
+      <span className="text-[11px] font-[600] tracking-[0.16em] text-text-tertiary">
+        {SIDE_LABEL[side]}
+      </span>
+      <Knob label="Trim" min={0} max={1} step={0.01} defaultValue={1} value={state.trim} size={30} format={(v) => `${Math.round(v * 100)}`} onChange={onTrim} />
+      <Knob label="High" min={-24} max={12} step={1} defaultValue={0} value={state.eq.high} size={30} format={(v) => `${v > 0 ? "+" : ""}${Math.round(v)}`} onChange={(n) => onEq("high", n)} />
+      <Knob label="Mid" min={-24} max={12} step={1} defaultValue={0} value={state.eq.mid} size={30} format={(v) => `${v > 0 ? "+" : ""}${Math.round(v)}`} onChange={(n) => onEq("mid", n)} />
+      <Knob label="Low" min={-24} max={12} step={1} defaultValue={0} value={state.eq.low} size={30} format={(v) => `${v > 0 ? "+" : ""}${Math.round(v)}`} onChange={(n) => onEq("low", n)} />
+      <div className="my-[2px] h-px w-[26px] bg-border-primary" />
+      <Knob label="Filt" min={0} max={1} step={0.01} defaultValue={0.5} value={state.fx.filter} size={30} format={(v) => `${Math.round(v * 100)}`} onChange={(n) => onFx("filter", n)} />
+      <Knob label="Echo" min={0} max={1} step={0.01} defaultValue={0} value={state.fx.echo} size={30} format={(v) => `${Math.round(v * 100)}`} onChange={(n) => onFx("echo", n)} />
+      <Knob label="Verb" min={0} max={1} step={0.01} defaultValue={0} value={state.fx.reverb} size={30} format={(v) => `${Math.round(v * 100)}`} onChange={(n) => onFx("reverb", n)} />
     </div>
   );
 }
@@ -452,6 +347,7 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     a: null,
     b: null,
   });
+  const objectUrls = useRef<{ a: string | null; b: string | null }>({ a: null, b: null });
   const gainsRef = useRef<{
     ctx: AudioContext;
     a: GainNode;
@@ -462,35 +358,54 @@ function DjSurface({ onClose }: { onClose: () => void }) {
 
   const crossfade = useMemo(() => crossfadeGains(crossfader), [crossfader]);
 
+  /**
+   * Build the per-deck audio graph. Each deck plays a same-origin blob, so
+   * `createMediaElementSource` is never tainted and the graph always has
+   * signal. If the graph cannot be built at all we fall back to plain element
+   * playback — silence is worse than losing the EQ.
+   */
   const ensureGraph = useCallback(() => {
     if (gainsRef.current) return gainsRef.current;
-    const ctx = new AudioContext();
     const a = audioRef.current.a;
     const b = audioRef.current.b;
     if (!a || !b) return null;
-    const gainA = ctx.createGain();
-    const gainB = ctx.createGain();
-    const masterGain = ctx.createGain();
-    masterGain.gain.value = master;
-    masterGain.connect(ctx.destination);
-    // source → 3-band EQ → FX send → trim/crossfade gain → master
-    const eqA = createDeckChain(ctx, ctx.createMediaElementSource(a));
-    const eqB = createDeckChain(ctx, ctx.createMediaElementSource(b));
-    const fxA = createDeckFx(ctx);
-    const fxB = createDeckFx(ctx);
-    eqA.output.connect(fxA.input);
-    fxA.output.connect(gainA).connect(masterGain);
-    eqB.output.connect(fxB.input);
-    fxB.output.connect(gainB).connect(masterGain);
-    masterGainRef.current = masterGain;
-    gainsRef.current = { ctx, a: gainA, b: gainB, eq: { a: eqA, b: eqB }, fx: { a: fxA, b: fxB } };
-    return gainsRef.current;
+    try {
+      const ctx = new AudioContext();
+      const gainA = ctx.createGain();
+      const gainB = ctx.createGain();
+      const masterGain = ctx.createGain();
+      masterGain.gain.value = master;
+      masterGain.connect(ctx.destination);
+      const eqA = createDeckChain(ctx, ctx.createMediaElementSource(a));
+      const eqB = createDeckChain(ctx, ctx.createMediaElementSource(b));
+      const fxA = createDeckFx(ctx);
+      const fxB = createDeckFx(ctx);
+      eqA.output.connect(fxA.input);
+      fxA.output.connect(gainA).connect(masterGain);
+      eqB.output.connect(fxB.input);
+      fxB.output.connect(gainB).connect(masterGain);
+      masterGainRef.current = masterGain;
+      gainsRef.current = { ctx, a: gainA, b: gainB, eq: { a: eqA, b: eqB }, fx: { a: fxA, b: fxB } };
+      return gainsRef.current;
+    } catch (error) {
+      log("yellow", "dj", `audio graph unavailable, playing directly: ${String(error)}`);
+      return null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Apply fader + trim + master + eq + fx continuously.
   useEffect(() => {
     const graph = ensureGraph();
-    if (!graph) return;
+    const a = audioRef.current.a;
+    const b = audioRef.current.b;
+    if (!a || !b) return;
+    if (!graph) {
+      // No graph: drive the elements directly so audio still works.
+      a.volume = Math.min(1, Math.max(0, deckGain(crossfade, "a", decks.a.trim) * master));
+      b.volume = Math.min(1, Math.max(0, deckGain(crossfade, "b", decks.b.trim) * master));
+      return;
+    }
     graph.a.gain.value = deckGain(crossfade, "a", decks.a.trim);
     graph.b.gain.value = deckGain(crossfade, "b", decks.b.trim);
     if (masterGainRef.current) masterGainRef.current.gain.value = master;
@@ -498,19 +413,7 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     graph.eq.b.setEq(decks.b.eq);
     graph.fx.a.update(decks.a.fx, decks.a.bpm ?? 120);
     graph.fx.b.update(decks.b.fx, decks.b.bpm ?? 120);
-  }, [
-    crossfade,
-    decks.a.trim,
-    decks.b.trim,
-    decks.a.eq,
-    decks.b.eq,
-    decks.a.fx,
-    decks.b.fx,
-    decks.a.bpm,
-    decks.b.bpm,
-    master,
-    ensureGraph,
-  ]);
+  }, [crossfade, decks.a, decks.b, master, ensureGraph]);
 
   // Transport clocks.
   useEffect(() => {
@@ -523,7 +426,6 @@ function DjSurface({ onClose }: { onClose: () => void }) {
         a: { ...prev.a, positionMs: a.currentTime * 1000, durationMs: (a.duration || 0) * 1000 },
         b: { ...prev.b, positionMs: b.currentTime * 1000, durationMs: (b.duration || 0) * 1000 },
       }));
-      // Keep the quieter deck phase-locked to the master clock.
       if (!a.paused && !b.paused && needsResync(clock, b.currentTime * 1000)) {
         b.currentTime = clock / 1000;
       }
@@ -531,7 +433,7 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     return () => window.clearInterval(id);
   }, []);
 
-  // Beat loops: wrap each deck back to its loop start when the end passes.
+  // Beat loops wrap each deck back to its loop start.
   const loopsRef = useRef<{ a: DeckState["loop"]; b: DeckState["loop"] }>({ a: null, b: null });
   useEffect(() => {
     loopsRef.current = { a: decks.a.loop, b: decks.b.loop };
@@ -551,19 +453,15 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     return () => window.clearInterval(id);
   }, []);
 
-  /** Decode the loaded stream once; waveform, beatgrid and structure all
-   * come from this single analysis pass. */
-  const analyseTrack = useCallback(async (side: "a" | "b", url: string | null) => {
-    if (!url) {
-      setDecks((prev) => ({ ...prev, [side]: { ...prev[side], peaksStatus: "unavailable" } }));
-      return;
-    }
+  /**
+   * Analyse an already-downloaded track. `bytes` is shared with the deck's
+   * blob URL so nothing is fetched twice; on failure the deck still plays, it
+   * just has no waveform or grid.
+   */
+  const analyseBytes = useCallback(async (side: "a" | "b", bytes: ArrayBuffer) => {
     try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const bytes = await response.arrayBuffer();
       const ctx = new AudioContext();
-      const buffer = await ctx.decodeAudioData(bytes);
+      const buffer = await ctx.decodeAudioData(bytes.slice(0));
       const sampleRate = ctx.sampleRate;
       void ctx.close().catch(() => undefined);
       const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) =>
@@ -588,7 +486,6 @@ function DjSurface({ onClose }: { onClose: () => void }) {
           peaks: analysis.peaks,
           peaksStatus: "ready",
           analysis,
-          // tap tempo always wins over detection
           bpm: prev[side].bpm ?? analysis.bpm,
           anchorMs: analysis.anchorMs,
         },
@@ -598,6 +495,11 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     }
   }, []);
 
+  /**
+   * Load a track onto a deck. The stream is fetched once, turned into a
+   * same-origin blob URL (so the audio graph can read it), and the same bytes
+   * feed the analysis pass.
+   */
   const loadTrack = useCallback(
     async (side: "a" | "b", track: Track | undefined) => {
       if (!track) return;
@@ -606,14 +508,27 @@ function DjSurface({ onClose }: { onClose: () => void }) {
         const stream = await resolvePlaybackStream(track);
         const element = audioRef.current[side];
         if (!element || !stream.url) throw new Error("No stream available");
-        element.src = stream.url;
+
+        const response = await fetch(stream.url);
+        if (!response.ok) throw new Error(`Stream returned ${response.status}`);
+        const bytes = await response.arrayBuffer();
+
+        const blob = new Blob([bytes], {
+          type: stream.mimeType || "audio/mpeg",
+        });
+        const objectUrl = URL.createObjectURL(blob);
+        if (objectUrls.current[side]) URL.revokeObjectURL(objectUrls.current[side] as string);
+        objectUrls.current[side] = objectUrl;
+
+        element.src = objectUrl;
         element.load();
+
         setDecks((prev) => ({
           ...prev,
           [side]: {
             ...prev[side],
             track,
-            src: stream.url ?? null,
+            src: objectUrl,
             loading: false,
             durationMs: 0,
             positionMs: 0,
@@ -627,7 +542,8 @@ function DjSurface({ onClose }: { onClose: () => void }) {
             analysis: null,
           },
         }));
-        void analyseTrack(side, stream.url ?? null);
+
+        void analyseBytes(side, bytes);
       } catch (error) {
         log("red", "dj", `deck ${side} could not load "${track.title}"`);
         setDecks((prev) => ({
@@ -640,7 +556,7 @@ function DjSurface({ onClose }: { onClose: () => void }) {
         }));
       }
     },
-    [analyseTrack],
+    [analyseBytes],
   );
 
   const toggle = useCallback(
@@ -668,7 +584,6 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     setDecks((prev) => ({ ...prev, [side]: { ...prev[side], playing: false, positionMs: 0 } }));
   }, []);
 
-  /** Matches the other deck's tempo so the two can be beat-mixed by ear. */
   const syncTempo = useCallback(
     (side: "a" | "b") => {
       const other = side === "a" ? "b" : "a";
@@ -700,7 +615,10 @@ function DjSurface({ onClose }: { onClose: () => void }) {
   }, []);
 
   const setEq = useCallback((side: "a" | "b", band: keyof EqBand, value: number) => {
-    setDecks((prev) => ({ ...prev, [side]: { ...prev[side], eq: { ...prev[side].eq, [band]: value } } }));
+    setDecks((prev) => ({
+      ...prev,
+      [side]: { ...prev[side], eq: { ...prev[side].eq, [band]: value } },
+    }));
   }, []);
 
   const setLoop = useCallback(
@@ -753,9 +671,9 @@ function DjSurface({ onClose }: { onClose: () => void }) {
   const goToHotcue = useCallback(
     (side: "a" | "b", index: number) => {
       const element = audioRef.current[side];
-      const cuePoint = decks[side].hotcues[index];
-      if (!element || cuePoint === null || cuePoint === undefined) return;
-      element.currentTime = cuePoint / 1000;
+      const point = decks[side].hotcues[index];
+      if (!element || point === null || point === undefined) return;
+      element.currentTime = point / 1000;
     },
     [decks],
   );
@@ -764,7 +682,6 @@ function DjSurface({ onClose }: { onClose: () => void }) {
   const tap = useCallback((side: "a" | "b") => {
     const now = performance.now();
     const taps = tapsRef.current[side];
-    // A gap longer than 2 s restarts the measurement window.
     if (taps.length && now - taps[taps.length - 1] > 2000) taps.length = 0;
     taps.push(now);
     const bpm = tapTempo(taps);
@@ -779,6 +696,10 @@ function DjSurface({ onClose }: { onClose: () => void }) {
         element.removeAttribute("src");
         element.load();
       }
+      if (objectUrls.current[side]) {
+        URL.revokeObjectURL(objectUrls.current[side] as string);
+        objectUrls.current[side] = null;
+      }
     }
     gainsRef.current?.eq.a.dispose();
     gainsRef.current?.eq.b.dispose();
@@ -789,7 +710,7 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     onClose();
   }, [onClose]);
 
-  // Auto-mix: analysis-driven transition between the two decks.
+  // Auto-mix.
   const autoRef = useRef<{ phase: "ramp"; startedAt: number; from: number } | null>(null);
   const crossfaderRef = useRef(crossfader);
   crossfaderRef.current = crossfader;
@@ -839,81 +760,38 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     return () => window.clearInterval(id);
   }, [autoArmed, autoPlan]);
 
-  // MIDI action bus: one dispatcher for every assignable control.
+  // MIDI action bus.
   const applyMidiAction = useCallback(
     (action: DjAction) => {
       switch (action.kind) {
-        case "selectDeck":
-          setFocused(action.deck);
-          break;
-        case "togglePlay":
-          void toggle(action.deck);
-          break;
-        case "cue":
-          cue(action.deck);
-          break;
-        case "sync":
-          syncTempo(action.deck);
-          break;
-        case "loopBeats":
-          setLoop(action.deck, action.beats);
-          break;
-        case "exitLoop":
-          exitLoop(action.deck);
-          break;
-        case "hotcueSet":
-          setHotcue(action.deck, action.index);
-          break;
-        case "hotcueGo":
-          goToHotcue(action.deck, action.index);
-          break;
-        case "hotcueClear":
-          clearHotcue(action.deck, action.index);
-          break;
-        case "eq":
-          setEq(action.deck, action.band, action.value);
-          break;
-        case "fx":
-          setFx(action.deck, action.key, action.value);
-          break;
+        case "selectDeck": setFocused(action.deck); break;
+        case "togglePlay": void toggle(action.deck); break;
+        case "cue": cue(action.deck); break;
+        case "sync": syncTempo(action.deck); break;
+        case "loopBeats": setLoop(action.deck, action.beats); break;
+        case "exitLoop": exitLoop(action.deck); break;
+        case "hotcueSet": setHotcue(action.deck, action.index); break;
+        case "hotcueGo": goToHotcue(action.deck, action.index); break;
+        case "hotcueClear": clearHotcue(action.deck, action.index); break;
+        case "eq": setEq(action.deck, action.band, action.value); break;
+        case "fx": setFx(action.deck, action.key, action.value); break;
         case "trim":
           setDecks((prev) => ({
             ...prev,
             [action.deck]: { ...prev[action.deck], trim: action.value },
           }));
           break;
-        case "tempo":
-          setTempo(action.deck, action.value);
-          break;
-        case "crossfader":
-          setCrossfader(action.value);
-          break;
-        case "master":
-          setMaster(action.value);
-          break;
-        case "quantise":
-          setQuantise((prev) => !prev);
-          break;
+        case "tempo": setTempo(action.deck, action.value); break;
+        case "crossfader": setCrossfader(action.value); break;
+        case "master": setMaster(action.value); break;
+        case "quantise": setQuantise((prev) => !prev); break;
       }
     },
-    [
-      toggle,
-      cue,
-      syncTempo,
-      setLoop,
-      exitLoop,
-      setHotcue,
-      goToHotcue,
-      clearHotcue,
-      setEq,
-      setFx,
-      setTempo,
-    ],
+    [toggle, cue, syncTempo, setLoop, exitLoop, setHotcue, goToHotcue, clearHotcue, setEq, setFx, setTempo],
   );
 
   const midi = useMidi({ focused, onAction: applyMidiAction });
 
-  // Library: search the queue and load into the focused deck.
   const library = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const matches = needle
@@ -926,7 +804,6 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     return matches.slice(0, 60);
   }, [queue, query]);
 
-  // Seed both decks from the current queue on open.
   const suggestions = useMemo(() => {
     if (queue.length === 0) return { a: undefined, b: undefined };
     const index = Math.max(0, currentIndex);
@@ -936,115 +813,76 @@ function DjSurface({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     void loadTrack("a", suggestions.a);
     void loadTrack("b", suggestions.b);
-  }, [loadTrack, suggestions.a, suggestions.b]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestions.a?.id, suggestions.b?.id]);
+
+  const chip = "rounded-[10px] border border-border-primary px-[12px] text-[12px] font-[500] transition-colors active:scale-[0.97] disabled:opacity-35";
 
   return (
-    <div className="absolute inset-0 z-[95] flex flex-col gap-2 bg-[var(--dj-well)] p-2">
-      {/* header: the panel's only chrome */}
-      <header className="flex items-center gap-2 px-1">
-        <h2 className="m-0 dj-label" style={{ fontSize: 11, letterSpacing: "0.3em" }}>
-          Booth
-        </h2>
-        <span
-          aria-hidden="true"
-          className={`dj-led ${autoArmed ? "dj-led--on-amber" : ""}`}
-          title={autoArmed ? "Auto-mix armed" : undefined}
-        />
-        <div className="ml-auto flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setLibraryOpen((prev) => !prev)}
-            aria-pressed={libraryOpen}
-            className={`dj-btn ${libraryOpen ? "dj-btn--lit" : ""}`}
-          >
+    <div className="absolute inset-0 z-[95] flex flex-col gap-2 overflow-y-auto bg-bg-primary p-3">
+      {/* header */}
+      <header className="flex flex-wrap items-center gap-[8px]">
+        <h2 className="m-0 text-[21px] font-semibold tracking-tight text-text-primary">DJ</h2>
+        <div className="ml-auto flex flex-wrap items-center gap-[6px]">
+          <button type="button" onClick={() => setLibraryOpen((p) => !p)} aria-pressed={libraryOpen} className={`${chip} ${libraryOpen ? "bg-accent-soft text-accent-primary" : "text-text-secondary"}`}>
             Library
           </button>
           <button
             type="button"
-            onClick={() => {
-              setAutoPlan(computedPlan);
-              setAutoArmed(false);
-            }}
+            onClick={() => { setAutoPlan(computedPlan); setAutoArmed(false); }}
             disabled={!computedPlan}
-            className={`dj-btn ${autoPlan ? "dj-btn--lit" : ""}`}
+            className={`${chip} ${autoPlan ? "bg-accent-soft text-accent-primary" : "text-text-secondary"}`}
           >
             Auto Mix
           </button>
-          <button
-            type="button"
-            onClick={() => setMidiOpen((prev) => !prev)}
-            aria-pressed={midiOpen}
-            className={`dj-btn ${midi.connected ? "dj-btn--green" : midiOpen ? "dj-btn--lit" : ""}`}
-          >
+          <button type="button" onClick={() => setMidiOpen((p) => !p)} aria-pressed={midiOpen} className={`${chip} ${midi.connected ? "bg-accent-soft text-accent-primary" : "text-text-secondary"}`}>
             MIDI
           </button>
-          <button
-            type="button"
-            onClick={() => setQuantise((prev) => !prev)}
-            aria-pressed={quantise}
-            className={`dj-btn ${quantise ? "dj-btn--lit" : ""}`}
-          >
+          <button type="button" onClick={() => setQuantise((p) => !p)} aria-pressed={quantise} className={`${chip} ${quantise ? "bg-accent-soft text-accent-primary" : "text-text-secondary"}`}>
             Quantise
           </button>
-          <button type="button" onClick={close} className="dj-btn">
+          <button type="button" onClick={close} className={`${chip} text-text-primary`}>
             Exit
           </button>
         </div>
       </header>
 
-      {/* auto-mix plan: state before action, so you can read the math */}
+      {/* auto-mix plan */}
       {autoPlan ? (
-        <div className="dj-panel flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2">
-          <span className="dj-value dj-value--big">
-            MIX {formatDeckTime(autoPlan.triggerAtMs)} · {Math.round(autoPlan.crossfadeMs / 1000)}s
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-[16px] border border-border-primary/60 bg-bg-surface px-3 py-2">
+          <span className="text-[13.5px] font-[550] tracking-[-0.014em] text-text-primary">
+            Mix at {formatDeckTime(autoPlan.triggerAtMs)} · {Math.round(autoPlan.crossfadeMs / 1000)}s fade
           </span>
-          <span className="dj-value">
+          <span className="text-[13px] text-text-secondary">
             B {autoPlan.tempoMatch >= 0 ? "+" : ""}
             {(autoPlan.tempoMatch * 100).toFixed(1)}%
             {autoPlan.matchedBpm ? ` · ${autoPlan.matchedBpm.toFixed(1)} BPM` : ""}
           </span>
-          <span className="dj-value">
-            IN {formatDeckTime(autoPlan.bStartMs)} · GRID{" "}
-            {autoPlan.beatAlignMs >= 0 ? "+" : ""}
+          <span className="text-[13px] text-text-tertiary">
+            In {formatDeckTime(autoPlan.bStartMs)} · grid {autoPlan.beatAlignMs >= 0 ? "+" : ""}
             {Math.round(autoPlan.beatAlignMs)}ms
           </span>
           {autoPlan.warnings.map((warning) => (
-            <span key={warning} className="dj-value" style={{ color: "var(--dj-led-amber)" }}>
-              {warning}
-            </span>
+            <span key={warning} className="text-[12px] text-text-secondary">{warning}</span>
           ))}
           <button
             type="button"
-            onClick={() => {
-              autoRef.current = null;
-              setAutoArmed((prev) => !prev);
-            }}
-            className={`dj-btn ml-auto ${autoArmed ? "dj-btn--red" : "dj-btn--amber"}`}
+            onClick={() => { autoRef.current = null; setAutoArmed((p) => !p); }}
+            className={`${chip} ml-auto ${autoArmed ? "bg-accent-primary text-accent-ink" : "bg-accent-soft text-accent-primary"}`}
           >
             {autoArmed ? "Disarm" : "Arm"}
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              setAutoPlan(null);
-              setAutoArmed(false);
-            }}
-            className="dj-btn"
-          >
+          <button type="button" onClick={() => { setAutoPlan(null); setAutoArmed(false); }} className={`${chip} text-text-secondary`}>
             Hide
           </button>
         </div>
       ) : null}
 
-      {/* the ribbon: signature element, chroma-coded decks on a shared grid */}
-      <div className="flex flex-col gap-1">
+      {/* waveform ribbon */}
+      <div className="flex flex-col gap-[6px]">
         {(["a", "b"] as const).map((side) => (
-          <div key={side} className="flex items-center gap-2">
-            <span
-              className={`dj-deck-letter w-[12px] shrink-0 text-center ${
-                side === "a" ? "dj-deck-a" : "dj-deck-b"
-              }`}
-            >
+          <div key={side} className="flex items-center gap-[10px]">
+            <span className="w-[16px] shrink-0 text-center text-[11px] font-[600] tracking-[0.16em] text-text-tertiary">
               {SIDE_LABEL[side]}
             </span>
             <div className="min-w-0 flex-1">
@@ -1053,13 +891,9 @@ function DjSurface({ onClose }: { onClose: () => void }) {
                 status={decks[side].peaksStatus}
                 positionMs={decks[side].positionMs}
                 durationMs={decks[side].durationMs}
-                grid={
-                  decks[side].bpm
-                    ? { bpm: decks[side].bpm, anchorMs: decks[side].anchorMs }
-                    : null
-                }
+                grid={decks[side].bpm ? { bpm: decks[side].bpm, anchorMs: decks[side].anchorMs } : null}
                 hue={side}
-                height={72}
+                height={70}
                 onSeek={(ms) => {
                   const element = audioRef.current[side];
                   if (element) element.currentTime = ms / 1000;
@@ -1067,7 +901,7 @@ function DjSurface({ onClose }: { onClose: () => void }) {
                 label={`Deck ${SIDE_LABEL[side]}`}
               />
             </div>
-            <span className="dj-value w-[52px] shrink-0 text-right">
+            <span className="w-[52px] shrink-0 text-right font-mono text-[11px] tabular-nums text-text-secondary">
               {formatDeckTime(decks[side].positionMs)}
             </span>
           </div>
@@ -1075,34 +909,36 @@ function DjSurface({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* decks + mixer */}
-      <div className="flex min-h-0 flex-1 gap-2">
+      <div className="flex min-h-0 flex-1 flex-wrap gap-2">
         {libraryOpen ? (
-          <aside className="dj-panel flex w-[228px] shrink-0 flex-col gap-2 p-2">
-            <div className="flex items-center justify-between">
-              <span className="dj-label">Library → Deck {SIDE_LABEL[focused]}</span>
-            </div>
+          <aside className="flex w-[232px] shrink-0 flex-col gap-[8px] rounded-[16px] border border-border-primary/60 bg-bg-surface p-3">
+            <span className="text-[10px] uppercase tracking-[0.16em] text-text-tertiary">
+              Library → Deck {SIDE_LABEL[focused]}
+            </span>
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search the queue…"
               aria-label="Search tracks for the decks"
-              className="dj-well h-[28px] w-full px-2 text-[12px] text-text-primary outline-none"
+              className="h-[32px] w-full rounded-[10px] border border-border-primary bg-transparent px-[10px] text-[13px] text-text-primary outline-none focus-visible:ring-4 focus-visible:ring-accent-soft"
             />
-            <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+            <div className="flex min-h-0 flex-1 flex-col gap-[2px] overflow-y-auto">
               {library.length === 0 ? (
-                <p className="dj-value m-0">Nothing queued yet.</p>
+                <p className="m-0 text-[13px] text-text-tertiary">Nothing queued yet.</p>
               ) : (
                 library.map((item) => (
                   <button
                     key={`${item.id}-${item.title}`}
                     type="button"
                     onClick={() => void loadTrack(focused, item)}
-                    className="dj-row"
+                    className="flex w-full flex-col items-start rounded-[10px] px-[8px] py-[6px] text-left transition-colors hover:bg-bg-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent-soft"
                   >
-                    <span className="w-full truncate text-[11px] font-[500] text-text-primary">
+                    <span className="w-full truncate text-[13.5px] font-[550] tracking-[-0.014em] text-text-primary">
                       {item.title}
                     </span>
-                    <span className="dj-value w-full truncate">{item.artists}</span>
+                    <span className="w-full truncate text-[13px] text-text-secondary">
+                      {item.artists}
+                    </span>
                   </button>
                 ))
               )}
@@ -1119,56 +955,51 @@ function DjSurface({ onClose }: { onClose: () => void }) {
           onFocus={() => setFocused("a")}
           onCue={() => cue("a")}
           onSync={() => syncTempo("a")}
-          onNudge={(delta) => nudge("a", delta)}
+          onNudge={(d) => nudge("a", d)}
           onPlay={() => void toggle("a")}
           onPause={() => void toggle("a")}
-          onSeek={(ms) => {
-            const element = audioRef.current.a;
-            if (element) element.currentTime = ms / 1000;
-          }}
-          onTempo={(tempo) => setTempo("a", tempo)}
+          onTempo={(t) => setTempo("a", t)}
           onLoop={(beats) => setLoop("a", beats)}
           onExitLoop={() => exitLoop("a")}
-          onHotcueSet={(index) => setHotcue("a", index)}
-          onHotcueClear={(index) => clearHotcue("a", index)}
-          onHotcueGo={(index) => goToHotcue("a", index)}
+          onHotcueSet={(i) => setHotcue("a", i)}
+          onHotcueClear={(i) => clearHotcue("a", i)}
+          onHotcueGo={(i) => goToHotcue("a", i)}
           onTap={() => tap("a")}
-          onToggleCueMode={() => setCueMode((prev) => (prev === "a" ? null : "a"))}
+          onToggleCueMode={() => setCueMode((p) => (p === "a" ? null : "a"))}
         />
 
-        {/* mixer: the milled column between the decks */}
-        <section aria-label="Mixer" className="dj-metal flex w-[176px] shrink-0 flex-col gap-1.5 p-2">
+        <section
+          aria-label="Mixer"
+          className="flex w-[184px] shrink-0 flex-col gap-[8px] rounded-[16px] border border-border-primary/60 bg-bg-panel p-3"
+        >
           <div className="flex items-center justify-between">
-            <span className="dj-label">Mixer</span>
-            <span className="dj-value">{Math.round(master * 100)}%</span>
+            <span className="text-[10px] uppercase tracking-[0.16em] text-text-tertiary">Mixer</span>
+            <span className="font-mono text-[11px] tabular-nums text-text-secondary">
+              {Math.round(master * 100)}%
+            </span>
           </div>
-          <div className="flex flex-1 justify-between px-1">
+          <div className="flex flex-1 justify-between px-[2px]">
             <ChannelStrip
               side="a"
               state={decks.a}
               onEq={(band, value) => setEq("a", band, value)}
               onFx={(key, value) => setFx("a", key, value)}
-              onTrim={(value) =>
-                setDecks((prev) => ({ ...prev, a: { ...prev.a, trim: value } }))
-              }
+              onTrim={(value) => setDecks((prev) => ({ ...prev, a: { ...prev.a, trim: value } }))}
             />
             <ChannelStrip
               side="b"
               state={decks.b}
               onEq={(band, value) => setEq("b", band, value)}
               onFx={(key, value) => setFx("b", key, value)}
-              onTrim={(value) =>
-                setDecks((prev) => ({ ...prev, b: { ...prev.b, trim: value } }))
-              }
+              onTrim={(value) => setDecks((prev) => ({ ...prev, b: { ...prev.b, trim: value } }))}
             />
           </div>
 
-          {/* crossfader */}
           <div>
-            <div className="mb-1 flex items-center justify-between">
-              <span className="dj-deck-letter dj-deck-a">A</span>
-              <span className="dj-label">Crossfader</span>
-              <span className="dj-deck-letter dj-deck-b">B</span>
+            <div className="mb-[6px] flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-[0.14em] text-text-tertiary">A</span>
+              <span className="text-[10px] uppercase tracking-[0.14em] text-text-tertiary">Crossfader</span>
+              <span className="text-[10px] uppercase tracking-[0.14em] text-text-tertiary">B</span>
             </div>
             <input
               type="range"
@@ -1182,18 +1013,8 @@ function DjSurface({ onClose }: { onClose: () => void }) {
             />
           </div>
 
-          <div className="flex items-center justify-center gap-2 border-t pt-1" style={{ borderColor: "var(--dj-line-strong)" }}>
-            <Knob
-              label="Master"
-              min={0}
-              max={1}
-              step={0.01}
-              defaultValue={1}
-              value={master}
-              size={34}
-              format={(v) => `${Math.round(v * 100)}`}
-              onChange={setMaster}
-            />
+          <div className="flex justify-center border-t border-border-primary pt-[8px]">
+            <Knob label="Master" min={0} max={1} step={0.01} defaultValue={1} value={master} size={34} format={(v) => `${Math.round(v * 100)}`} onChange={setMaster} />
           </div>
         </section>
 
@@ -1206,21 +1027,17 @@ function DjSurface({ onClose }: { onClose: () => void }) {
           onFocus={() => setFocused("b")}
           onCue={() => cue("b")}
           onSync={() => syncTempo("b")}
-          onNudge={(delta) => nudge("b", delta)}
+          onNudge={(d) => nudge("b", d)}
           onPlay={() => void toggle("b")}
           onPause={() => void toggle("b")}
-          onSeek={(ms) => {
-            const element = audioRef.current.b;
-            if (element) element.currentTime = ms / 1000;
-          }}
-          onTempo={(tempo) => setTempo("b", tempo)}
+          onTempo={(t) => setTempo("b", t)}
           onLoop={(beats) => setLoop("b", beats)}
           onExitLoop={() => exitLoop("b")}
-          onHotcueSet={(index) => setHotcue("b", index)}
-          onHotcueClear={(index) => clearHotcue("b", index)}
-          onHotcueGo={(index) => goToHotcue("b", index)}
+          onHotcueSet={(i) => setHotcue("b", i)}
+          onHotcueClear={(i) => clearHotcue("b", i)}
+          onHotcueGo={(i) => goToHotcue("b", i)}
           onTap={() => tap("b")}
-          onToggleCueMode={() => setCueMode((prev) => (prev === "b" ? null : "b"))}
+          onToggleCueMode={() => setCueMode((p) => (p === "b" ? null : "b"))}
         />
       </div>
 
