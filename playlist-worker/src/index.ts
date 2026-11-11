@@ -83,10 +83,19 @@ async function readJson<T>(request: Request): Promise<T | null> {
   }
 }
 
+/**
+ * The API this Worker delegates identity (and source-playlist) lookups to.
+ *
+ * It must be the same deployment the app signs into — this Worker holds no JWT
+ * secret, it validates sessions by calling `/v1/me`. Pointing it at a different
+ * API is what made every shared-playlist request answer 401.
+ */
+const DEFAULT_PRIMARY_API_URL = "https://liner-api.lucabatarcian.workers.dev";
+
 async function authenticate(request: Request, env: Env): Promise<AuthContext | null> {
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) return null;
-  const apiUrl = env.PRIMARY_API_URL ?? "https://api.tryliner.fun";
+  const apiUrl = env.PRIMARY_API_URL ?? DEFAULT_PRIMARY_API_URL;
   const response = await fetch(`${apiUrl}/v1/me`, {
     headers: { authorization: `Bearer ${token}`, accept: "application/json" },
   });
@@ -109,7 +118,7 @@ async function member(
 }
 
 function apiUrl(env: Env, path: string): string {
-  return `${env.PRIMARY_API_URL ?? "https://api.tryliner.fun"}${path}`;
+  return `${env.PRIMARY_API_URL ?? DEFAULT_PRIMARY_API_URL}${path}`;
 }
 
 async function createSharedPlaylist(

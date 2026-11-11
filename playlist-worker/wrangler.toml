@@ -3,7 +3,10 @@ main = "src/index.ts"
 compatibility_date = "2025-09-01"
 
 [vars]
-PRIMARY_API_URL = "https://api.tryliner.fun"
+# The shared-playlist Worker has no JWT secret of its own: it authenticates by
+# calling the API's /v1/me with the caller's bearer token. That must be the SAME
+# API the app signs into, or every request comes back 401.
+PRIMARY_API_URL = "https://liner-api.lucabatarcian.workers.dev"
 
 [[d1_databases]]
 binding = "DB"
