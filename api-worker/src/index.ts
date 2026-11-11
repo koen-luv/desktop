@@ -32,6 +32,7 @@ import {
   handlePlaybackSession,
   handleStream,
 } from "./playback";
+import { handleStemsRequest, stemsStatusResponse } from "./stems";
 import {
   handleAttRelay,
   handleGenerateItRelay,
@@ -2199,6 +2200,13 @@ async function route(request: Request, env: Env): Promise<Response> {
     return handleStream(request, env, path.slice("/v1/stream/".length));
   }
   // Integrity relays for clients that mint their own PO tokens (the website).
+  if (path === "/v1/stems/status" && method === "GET") {
+    return stemsStatusResponse(request, env);
+  }
+  const stems = path.match(/^\/v1\/tracks\/([^/]+)\/stems$/);
+  if (stems && method === "POST") {
+    return handleStemsRequest(request, env, decodeURIComponent(stems[1]));
+  }
   if (path === "/v1/yt/att" && method === "POST") {
     return handleAttRelay(request, env);
   }

@@ -12,6 +12,9 @@ export interface Env {
   ALLOWED_ORIGINS?: string;
   /** Signs short-lived /v1/stream tokens. Falls back to JWT_SECRET. */
   STREAM_SIGNING_SECRET?: string;
+  /** Demucs-class separation service; see stems.ts. */
+  STEMS_SERVICE_URL?: string;
+  STEMS_SERVICE_TOKEN?: string;
 }
 
 export class HttpError extends Error {
