@@ -1,5 +1,5 @@
-import { memo, useEffect, useRef, useState } from "react";
-import { columnForPosition, computePeaks, positionForColumn, toMono, type WaveformPeaks } from "./waveform";
+import { memo, useEffect, useRef } from "react";
+import { columnForPosition, positionForColumn, type WaveformPeaks } from "./waveform";
 
 /**
  * Deck waveform (Deere-style overview).
@@ -13,53 +13,23 @@ import { columnForPosition, computePeaks, positionForColumn, toMono, type Wavefo
  */
 
 interface WaveformProps {
-  src: string | null;
+  /** Peaks computed by the deck (shared with BPM analysis, decoded once). */
+  peaks: WaveformPeaks | null;
+  status: "idle" | "ready" | "unavailable";
   positionMs: number;
   durationMs: number;
+  /** Beatgrid for the vertical tick overlay. */
+  grid: { bpm: number; anchorMs: number } | null;
   onSeek: (ms: number) => void;
   label: string;
 }
 
 const COLUMNS = 900;
 
-function Waveform({ src, positionMs, durationMs, onSeek, label }: WaveformProps) {
+function Waveform({ peaks: peaksProp, status, positionMs, durationMs, grid, onSeek, label }: WaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const peaksRef = useRef<WaveformPeaks | null>(null);
-  const [state, setState] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
-
-  // Decode + reduce once per source.
-  useEffect(() => {
-    peaksRef.current = null;
-    if (!src) {
-      setState("idle");
-      return;
-    }
-    let cancelled = false;
-    setState("loading");
-
-    void (async () => {
-      try {
-        const response = await fetch(src);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const bytes = await response.arrayBuffer();
-        const context = new AudioContext();
-        const buffer = await context.decodeAudioData(bytes);
-        await context.close().catch(() => undefined);
-        if (cancelled) return;
-        const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) =>
-          buffer.getChannelData(index),
-        );
-        peaksRef.current = computePeaks(toMono(channels), COLUMNS);
-        setState("ready");
-      } catch {
-        if (!cancelled) setState("unavailable");
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [src]);
+  const peaksRef = useRef<WaveformPeaks | null>(peaksProp);
+  peaksRef.current = peaksProp;
 
   // Paint.
   useEffect(() => {
@@ -101,9 +71,18 @@ function Waveform({ src, positionMs, durationMs, onSeek, label }: WaveformProps)
       context.fillRect(column, top, 1, Math.max(1, bottom - top));
     }
 
+    if (grid && durationMs > 0) {
+      const beat = 60_000 / grid.bpm;
+      context.fillStyle = "rgba(255,255,255,0.22)";
+      for (let t = grid.anchorMs % beat; t < durationMs; t += beat) {
+        const x = Math.round((t / durationMs) * width);
+        context.fillRect(x, 0, 1, height);
+      }
+    }
+
     context.fillStyle = "#f4f3f8";
     context.fillRect(Math.round(playheadX), 0, 1, height);
-  }, [positionMs, durationMs, state]);
+  }, [positionMs, durationMs, status, grid]);
 
   const seekFromEvent = (event: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -119,14 +98,9 @@ function Waveform({ src, positionMs, durationMs, onSeek, label }: WaveformProps)
         onClick={seekFromEvent}
         className="h-full w-full cursor-crosshair"
       />
-      {state === "unavailable" && (
+      {status === "unavailable" && (
         <span className="absolute inset-0 flex items-center justify-center text-[10px] text-text-tertiary">
           waveform unavailable for this stream
-        </span>
-      )}
-      {state === "loading" && (
-        <span className="absolute inset-0 flex items-center justify-center text-[10px] text-text-tertiary">
-          analysing waveform…
         </span>
       )}
     </div>

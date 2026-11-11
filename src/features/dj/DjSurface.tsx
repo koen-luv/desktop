@@ -5,6 +5,9 @@ import { resolvePlaybackStream } from "@/features/player/engine/playbackSource";
 import type { Track } from "@/shared/types";
 import { log } from "@/shared/utils/logger";
 import { createDeckChain, NEUTRAL_EQ, type EqBand } from "./deckAudio";
+import { createDeckFx, NEUTRAL_FX, type FxState } from "./fx";
+import { detectBpm, quantizePosition } from "./bpm";
+import { computePeaks, toMono, type WaveformPeaks } from "./waveform";
 import { loopedPosition, makeLoop, tapTempo } from "./loopMath";
 import {
   crossfadeGains,
@@ -44,6 +47,11 @@ interface DeckState {
   hotcues: (number | null)[];
   /** Tap-tempo result for this deck. */
   bpm: number | null;
+  /** Beat anchor from auto-detection (ms); 0 with tap tempo. */
+  anchorMs: number;
+  fx: FxState;
+  peaks: WaveformPeaks | null;
+  peaksStatus: "idle" | "ready" | "unavailable";
 }
 
 const EMPTY_DECK: DeckState = {
@@ -60,6 +68,10 @@ const EMPTY_DECK: DeckState = {
   loop: null,
   hotcues: [null, null, null, null],
   bpm: null,
+  anchorMs: 0,
+  fx: NEUTRAL_FX,
+  peaks: null,
+  peaksStatus: "idle",
 };
 
 function Deck({
@@ -86,6 +98,7 @@ function Deck({
   onTap,
   cueMode,
   onToggleCueMode,
+  onFx,
 }: {
   side: "A" | "B";
   state: DeckState;
@@ -110,6 +123,7 @@ function Deck({
   onTap: () => void;
   cueMode: boolean;
   onToggleCueMode: () => void;
+  onFx: (key: keyof FxState, value: number) => void;
 }) {
   return (
     <div
@@ -126,9 +140,11 @@ function Deck({
       </div>
 
       <Waveform
-        src={state.src}
+        peaks={state.peaks}
+        status={state.peaksStatus}
         positionMs={state.positionMs}
         durationMs={state.durationMs}
+        grid={state.bpm ? { bpm: state.bpm, anchorMs: state.anchorMs } : null}
         onSeek={onSeek}
         label={`Deck ${side}`}
       />
@@ -236,6 +252,48 @@ function Deck({
         ))}
       </div>
 
+      <div className="flex items-center gap-3">
+        <label className="flex flex-1 flex-col gap-[2px] text-[10px] uppercase text-text-tertiary">
+          Filter
+          <input
+            type="range"
+            aria-label={`Deck ${side} filter`}
+            min={0}
+            max={1}
+            step={0.01}
+            value={state.fx.filter}
+            onChange={(event) => onFx("filter", Number(event.target.value))}
+            className="w-full accent-accent-primary"
+          />
+        </label>
+        <label className="flex flex-1 flex-col gap-[2px] text-[10px] uppercase text-text-tertiary">
+          Echo
+          <input
+            type="range"
+            aria-label={`Deck ${side} echo`}
+            min={0}
+            max={1}
+            step={0.01}
+            value={state.fx.echo}
+            onChange={(event) => onFx("echo", Number(event.target.value))}
+            className="w-full accent-accent-primary"
+          />
+        </label>
+        <label className="flex flex-1 flex-col gap-[2px] text-[10px] uppercase text-text-tertiary">
+          Reverb
+          <input
+            type="range"
+            aria-label={`Deck ${side} reverb`}
+            min={0}
+            max={1}
+            step={0.01}
+            value={state.fx.reverb}
+            onChange={(event) => onFx("reverb", Number(event.target.value))}
+            className="w-full accent-accent-primary"
+          />
+        </label>
+      </div>
+
       <div className="flex flex-wrap items-center gap-1">
         {[0.5, 1, 2, 4, 8].map((beats) => (
           <button
@@ -335,6 +393,7 @@ function DjSurface({ onClose }: { onClose: () => void }) {
   const [focused, setFocused] = useState<"a" | "b">("a");
   const [query, setQuery] = useState("");
   const [cueMode, setCueMode] = useState<"a" | "b" | null>(null);
+  const [quantise, setQuantise] = useState(true);
   const masterGainRef = useRef<GainNode | null>(null);
   const audioRef = useRef<{ a: HTMLAudioElement | null; b: HTMLAudioElement | null }>({
     a: null,
@@ -345,6 +404,7 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     a: GainNode;
     b: GainNode;
     eq: { a: ReturnType<typeof createDeckChain>; b: ReturnType<typeof createDeckChain> };
+    fx: { a: ReturnType<typeof createDeckFx>; b: ReturnType<typeof createDeckFx> };
   } | null>(null);
 
   const crossfade = useMemo(() => crossfadeGains(crossfader), [crossfader]);
@@ -360,13 +420,17 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     const masterGain = ctx.createGain();
     masterGain.gain.value = master;
     masterGain.connect(ctx.destination);
-    // source → 3-band EQ → trim/crossfade gain → master
+    // source → 3-band EQ → FX send → trim/crossfade gain → master
     const eqA = createDeckChain(ctx, ctx.createMediaElementSource(a));
     const eqB = createDeckChain(ctx, ctx.createMediaElementSource(b));
-    eqA.output.connect(gainA).connect(masterGain);
-    eqB.output.connect(gainB).connect(masterGain);
+    const fxA = createDeckFx(ctx);
+    const fxB = createDeckFx(ctx);
+    eqA.output.connect(fxA.input);
+    fxA.output.connect(gainA).connect(masterGain);
+    eqB.output.connect(fxB.input);
+    fxB.output.connect(gainB).connect(masterGain);
     masterGainRef.current = masterGain;
-    gainsRef.current = { ctx, a: gainA, b: gainB, eq: { a: eqA, b: eqB } };
+    gainsRef.current = { ctx, a: gainA, b: gainB, eq: { a: eqA, b: eqB }, fx: { a: fxA, b: fxB } };
     return gainsRef.current;
   }, []);
 
@@ -379,7 +443,9 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     if (masterGainRef.current) masterGainRef.current.gain.value = master;
     graph.eq.a.setEq(decks.a.eq);
     graph.eq.b.setEq(decks.b.eq);
-  }, [crossfade, decks.a.trim, decks.b.trim, decks.a.eq, decks.b.eq, master, ensureGraph]);
+    graph.fx.a.update(decks.a.fx, decks.a.bpm ?? 120);
+    graph.fx.b.update(decks.b.fx, decks.b.bpm ?? 120);
+  }, [crossfade, decks.a.trim, decks.b.trim, decks.a.eq, decks.b.eq, decks.a.fx, decks.b.fx, decks.a.bpm, decks.b.bpm, master, ensureGraph]);
 
   // Transport clocks.
   useEffect(() => {
@@ -446,8 +512,13 @@ function DjSurface({ onClose }: { onClose: () => void }) {
             loop: null,
             hotcues: [null, null, null, null],
             bpm: null,
+            anchorMs: 0,
+            fx: NEUTRAL_FX,
+            peaks: null,
+            peaksStatus: "idle",
           },
         }));
+        void analyseTrack(side, stream.url ?? null);
       } catch (error) {
         log("red", "dj", `deck ${side} could not load "${track.title}"`);
         setDecks((prev) => ({
@@ -476,6 +547,49 @@ function DjSurface({ onClose }: { onClose: () => void }) {
       setDecks((prev) => ({ ...prev, [side]: { ...prev[side], playing: false } }));
     }
   }, [ensureGraph]);
+
+  /** Decode the loaded stream once; feeds the waveform and the beatgrid. */
+  const analyseTrack = useCallback(async (side: "a" | "b", url: string | null) => {
+    if (!url) {
+      setDecks((prev) => ({ ...prev, [side]: { ...prev[side], peaksStatus: "unavailable" } }));
+      return;
+    }
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const bytes = await response.arrayBuffer();
+      const ctx = new AudioContext();
+      const buffer = await ctx.decodeAudioData(bytes);
+      void ctx.close().catch(() => undefined);
+      const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) =>
+        buffer.getChannelData(i),
+      );
+      const mono = toMono(channels);
+      const peaks = computePeaks(mono, 900);
+      const estimate = detectBpm(mono, buffer.sampleRate);
+      setDecks((prev) => ({
+        ...prev,
+        [side]: {
+          ...prev[side],
+          peaks,
+          peaksStatus: "ready",
+          bpm: prev[side].bpm ?? (estimate && estimate.confidence >= 0.2 ? estimate.bpm : null),
+          // Fold the first strong onset into one beat period so the grid
+          // starts at the top of the file.
+          anchorMs: estimate ? estimate.anchorMs % (60_000 / estimate.bpm) : 0,
+        },
+      }));
+    } catch {
+      setDecks((prev) => ({ ...prev, [side]: { ...prev[side], peaksStatus: "unavailable" } }));
+    }
+  }, []);
+
+  const setFx = useCallback((side: "a" | "b", key: keyof FxState, value: number) => {
+    setDecks((prev) => ({
+      ...prev,
+      [side]: { ...prev[side], fx: { ...prev[side].fx, [key]: value } },
+    }));
+  }, []);
 
   const cue = useCallback(
     (side: "a" | "b") => {
@@ -516,11 +630,15 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     setDecks((prev) => {
       const deck = prev[side];
       const bpm = deck.bpm ?? 120;
-      const loop = makeLoop(deck.positionMs, beats, bpm);
+      const start =
+        quantise && deck.bpm
+          ? quantizePosition(deck.positionMs, deck.bpm, deck.anchorMs)
+          : deck.positionMs;
+      const loop = makeLoop(start, beats, bpm);
       return { ...prev, [side]: { ...deck, loop } };
     });
     if (element.paused) void element.play().catch(() => undefined);
-  }, []);
+  }, [quantise]);
 
   const exitLoop = useCallback((side: "a" | "b") => {
     setDecks((prev) => ({ ...prev, [side]: { ...prev[side], loop: null } }));
@@ -530,10 +648,13 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     setDecks((prev) => {
       const deck = prev[side];
       const hotcues = [...deck.hotcues];
-      hotcues[index] = deck.positionMs;
+      hotcues[index] =
+        quantise && deck.bpm
+          ? quantizePosition(deck.positionMs, deck.bpm, deck.anchorMs)
+          : deck.positionMs;
       return { ...prev, [side]: { ...deck, hotcues } };
     });
-  }, []);
+  }, [quantise]);
 
   const clearHotcue = useCallback((side: "a" | "b", index: number) => {
     setDecks((prev) => {
@@ -573,6 +694,8 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     }
     gainsRef.current?.eq.a.dispose();
     gainsRef.current?.eq.b.dispose();
+    gainsRef.current?.fx.a.dispose();
+    gainsRef.current?.fx.b.dispose();
     void gainsRef.current?.ctx.close().catch(() => undefined);
     gainsRef.current = null;
     onClose();
@@ -605,13 +728,27 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     <div className="absolute inset-0 z-[95] flex flex-col gap-3 bg-bg-primary/98 p-3 backdrop-blur-xl">
       <div className="flex items-center justify-between">
         <h2 className="m-0 text-[15px] font-[600]">DJ mode</h2>
-        <button
-          type="button"
-          onClick={close}
-          className="h-[32px] rounded-[10px] border border-border-primary px-3 text-[12px]"
-        >
-          Exit
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setQuantise((prev) => !prev)}
+            aria-pressed={quantise}
+            className={`h-[32px] rounded-[10px] px-3 text-[12px] font-[600] ${
+              quantise
+                ? "bg-accent-primary text-accent-ink"
+                : "border border-border-primary text-text-secondary"
+            }`}
+          >
+            Quantise
+          </button>
+          <button
+            type="button"
+            onClick={close}
+            className="h-[32px] rounded-[10px] border border-border-primary px-3 text-[12px]"
+          >
+            Exit
+          </button>
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 gap-3">
@@ -676,6 +813,7 @@ function DjSurface({ onClose }: { onClose: () => void }) {
           onTap={() => tap("a")}
           cueMode={cueMode === "a"}
           onToggleCueMode={() => setCueMode((prev) => (prev === "a" ? null : "a"))}
+          onFx={(key, value) => setFx("a", key, value)}
           onTrim={(trim) => setDecks((prev) => ({ ...prev, a: { ...prev.a, trim } }))}
           onTempo={(tempo) => {
             setDecks((prev) => ({ ...prev, a: { ...prev.a, tempo } }));
@@ -738,6 +876,7 @@ function DjSurface({ onClose }: { onClose: () => void }) {
           onTap={() => tap("b")}
           cueMode={cueMode === "b"}
           onToggleCueMode={() => setCueMode((prev) => (prev === "b" ? null : "b"))}
+          onFx={(key, value) => setFx("b", key, value)}
           onTrim={(trim) => setDecks((prev) => ({ ...prev, b: { ...prev.b, trim } }))}
           onTempo={(tempo) => {
             setDecks((prev) => ({ ...prev, b: { ...prev.b, tempo } }));
