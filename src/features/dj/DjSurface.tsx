@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePlayerStore } from "@/features/player";
+import Waveform from "./WaveformView";
 import { resolvePlaybackStream } from "@/features/player/engine/playbackSource";
 import type { Track } from "@/shared/types";
 import { log } from "@/shared/utils/logger";
@@ -25,6 +26,8 @@ import {
 
 interface DeckState {
   track: Track | null;
+  /** Stream URL the deck is playing; the waveform decodes this. */
+  src: string | null;
   playing: boolean;
   loading: boolean;
   trim: number;
@@ -36,6 +39,7 @@ interface DeckState {
 
 const EMPTY_DECK: DeckState = {
   track: null,
+  src: null,
   playing: false,
   loading: false,
   trim: 1,
@@ -89,6 +93,14 @@ function Deck({
         <span className="text-[11px] font-[600] tracking-[0.2em] text-text-tertiary">DECK {side}</span>
         <span className="font-mono text-[11px] text-text-tertiary">{Math.round(gain * 100)}%</span>
       </div>
+
+      <Waveform
+        src={state.src}
+        positionMs={state.positionMs}
+        durationMs={state.durationMs}
+        onSeek={onSeek}
+        label={`Deck ${side}`}
+      />
 
       <div className="min-h-[42px]">
         <p className="m-0 truncate text-[14px] font-[600] text-text-primary">
@@ -277,7 +289,14 @@ function DjSurface({ onClose }: { onClose: () => void }) {
         element.load();
         setDecks((prev) => ({
           ...prev,
-          [side]: { ...prev[side], track, loading: false, durationMs: 0, positionMs: 0 },
+          [side]: {
+            ...prev[side],
+            track,
+            src: stream.url ?? null,
+            loading: false,
+            durationMs: 0,
+            positionMs: 0,
+          },
         }));
       } catch (error) {
         log("red", "dj", `deck ${side} could not load "${track.title}"`);
