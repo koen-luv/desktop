@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePlayerStore } from "@/features/player";
 import Waveform from "./WaveformView";
+import Knob from "./Knob";
 import { resolvePlaybackStream } from "@/features/player/engine/playbackSource";
 import type { Track } from "@/shared/types";
 import { log } from "@/shared/utils/logger";
@@ -219,79 +220,65 @@ function Deck({
         >
           +
         </button>
-        <label className="flex flex-1 items-center gap-2 text-[11px] text-text-tertiary">
-          Trim
-          <input
-            type="range"
-            aria-label={`Deck ${side} trim`}
-            min={0}
-            max={1}
-            step={0.01}
-            value={state.trim}
-            onChange={(event) => onTrim(Number(event.target.value))}
-            className="w-full accent-accent-primary"
-          />
-        </label>
+        <Knob
+          label="Trim"
+          min={0}
+          max={1}
+          step={0.01}
+          defaultValue={1}
+          value={state.trim}
+          format={(v) => `${Math.round(v * 100)}%`}
+          onChange={onTrim}
+        />
       </div>
 
-      <div className="flex items-center gap-3">
-        {(["low", "mid", "high"] as const).map((band) => (
-          <label key={band} className="flex flex-1 flex-col gap-[2px] text-[10px] uppercase text-text-tertiary">
-            {band}
-            <input
-              type="range"
-              aria-label={`Deck ${side} ${band} EQ`}
-              min={-24}
-              max={12}
-              step={1}
-              value={state.eq[band]}
-              onChange={(event) => onEq(band, Number(event.target.value))}
-              className="w-full accent-accent-primary"
-            />
-          </label>
+      <div className="flex items-start justify-center gap-2">
+        {(["high", "mid", "low"] as const).map((band) => (
+          <Knob
+            key={band}
+            label={band}
+            min={-24}
+            max={12}
+            step={1}
+            defaultValue={0}
+            value={state.eq[band]}
+            format={(v) => `${v > 0 ? "+" : ""}${Math.round(v)}dB`}
+            onChange={(next) => onEq(band, next)}
+          />
         ))}
       </div>
 
-      <div className="flex items-center gap-3">
-        <label className="flex flex-1 flex-col gap-[2px] text-[10px] uppercase text-text-tertiary">
-          Filter
-          <input
-            type="range"
-            aria-label={`Deck ${side} filter`}
-            min={0}
-            max={1}
-            step={0.01}
-            value={state.fx.filter}
-            onChange={(event) => onFx("filter", Number(event.target.value))}
-            className="w-full accent-accent-primary"
-          />
-        </label>
-        <label className="flex flex-1 flex-col gap-[2px] text-[10px] uppercase text-text-tertiary">
-          Echo
-          <input
-            type="range"
-            aria-label={`Deck ${side} echo`}
-            min={0}
-            max={1}
-            step={0.01}
-            value={state.fx.echo}
-            onChange={(event) => onFx("echo", Number(event.target.value))}
-            className="w-full accent-accent-primary"
-          />
-        </label>
-        <label className="flex flex-1 flex-col gap-[2px] text-[10px] uppercase text-text-tertiary">
-          Reverb
-          <input
-            type="range"
-            aria-label={`Deck ${side} reverb`}
-            min={0}
-            max={1}
-            step={0.01}
-            value={state.fx.reverb}
-            onChange={(event) => onFx("reverb", Number(event.target.value))}
-            className="w-full accent-accent-primary"
-          />
-        </label>
+      <div className="flex items-start justify-center gap-2">
+        <Knob
+          label="Filter"
+          min={0}
+          max={1}
+          step={0.01}
+          defaultValue={0.5}
+          value={state.fx.filter}
+          format={(v) => `${Math.round(v * 100)}`}
+          onChange={(next) => onFx("filter", next)}
+        />
+        <Knob
+          label="Echo"
+          min={0}
+          max={1}
+          step={0.01}
+          defaultValue={0}
+          value={state.fx.echo}
+          format={(v) => `${Math.round(v * 100)}%`}
+          onChange={(next) => onFx("echo", next)}
+        />
+        <Knob
+          label="Verb"
+          min={0}
+          max={1}
+          step={0.01}
+          defaultValue={0}
+          value={state.fx.reverb}
+          format={(v) => `${Math.round(v * 100)}%`}
+          onChange={(next) => onFx("reverb", next)}
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-1">
@@ -837,16 +824,16 @@ function DjSurface({ onClose }: { onClose: () => void }) {
           />
           <span className="text-[10px] tracking-[0.2em] text-text-tertiary">B</span>
           <div className="mt-3 flex w-[46px] flex-col items-center gap-1">
-            <span className="text-[9px] tracking-[0.12em] text-text-tertiary">MASTER</span>
-            <input
-              type="range"
-              aria-label="Master volume"
+            <Knob
+              label="Master"
               min={0}
               max={1}
               step={0.01}
+              defaultValue={1}
               value={master}
-              onChange={(event) => setMaster(Number(event.target.value))}
-              className="w-full accent-accent-primary"
+              size={38}
+              format={(v) => `${Math.round(v * 100)}%`}
+              onChange={setMaster}
             />
           </div>
         </div>
