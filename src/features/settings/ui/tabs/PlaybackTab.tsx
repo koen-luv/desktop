@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/languages";
+import { isAndroidApp } from "@/platform";
 import { usePlayerStore, downloadTrack, SleepTimerControl } from "@/features/player";
 import { ToggleSwitch, Select, useToast } from "@/shared/ui";
 import Button from "@/shared/ui/Button";
@@ -14,6 +15,8 @@ export function PlaybackTab({ searchQuery }: { searchQuery?: string }) {
   const [mounted, setMounted] = useState(false);
   const { toast } = useToast();
   const autoplaySimilar = usePlayerStore((state) => state.autoplaySimilar);
+  const djMode = usePlayerStore((state) => state.djMode);
+  const setDjMode = usePlayerStore((state) => state.setDjMode);
   const setAutoplaySimilar = usePlayerStore(
     (state) => state.setAutoplaySimilar,
   );
@@ -48,6 +51,15 @@ export function PlaybackTab({ searchQuery }: { searchQuery?: string }) {
 
   return (
     <SettingSection>
+
+      {!isAndroidApp() && (
+        <SettingRow
+          title="DJ mode"
+          description="Two decks with trim, tempo and a crossfader. Desktop only."
+          searchQuery={searchQuery}
+          control={<ToggleSwitch checked={djMode} onChange={setDjMode} />}
+        />
+      )}
 
       <SettingRow
         title={t("settings.autoplay_similar.title")}

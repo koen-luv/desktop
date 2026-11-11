@@ -30,6 +30,7 @@ const EMPTY_STATE: PlayerState = {
   isReverbEnabled: false,
   reverbLevel: 0.35,
   transitionPreset: "auto",
+  djMode: false,
   sleepTimerEndsAtMs: null,
 };
 

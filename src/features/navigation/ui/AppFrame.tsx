@@ -53,7 +53,7 @@ import {
 } from "@/features/library";
 import { useCustomizationStore, getBlockStyle } from "@/features/settings/store/customizationStore";
 import { UpdateModal, UpdateToastBridge } from "@/features/updater";
-import { setBackHandler } from "@/platform";
+import { isAndroidApp, setBackHandler } from "@/platform";
 
 
 // Settings is the heaviest surface in the app (its Storage tab pulls in
@@ -63,6 +63,8 @@ const SettingsModal = lazy(() => import("@/features/settings/ui/SettingsModal"))
 
 // The fullscreen player owns the WebGL (kawarp) background and the lyrics
 // engine, so it only ships when it is first opened.
+const DjSurface = lazy(() => import("@/features/dj/DjSurface"));
+
 const FullscreenPlayer = lazy(() =>
   import("@/features/player/ui/FullscreenPlayer").then((m) => ({ default: m.FullscreenPlayer })),
 );
@@ -113,6 +115,8 @@ export default function AppFrame({ children }: AppFrameProps) {
   });
   const fullscreenPlayerOpen = usePlayerStore((state) => state.fullscreen);
   const setFullscreenPlayerOpen = usePlayerStore((state) => state.setFullscreen);
+  const djMode = usePlayerStore((state) => state.djMode);
+  const setDjMode = usePlayerStore((state) => state.setDjMode);
   const [fullscreenEffectsReady, setFullscreenEffectsReady] = useState(false);
 
   useEffect(() => {
@@ -1148,6 +1152,12 @@ export default function AppFrame({ children }: AppFrameProps) {
         </motion.div>
       )}      </AnimatePresence>
 
+
+      {djMode && !isAndroidApp() && (
+        <Suspense fallback={null}>
+          <DjSurface onClose={() => setDjMode(false)} />
+        </Suspense>
+      )}
 
       <MobileDock searchOpen={searchOpen} onSearchToggle={handleSearchToggle} />
 

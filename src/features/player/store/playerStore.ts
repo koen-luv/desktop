@@ -65,6 +65,8 @@ export interface SessionState {
   isReverbEnabled: boolean;
   reverbLevel: number;
   transitionPreset: TransitionPreset;
+  /** Desktop DJ surface (two decks + crossfader). */
+  djMode: boolean;
   /** Absolute epoch-ms when playback should pause; null = off. Session-only (not persisted). */
   sleepTimerEndsAtMs: number | null;
 }
@@ -122,6 +124,7 @@ export interface PlayerStore extends PlayerState {
   setIsReverbEnabled: (enabled: boolean) => void;
   setReverbLevel: (level: number) => void;
   setTransitionPreset: (value: TransitionPreset) => void;
+  setDjMode: (enabled: boolean) => void;
   setSleepTimer: (endsAtMs: number | null) => void;
   resetSpeedAndPitch: () => void;
   clearQueue: () => void;
@@ -168,6 +171,7 @@ export const usePlayerStore = create<PlayerStore>()(
       isReverbEnabled: false,
       reverbLevel: 0.35,
       transitionPreset: "auto",
+      djMode: false,
       sleepTimerEndsAtMs: null,
 
       dispatch: () => {
@@ -221,6 +225,7 @@ export const usePlayerStore = create<PlayerStore>()(
         set({ reverbLevel: Math.max(0, Math.min(1, reverbLevel)) }),
       setTransitionPreset: (transitionPreset: TransitionPreset) =>
         set({ transitionPreset }),
+      setDjMode: (djMode: boolean) => set({ djMode }),
       setSleepTimer: (sleepTimerEndsAtMs: number | null) =>
         set({ sleepTimerEndsAtMs }),
       resetSpeedAndPitch: () => set({ playbackRate: 1, pitchSemitones: 0 }),
@@ -309,6 +314,9 @@ export const usePlayerStore = create<PlayerStore>()(
           if (!isTransitionPreset(state.transitionPreset)) {
             state.transitionPreset = "off";
           }
+          if (typeof state.djMode !== "boolean") {
+            state.djMode = false;
+          }
         }
       },
       partialize: (state) => ({
@@ -341,6 +349,7 @@ export const usePlayerStore = create<PlayerStore>()(
         isReverbEnabled: state.isReverbEnabled,
         reverbLevel: state.reverbLevel,
         transitionPreset: state.transitionPreset,
+        djMode: state.djMode,
       }),
     },
   ),
