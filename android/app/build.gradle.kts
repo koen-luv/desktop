@@ -20,8 +20,8 @@ android {
         applicationId = "app.neritium.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 19
-        versionName = "0.2.1"
+        versionCode = 20
+        versionName = "0.3.0"
         resourceConfigurations += listOf("en", "es", "ru", "uk")
     }
 
