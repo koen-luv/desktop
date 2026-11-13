@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_CHANNELS, type StemChannel } from "./mix";
 import { formatDeckTime } from "@/features/dj/mixMath";
-import { StemEngine, toLoadedStems } from "./engine";
+import { StemEngine, toLoadedStems, type LoadedStem } from "./engine";
 import {
   StemsUnavailableError,
   isStemSeparationAvailable,
@@ -10,6 +10,7 @@ import {
   type StemName,
 } from "./api";
 import { resolvePlaybackStream } from "@/features/player/engine/playbackSource";
+import { playerRuntime } from "@/features/player/engine/runtime";
 import type { NeritiumElectronApi } from "../../../electron/preload";
 import type { Track } from "@/shared/types";
 import { log } from "@/shared/utils/logger";
@@ -52,6 +53,34 @@ function StemsPanel({ track, onClose }: StemsPanelProps) {
 
   const engine = engineRef.current;
 
+  /** Mounts four stems into the mixer once their sources are known. */
+  const startMixer = useCallback(
+    (loaded: LoadedStem[], note: string | null) => {
+      engine.load(loaded);
+      engine.subscribe((position, duration) => {
+        setPositionMs(position);
+        setDurationMs(duration);
+      });
+      engine.apply(DEFAULT_CHANNELS);
+      setChannels(DEFAULT_CHANNELS);
+      setCacheNote(note);
+      setPhase("ready");
+      setMessage(null);
+    },
+    [engine],
+  );
+
+  /**
+   * Stem playback has its own transport, so the main player is paused while
+   * the panel is open (and stays paused on close — the user chose the mixer).
+   * On Android this graph runs in the WebView, which is foreground-only; the
+   * native service keeps owning normal background playback.
+   */
+  useEffect(() => {
+    if (!track) return;
+    if (playerRuntime?.getCurrentTrackId() === track.id) playerRuntime?.pause();
+  }, [track]);
+
   const prepare = useCallback(async () => {
     if (!track) return;
     setPhase("checking");
@@ -63,22 +92,26 @@ function StemsPanel({ track, onClose }: StemsPanelProps) {
     // disk, so no worker availability check is involved.
     if (bridge?.stemsSeparate) {
       setPhase("working");
-      setMessage("Separating stems — the first run takes a minute or two…");
       try {
+        // Separation is expensive: open the cache before asking Demucs again.
+        const cached = bridge.stemsCached ? await bridge.stemsCached(track.id) : [];
+        if (cached.length >= 2) {
+          startMixer(
+            cached.map((stem) => ({ name: stem.name as StemName, src: stem.path })),
+            "Playing stems cached on disk — no separation needed.",
+          );
+          return;
+        }
+
+        setMessage("Separating stems — the first run takes a minute or two…");
         const stream = await resolvePlaybackStream(track);
         if (!stream.url) throw new Error("No playable stream to separate");
         const result = await bridge.stemsSeparate(track.id, stream.url);
         if (!result.ok) throw new Error(result.error);
-        engine.load(result.stems.map((stem) => ({ name: stem.name as StemName, src: stem.path })));
-        engine.subscribe((position, duration) => {
-          setPositionMs(position);
-          setDurationMs(duration);
-        });
-        engine.apply(DEFAULT_CHANNELS);
-        setChannels(DEFAULT_CHANNELS);
-        setCacheNote(`Cached on disk — replaying this track will not separate again.`);
-        setPhase("ready");
-        setMessage(null);
+        startMixer(
+          result.stems.map((stem) => ({ name: stem.name as StemName, src: stem.path })),
+          "Cached on disk — replaying this track will not separate again.",
+        );
       } catch (error) {
         log("red", "stems", `demucs separation failed: ${String(error)}`);
         setPhase("error");
@@ -123,15 +156,10 @@ function StemsPanel({ track, onClose }: StemsPanelProps) {
         }
       }
 
-      engine.load(toLoadedStems(result.stems, cached));
-      engine.subscribe((position, duration) => {
-        setPositionMs(position);
-        setDurationMs(duration);
-      });
-      engine.apply(DEFAULT_CHANNELS);
-      setChannels(DEFAULT_CHANNELS);
-      setPhase("ready");
-      setMessage(null);
+      startMixer(
+        toLoadedStems(result.stems, cached),
+        cached.length > 0 ? null : "Stems are streamed from the service for this session.",
+      );
     } catch (error) {
       if (error instanceof StemsUnavailableError) {
         setPhase("unavailable");
@@ -142,7 +170,7 @@ function StemsPanel({ track, onClose }: StemsPanelProps) {
       setPhase("error");
       setMessage(error instanceof Error ? error.message : "Stem separation failed.");
     }
-  }, [engine, track]);
+  }, [engine, startMixer, track]);
 
   useEffect(() => {
     void prepare();

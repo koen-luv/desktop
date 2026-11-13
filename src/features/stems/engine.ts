@@ -51,7 +51,9 @@ export class StemEngine {
       const element = new Audio();
       element.src = stem.src;
       element.preload = "auto";
-      element.crossOrigin = "anonymous";
+      // Only remote stems need CORS; asking for it on a file:// source makes
+      // the element refuse to load the cached file.
+      if (/^https?:/i.test(stem.src)) element.crossOrigin = "anonymous";
       const source = context.createMediaElementSource(element);
       const gain = context.createGain();
       gain.gain.value = 1;

@@ -1157,7 +1157,7 @@ export default function AppFrame({ children }: AppFrameProps) {
       )}      </AnimatePresence>
 
 
-      {stemsTrack && !isAndroidApp() && (
+      {stemsTrack && (
         <Suspense fallback={null}>
           <StemsPanel track={stemsTrack} onClose={closeStems} />
         </Suspense>

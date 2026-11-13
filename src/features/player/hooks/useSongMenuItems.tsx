@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import {
   LuRadio,
   LuStepForward,
@@ -58,6 +58,15 @@ export function useSongMenuItems(ctx: SongMenuContext): DropdownMenuItem[] {
   const unlikeMutation = useUnlikeTrack();
 
   const liked = useIsTrackLiked(id);
+  const stemsAvailable = useStemsPanelStore((state) => state.available);
+
+  // Desktop separates through the main process; everywhere else the backend
+  // capability decides whether the menu item is real or a dead button.
+  useEffect(() => {
+    if (id && !window.neritiumElectron?.stemsSeparate) {
+      void useStemsPanelStore.getState().probe();
+    }
+  }, [id]);
 
   const handleLike = useCallback(async () => {
     if (!id) return;
@@ -158,9 +167,9 @@ export function useSongMenuItems(ctx: SongMenuContext): DropdownMenuItem[] {
       }
 
       return [
-        // Desktop-only: Demucs separation runs in the main process and the stems
-        // are cached on disk, so it is offered only where that bridge exists.
-        ...(window.neritiumElectron?.stemsSeparate && id
+        // Offered wherever separation is real: the Electron main process, or a
+        // deployment whose backend has a Demucs service configured.
+        ...(id && (window.neritiumElectron?.stemsSeparate || stemsAvailable === true)
           ? [
               {
                 id: "separate-stems",

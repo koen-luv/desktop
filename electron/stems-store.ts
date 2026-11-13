@@ -1,7 +1,10 @@
 import { app } from "electron";
 import path from "node:path";
 import fs from "node:fs";
+import { pathToFileURL } from "node:url";
 import { ipcMain } from "electron";
+import { execFile, spawn } from "node:child_process";
+import { promisify } from "node:util";
 
 /**
  * Stem cache (main process).
@@ -23,6 +26,15 @@ export interface StemInput {
 export interface CachedStem {
   name: string;
   path: string;
+}
+
+/**
+ * The renderer feeds these paths straight into `HTMLAudioElement.src`, so
+ * they must be URLs. An absolute OS path ("C:\\Users\\...") is parsed as a
+ * relative URL and never loads — which made every cached stem silent.
+ */
+function toRendererStems(stems: CachedStem[]): CachedStem[] {
+  return stems.map((stem) => ({ name: stem.name, path: pathToFileURL(stem.path).href }));
 }
 
 const STEM_NAMES = new Set(["vocals", "drums", "bass", "other"]);
@@ -112,7 +124,7 @@ export function clearStems(trackId?: string): boolean {
 
 export function registerStemCacheIpc(): void {
   ipcMain.handle("stems:cached", (_event, trackId: unknown) =>
-    typeof trackId === "string" ? cachedStems(trackId) : [],
+    typeof trackId === "string" ? toRendererStems(cachedStems(trackId)) : [],
   );
 
   ipcMain.handle("stems:ensure", async (_event, trackId: unknown, stems: unknown) => {
@@ -129,7 +141,7 @@ export function registerStemCacheIpc(): void {
             typeof (stem as StemInput).url === "string",
         ),
       );
-      return { ok: true as const, ...result };
+      return { ok: true as const, ...result, stems: toRendererStems(result.stems) };
     } catch (error) {
       return {
         ok: false as const,
@@ -155,6 +167,147 @@ export function registerStemCacheIpc(): void {
 /** Override with LINER_DEMUCS_ENDPOINT; this is the public demo instance. */
 const DEFAULT_DEMUCS_ENDPOINT = "https://demucs-api-hwbhnojdya-uc.a.run.app";
 const DEMUCS_TIMEOUT_MS = 10 * 60 * 1000;
+const LOCAL_DEMUCS_TIMEOUT_MS = 15 * 60 * 1000;
+const execFileAsync = promisify(execFile);
+
+/**
+ * Local Demucs (the real implementation of stem separation).
+ *
+ * When the `demucs` CLI is installed, separation runs on this machine: the
+ * track is downloaded, split by `htdemucs` into vocals/drums/bass/other, and
+ * the four stems land in the same on-disk cache the mixer already reads. No
+ * account, no service and no upload — the audio never leaves the computer.
+ *
+ * `NERITIUM_DEMUCS_PATH` points at a specific executable (a venv, a wrapper);
+ * otherwise `demucs` is looked up on PATH. A miss is retried after a minute so
+ * installing Demucs while the app is open does not require a restart.
+ */
+let demucsProbe: Promise<string | null> | null = null;
+
+function demucsCandidates(): string[] {
+  const configured = process.env.NERITIUM_DEMUCS_PATH?.trim();
+  return configured ? [configured] : ["demucs"];
+}
+
+async function probeDemucs(): Promise<string | null> {
+  for (const candidate of demucsCandidates()) {
+    try {
+      await execFileAsync(candidate, ["--version"], { timeout: 8_000, windowsHide: true });
+      return candidate;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return null;
+}
+
+/** Path/command of a usable local Demucs, or null when it is not installed. */
+export function findDemucs(): Promise<string | null> {
+  if (!demucsProbe) {
+    demucsProbe = probeDemucs().then((found) => {
+      if (!found) {
+        const retry = setTimeout(() => {
+          demucsProbe = null;
+        }, 60_000);
+        retry.unref?.();
+      }
+      return found;
+    });
+  }
+  return demucsProbe;
+}
+
+async function downloadAudioFile(audioUrl: string, destination: string): Promise<void> {
+  const response = await fetch(audioUrl, {
+    headers: {
+      // The same browser identity the playback path uses; YouTube's CDN
+      // answers a bare Node fetch with 403.
+      "user-agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      accept: "audio/*,*/*;q=0.8",
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Could not fetch the track audio (HTTP ${response.status}).`);
+  }
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.byteLength === 0) throw new Error("The track audio was empty.");
+  fs.writeFileSync(destination, bytes);
+}
+
+function runDemucs(runner: string, input: string, outDir: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(runner, ["-n", "htdemucs", "-o", outDir, input], {
+      windowsHide: true,
+    });
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error("Local Demucs timed out after 15 minutes."));
+    }, LOCAL_DEMUCS_TIMEOUT_MS);
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderr = (stderr + chunk.toString()).slice(-4_000);
+    });
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      reject(new Error(`Could not run demucs: ${error.message}`));
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve();
+      else reject(new Error(`Demucs exited with code ${code}${stderr ? `: ${stderr.trim()}` : ""}`));
+    });
+  });
+}
+
+/**
+ * Separates with the local CLI and copies the four stems into the cache.
+ * Demucs writes `<outDir>/htdemucs/<input name>/<stem>.wav`; any of the four
+ * names it produces is cached, so a model that only finds three stems still
+ * yields a usable mixer.
+ */
+export async function separateWithLocalDemucs(
+  trackId: string,
+  audioUrl: string,
+  runner: string,
+): Promise<CachedStem[]> {
+  if (!/^https?:\/\//i.test(audioUrl)) {
+    throw new Error("A playable audio URL is required for separation.");
+  }
+  const workDir = fs.mkdtempSync(path.join(app.getPath("temp"), "neritium-demucs-"));
+  try {
+    // Keep a real extension: torchaudio/ffmpeg sniffers are unreliable on an
+    // extension-less stream, and Demucs needs to load the file before splitting.
+    const input = path.join(workDir, `input${extensionFor(audioUrl, null)}`);
+    await downloadAudioFile(audioUrl, input);
+    const outDir = path.join(workDir, "out");
+    await runDemucs(runner, input, outDir);
+
+    const modelDir = path.join(outDir, "htdemucs");
+    const targetDir = stemDir(trackId);
+    fs.mkdirSync(targetDir, { recursive: true });
+    let written = 0;
+    if (fs.existsSync(modelDir)) {
+      for (const entry of fs.readdirSync(modelDir)) {
+        const folder = path.join(modelDir, entry);
+        if (!fs.statSync(folder).isDirectory()) continue;
+        for (const file of fs.readdirSync(folder)) {
+          const name = path.parse(file).name;
+          if (!STEM_NAMES.has(name)) continue;
+          fs.copyFileSync(
+            path.join(folder, file),
+            path.join(targetDir, `${name}${path.extname(file)}`),
+          );
+          written += 1;
+        }
+      }
+    }
+    if (written < 2) throw new Error("Demucs produced fewer than two stems.");
+    return cachedStems(trackId);
+  } finally {
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+}
 
 function demucsEndpoint(): string {
   const configured = process.env.LINER_DEMUCS_ENDPOINT?.trim();
@@ -231,17 +384,58 @@ export function registerDemucsIpc(): void {
       if (typeof trackId !== "string" || typeof audioUrl !== "string") {
         return { ok: false as const, error: "A track id and audio URL are required." };
       }
+
+      // A track is separated exactly once: reuse the cache before spending
+      // minutes (local) or a large upload (remote) on it again.
+      const alreadyCached = cachedStems(trackId);
+      if (alreadyCached.length >= 2) {
+        return { ok: true as const, stems: toRendererStems(alreadyCached), cached: true as const };
+      }
+
+      // Local Demucs first: no upload, no service, and it keeps working
+      // offline. The hosted endpoint stays as the fallback for machines that
+      // do not have the CLI installed.
+      const localRunner = await findDemucs();
+      if (localRunner) {
+        try {
+          const stems = await separateWithLocalDemucs(trackId, audioUrl, localRunner);
+          return { ok: true as const, stems: toRendererStems(stems), cached: false as const };
+        } catch (localError) {
+          const message =
+            localError instanceof Error ? localError.message : "Local Demucs failed";
+          // Fall through to the hosted endpoint, but keep the local reason in
+          // case that also fails.
+          try {
+            const stems = await separateWithDemucs(
+              trackId,
+              audioUrl,
+              typeof endpoint === "string" && /^https?:\/\//i.test(endpoint)
+                ? endpoint
+                : undefined,
+            );
+            return { ok: true as const, stems: toRendererStems(stems), cached: false as const };
+          } catch (remoteError) {
+            return {
+              ok: false as const,
+              error: `${message} / hosted separation also failed: ${
+                remoteError instanceof Error ? remoteError.message : String(remoteError)
+              }`,
+            };
+          }
+        }
+      }
+
       try {
         const stems = await separateWithDemucs(
           trackId,
           audioUrl,
           typeof endpoint === "string" && /^https?:\/\//i.test(endpoint) ? endpoint : undefined,
         );
-        return { ok: true as const, stems };
+        return { ok: true as const, stems: toRendererStems(stems), cached: false as const };
       } catch (error) {
         return {
           ok: false as const,
-          error: error instanceof Error ? error.message : "Stem separation failed",
+          error: `${error instanceof Error ? error.message : "Stem separation failed"}. Install Demucs locally (pip install demucs) or set LINER_DEMUCS_ENDPOINT to a compatible service.`,
         };
       }
     },

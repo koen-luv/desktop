@@ -21,20 +21,29 @@ has no model runtime. So the app owns everything except the model.
 - **Worker tests** (`api-worker/src/stems.test.ts`): unavailability, status,
   input validation, forwarding + filtering, too-few-stems, unreachable service.
 
-## Desktop: hosted Demucs API (default)
+## Desktop: local Demucs, then a hosted API
 
 On desktop the separation does **not** go through the Worker. The Electron main
-process does the whole job (`electron/stems-store.ts`):
+process owns the whole job (`electron/stems-store.ts`) and tries, in order:
 
-1. fetch the track audio, base64 it, `POST {endpoint}/predict`
-   `{ "instances": [{ "b64": "…" }] }`
-2. decode the four base64 mp3s from the response (`vocals/drums/bass/other`)
-3. write them to `userData/stems/<trackId>/` and hand the renderer local paths
+1. **Local Demucs CLI** — if `demucs` is on `PATH` (or `NERITIUM_DEMUCS_PATH`
+   points at an executable), the audio is downloaded to a temp dir and split by
+   `demucs -n htdemucs`. The four WAVs are copied into the cache. Nothing is
+   uploaded, and it works offline.
+2. **Hosted Demucs API** — otherwise the audio is base64'd and `POST`ed to
+   `{endpoint}/predict` `{ "instances": [{ "b64": "…" }] }`, whose four base64
+   mp3s are written to the cache. Default endpoint
+   `https://demucs-api-hwbhnojdya-uc.a.run.app`, override with
+   `LINER_DEMUCS_ENDPOINT`.
+3. Either way the stems land in `userData/stems/<trackId>/`, and the renderer
+   receives local paths. Cached stems are reused forever; `stemsClear(trackId)`
+   removes them.
 
-Default endpoint: `https://demucs-api-hwbhnojdya-uc.a.run.app` (override with
-`LINER_DEMUCS_ENDPOINT`). Cached stems are reused forever; `stemsClear(trackId)`
-removes them. The renderer then plays four media elements through one
-AudioContext with per-stem `GainNode`s (mute/solo from `mix.ts`).
+Install the local engine with `pip install demucs` (a GPU is optional; CPU is
+slower but works). The first run downloads the model weights (~80 MB).
+
+The renderer then plays four media elements through one AudioContext with
+per-stem `GainNode`s (mute/solo from `mix.ts`).
 
 Entry point: song menu → **Separate stems (DJ)** (desktop only).
 
@@ -71,16 +80,26 @@ STEMS_SERVICE_URL = "https://stems.example.com"
 STEMS_SERVICE_TOKEN = "…"   # optional
 ```
 
-## Not implemented yet
+## Mixer
 
-The **mixer** — four faders with mute/solo that play in sync with the transport.
-That is deliberately left out of this change because it needs a decision:
+The **mixer** is implemented (`src/features/stems/engine.ts` + `StemsPanel.tsx`):
+four `HTMLAudioElement`s, one `MediaElementAudioSourceNode` and one `GainNode`
+each, all fed from a single `AudioContext`. Faders, mute and solo are real gain
+changes (`mix.ts`), and stems are re-seeked only when drift passes 120 ms.
 
-- **Desktop**: Web Audio (`MediaElementSource` per stem into `GainNode`s) — works
-  today, the runtime already owns an AudioContext.
-- **Android**: ExoPlayer holds one player per stem (four players, one clock) or a
-  native mixing stage; heavier, and the foreground service has to own it.
+- **Cache first**: the panel asks the main process for cached stems before it
+  asks Demucs, so opening the mixer twice never separates twice. Cached files
+  are returned to the renderer as `file://` URLs (an OS path is not a URL and
+  silently failed to load).
+- **Availability**: the menu entry appears when the desktop bridge exists or
+  when `/v1/stems/status` reports a configured service, so the feature is also
+  offered on the web and Android builds that deploy one.
+- **Transport**: opening the mixer pauses the normal player for that track (two
+  transports must not play at once). Closing it stops the stems; the main player
+  stays paused.
+- **Android**: the mixer graph runs in the WebView, so it is a foreground tool;
+  background playback remains the native Media3 service's job.
 
-Say which target to build first and the mixer follows on top of this contract.
-Caching (separated stems are expensive — one separation per track should persist
-in IndexedDB / the audio cache) belongs in the same change.
+Separation is still expensive and happens once per track. The desktop cache is
+`userData/stems/<trackId>/`; the worker path streams service URLs for the
+session when no on-disk cache exists.
