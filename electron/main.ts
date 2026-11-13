@@ -36,6 +36,7 @@ import { TouchBarManager } from "./touchbar.js";
 import { registerAuthSessionIpc } from "./auth-session-ipc.js";
 import { connectSpotifyAccount, refreshSpotifyTokens } from "./spotify-oauth.js";
 import { registerDemucsIpc, registerStemCacheIpc } from "./stems-store.js";
+import { registerYtDlpIpc } from "./ytdlp.js";
 import { ThumbarController } from "./thumbar.js";
 import { OverlayManager } from "./overlay.js";
 import { BundleManager } from "./bundle-manager.js";
@@ -1327,6 +1328,7 @@ if (!gotTheLock) {
 
     registerStemCacheIpc();
     registerDemucsIpc();
+    registerYtDlpIpc();
 
     const authSessions = registerAuthSessionIpc();
     overlayManager?.bindAuthSource(

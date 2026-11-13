@@ -1,6 +1,8 @@
 import type { Track } from "@/shared/types";
 import { api } from "@/shared/api";
 import { extractAudioStream } from "@/shared/api/innertubeClient";
+import { toVideoId } from "@/shared/media/innertube";
+import { isYtDlpAvailable, resolveYtDlpStream } from "@/shared/media/ytdlp";
 import { isCodecSupported, canExecuteDirectInnertubePlans } from "./codecSupport";
 import {
   classifySourceError,
@@ -174,6 +176,10 @@ export const innertubeClientProvider: SourceProvider = {
 
   supports(track: Track): boolean {
     if (!track?.id) return false;
+    // Extraction needs a real YouTube id. SoundCloud (`sc:…`) and local-file
+    // tracks would otherwise burn an extraction attempt (and its timeout)
+    // before falling through to a provider that can actually serve them.
+    if (!toVideoId(track.id)) return false;
     // Only where the renderer may call Innertube directly (Electron / Android
     // native bridge); a plain browser would be blocked by CORS.
     return canExecuteDirectInnertubePlans();
@@ -206,10 +212,55 @@ export const innertubeClientProvider: SourceProvider = {
   },
 };
 
+/**
+ * Locally installed yt-dlp (desktop only).
+ *
+ * Runs after Innertube and the Neritium session because spawning a process is
+ * slower, but before the derivative direct/proxy transports: it is an
+ * independent extractor that keeps working when YouTube refuses our player
+ * requests (bot check, stale client, missing PO token).
+ */
+export const ytDlpProvider: SourceProvider = {
+  id: "ytdlp",
+  priority: 95,
+  label: "yt-dlp (local)",
+
+  supports(track: Track): boolean {
+    return Boolean(track?.id) && Boolean(toVideoId(track.id)) && isYtDlpAvailable();
+  },
+
+  matchConfidence(): number {
+    return 1;
+  },
+
+  async resolve(ctx: ResolveContext): Promise<ResolvedStream> {
+    const videoId = toVideoId(ctx.track.id);
+    if (!videoId) {
+      throw new SourceError("unsupported", "Not a YouTube track", "ytdlp");
+    }
+    const stream = await resolveYtDlpStream(videoId, ctx.signal);
+    if (!stream) {
+      throw new SourceError("unavailable", "yt-dlp could not resolve this track", "ytdlp");
+    }
+    return {
+      url: stream.url,
+      mimeType: stream.mimeType,
+      codec: stream.codec ?? "aac",
+      bitrate: stream.bitrate ?? 0,
+      expiresAtMs: stream.expiresAtMs,
+      providerId: "ytdlp",
+      providerTrackId: ctx.track.id,
+      quality: ctx.quality,
+      resolvedAt: Date.now(),
+    };
+  },
+};
+
 /** Default ordered provider list. Ordering is by priority (descending). */
 export const defaultSourceProviders: SourceProvider[] = [
   innertubeClientProvider,
   neritiumAutoProvider,
+  ytDlpProvider,
   neritiumDirectAacProvider,
   neritiumDirectOpusProvider,
   neritiumProxyAacProvider,

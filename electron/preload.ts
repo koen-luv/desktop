@@ -83,6 +83,20 @@ export interface NeritiumElectronApi {
     | { ok: false; error: string }
   >;
   stemsClear?: (trackId?: string) => Promise<boolean>;
+  /** Desktop-only: resolves a track through a locally installed yt-dlp. */
+  ytdlpResolve?: (videoId: string) => Promise<
+    | {
+        ok: true;
+        stream: {
+          url: string;
+          mimeType: string;
+          codec?: string;
+          bitrate?: number;
+          expiresAtMs: number | null;
+        };
+      }
+    | { ok: false; error: string }
+  >;
   /** Separates through Demucs in the main process and caches the four stems. */
   stemsSeparate?: (
     trackId: string,
@@ -226,6 +240,7 @@ const api: NeritiumElectronApi = {
   stemsClear: (trackId) => ipcRenderer.invoke("stems:clear", trackId),
   stemsSeparate: (trackId, audioUrl, endpoint) =>
     ipcRenderer.invoke("stems:separate", trackId, audioUrl, endpoint),
+  ytdlpResolve: (videoId) => ipcRenderer.invoke("ytdlp:resolve", videoId),
   authSession: {
     get: () => ipcRenderer.sendSync("auth:get-session") ?? null,
     set: (next) => ipcRenderer.invoke("auth:set-session", next),

@@ -15,6 +15,7 @@ import {
   type PlaybackStream,
 } from "./playbackStream";
 import { findYoutubeStandIn } from "./youtubeStandIn";
+import { resolveYtDlpStream } from "@/shared/media/ytdlp";
 import type { AudioQuality } from "../store/playerStore";
 
 export type { BufferedPlaybackStream, PlayableTrack, PlaybackStream, UrlPlaybackStream } from "./playbackStream";
@@ -139,7 +140,24 @@ async function resolveYoutubeTrack(
       throw new WebPlaybackUnsupportedError(track);
     }
   }
-  return fromInnertubeStream(await resolveDirectAudioStream(track.id, { signal }));
+  try {
+    return fromInnertubeStream(await resolveDirectAudioStream(track.id, { signal }));
+  } catch (error) {
+    if (isAbortError(error, signal)) throw error;
+    // Innertube can be refused (bot check / missing PO token) while a locally
+    // installed yt-dlp still resolves the same video. It is the last resort
+    // because spawning a process is slower than an in-renderer request.
+    const ytDlp = await resolveYtDlpStream(videoId, signal);
+    if (!ytDlp) throw error;
+    log("cyan", "playback", `playing yt-dlp audio for "${track.title}"`);
+    return {
+      url: ytDlp.url,
+      mimeType: ytDlp.mimeType,
+      codec: ytDlp.codec ?? "aac",
+      bitrate: ytDlp.bitrate ?? 0,
+      expiresAtMs: ytDlp.expiresAtMs,
+    };
+  }
 }
 
 export async function resolvePlaybackStream(
