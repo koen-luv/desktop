@@ -27,8 +27,10 @@ export function resolvePlaybackStream(
   signal?: AbortSignal,
   purpose: ResolvePurpose = "playback",
   quality: AudioQuality = "high",
+  /** Bypass the cached signed URL and ask the providers again (error recovery). */
+  forceRefresh = false,
 ): Promise<ResolvedStream> {
-  return resolvePlayback({ track, purpose, signal, quality }).then(
+  return resolvePlayback({ track, purpose, signal, quality, forceRefresh }).then(
     (resolution) => resolution.stream,
   );
 }

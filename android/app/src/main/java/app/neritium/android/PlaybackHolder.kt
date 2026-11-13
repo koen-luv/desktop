@@ -27,6 +27,12 @@ object PlaybackHolder {
     @Volatile var service: PlaybackService? = null
         internal set
 
+    /** Application context, kept so a paused session can revive its service. */
+    @Volatile private var appContext: Context? = null
+    /** Playback position at the moment the service went away (idle stop). */
+    @Volatile private var lastKnownPositionMs = 0L
+    /** Payload prepared on the transition player, used as history after promotion. */
+    private var transitionPayload: String? = null
     private var pendingLoad: String? = null
     // Pre-resolved upcoming queue, pushed by JS while the app is in the
     // foreground. Native owns advancement from here so queue walking,
@@ -55,6 +61,8 @@ object PlaybackHolder {
 
     @Volatile private var currentTrackId: String? = null
     @Volatile private var loadedDurationMs = 0L
+    /** Track that already consumed its one automatic reload after a media error. */
+    @Volatile private var errorRetryTrackId: String? = null
     @Volatile private var lastError: String? = null
     @Volatile private var lastState = "{}"
     @Volatile private var usingCache = false
@@ -92,7 +100,10 @@ object PlaybackHolder {
                 if (crossfadeTrackId == null) {
                     val id = currentTrackId
                     if (id != null) {
-                        val next = consumeNextLocked() ?: peekNextLocked()
+                        // Peek first: consuming twice here dropped the song
+                        // *after* the one that had to play, so every native
+                        // auto-advance skipped a track.
+                        val next = peekNextLocked()
                         if (next != null && playWhenReadyIntent && queueAutoAdvance) {
                             consumeNextLocked()
                             previousTrackPayload = null
@@ -143,12 +154,34 @@ object PlaybackHolder {
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            if (isPlaying) consecutiveErrors = 0
+            if (isPlaying) {
+                consecutiveErrors = 0
+                errorRetryTrackId = null
+            }
             updateState()
         }
 
         override fun onPlayerError(error: PlaybackException) {
             val failedTrackId = currentTrackId
+
+            // One transparent retry of the same item before declaring the track
+            // unavailable. Most player errors are a CDN hiccup (expired edge,
+            // dropped connection), not a dead song — surfacing them as
+            // "track unavailable" made healthy tracks look broken.
+            val payload = currentPayload
+            if (playWhenReadyIntent && failedTrackId != null && payload != null && errorRetryTrackId != failedTrackId) {
+                errorRetryTrackId = failedTrackId
+                val resumeAt = lastKnownPositionMs
+                // Do not publish an "error" state for this attempt: the JS
+                // runtime would see it and start a competing re-resolve.
+                main.post {
+                    if (currentTrackId != failedTrackId || !playWhenReadyIntent) return@post
+                    lastError = null
+                    applyLoad(withStartMs(payload, resumeAt))
+                }
+                return
+            }
+
             lastError = describePlaybackError(error)
             consecutiveErrors += 1
             // Skip unavailable / undecodable tracks without JS. Consecutive
@@ -181,6 +214,7 @@ object PlaybackHolder {
     fun ensureService(context: Context) {
         if (service != null) return
         val app = context.applicationContext
+        appContext = app
         val intent = Intent(app, PlaybackService::class.java)
         try {
             app.startForegroundService(
@@ -200,6 +234,7 @@ object PlaybackHolder {
         session: MediaSession,
         forwarding: NeritiumForwardingPlayer,
     ) {
+        appContext = service.applicationContext
         this.service = service
         this.player = player
         this.session = session
@@ -220,6 +255,7 @@ object PlaybackHolder {
 
     internal fun detach(player: ExoPlayer) {
         if (this.player === player) {
+            lastKnownPositionMs = player.currentPosition.coerceAtLeast(0L)
             cancelCrossfadeLocked()
             this.player = null
             this.session = null
@@ -268,6 +304,18 @@ object PlaybackHolder {
 
     fun resume() {
         playWhenReadyIntent = true
+        if (player == null) {
+            // The service may have stopped itself while paused/idle. Bring it
+            // back and re-attach the current track at the position it had, so
+            // a background resume never becomes a silent no-op.
+            val context = appContext
+            val payload = currentPayload
+            if (context != null && payload != null) {
+                pendingLoad = withStartMs(payload, lastKnownPositionMs)
+                ensureService(context)
+                return
+            }
+        }
         runOnPlayer { it.play() }
     }
 
@@ -350,7 +398,12 @@ object PlaybackHolder {
         }
 
     fun skipToNext() {
-        val next = consumeNextLocked()
+        var next = consumeNextLocked()
+        if (next == null && repeatMode == "all") {
+            // Native walks the queue without JS; at the end of a repeat-all
+            // queue it must wrap instead of asking a frozen WebView.
+            next = loopFirstPayload
+        }
         if (next != null) {
             previousTrackPayload = null
             runOnPlayer {
@@ -372,9 +425,20 @@ object PlaybackHolder {
                     if (history.isNotEmpty()) history.removeLast() else null
                 } ?: previousTrackPayload
                 if (previous != null) {
+                    // The song we are leaving is what a later auto-advance must
+                    // play next. Clearing the forward queue here (the old
+                    // behaviour) left native with nothing to advance to, so
+                    // autoplay died after every "previous" once the WebView
+                    // was frozen. Put it back at the head instead.
+                    val leaving = currentPayload
                     previousTrackPayload = null
-                    synchronized(queueLock) { nextQueue.clear() }
                     applyLoad(previous)
+                    if (leaving != null) {
+                        synchronized(queueLock) {
+                            nextQueue.addFirst(leaving)
+                            while (nextQueue.size > 32) nextQueue.removeLast()
+                        }
+                    }
                     emitTrackChange("playbackPreviousAdvanced", previous)
                 } else {
                     current.seekTo(0L)
@@ -488,21 +552,31 @@ object PlaybackHolder {
         reverbSessionId = C.AUDIO_SESSION_ID_UNSET
     }
 
-    fun stop() = runOnPlayer {
-        cancelCrossfadeLocked()
+    fun stop() {
         playWhenReadyIntent = false
-        synchronized(queueLock) { nextQueue.clear(); history.clear() }
-        queueAutoAdvance = false
-        previousTrackPayload = null
-        currentPayload = null
-        it.volume = volume
-        it.stop()
-        it.clearMediaItems()
-        currentTrackId = null
-        loadedDurationMs = 0L
-        lastError = null
-        usingCache = false
-        updateState()
+        main.post {
+            cancelCrossfadeLocked()
+            synchronized(queueLock) { nextQueue.clear(); history.clear() }
+            queueAutoAdvance = false
+            previousTrackPayload = null
+            transitionPayload = null
+            currentPayload = null
+            pendingLoad = null
+            player?.let {
+                it.volume = volume
+                it.stop()
+                it.clearMediaItems()
+            }
+            currentTrackId = null
+            loadedDurationMs = 0L
+            lastKnownPositionMs = 0L
+            lastError = null
+            usingCache = false
+            updateState()
+            // A stopped player has nothing to keep alive: dropping the
+            // foreground service also removes its notification.
+            service?.stopSelf()
+        }
     }
 
     fun setSleepAt(deadlineEpochMs: Long) {
@@ -594,6 +668,7 @@ object PlaybackHolder {
                     .apply { if (resolvedMime != null) setMimeType(resolvedMime) }
                     .build()
 
+                transitionPayload = payloadJson
                 val transition = svc.buildCrossfadePlayer()
                 transition.volume = 0f
                 transition.setMediaItem(item, payload.optLong("startMs", 0L).coerceAtLeast(0L))
@@ -681,7 +756,9 @@ object PlaybackHolder {
         crossfadeRunnable?.let { main.removeCallbacks(it) }
         val tick = Runnable { runRampTick(epoch) }
         crossfadeRunnable = tick
-        main.postDelayed(tick, 16L)
+        // 30 fps is indistinguishable for a volume/EQ ramp and costs roughly
+        // half the CPU of the old 60 fps timer.
+        main.postDelayed(tick, 33L)
     }
 
     private fun runRampTick(epoch: Int) {
@@ -781,9 +858,29 @@ object PlaybackHolder {
         transition.addListener(playerListener)
         player = transition
         currentTrackId = promotedId ?: currentTrackId
+        // Promotion bypasses applyLoad, so the outgoing song has to be recorded
+        // here or Previous has no history to walk after a crossfade.
+        val outgoing = currentPayload
+        val outgoingId = try {
+            outgoing?.let { JSONObject(it).optString("trackId") }
+        } catch (_: Exception) {
+            null
+        }
+        if (outgoing != null && outgoingId != promotedId) {
+            synchronized(queueLock) {
+                history.addLast(outgoing)
+                while (history.size > 50) history.removeFirst()
+            }
+        }
+        // The promoted song is now the one playing, so it must become the
+        // current payload: otherwise the next load records the outgoing song
+        // as history and Previous replays the wrong track.
+        transitionPayload?.let { currentPayload = it }
+        transitionPayload = null
         val duration = transition.duration
         if (duration > 0 && duration != C.TIME_UNSET) loadedDurationMs = duration
         lastError = null
+        errorRetryTrackId = null
 
         // Hand the session (notification, lock screen, other controllers) to
         // the promoted player through a fresh command-wiring wrapper.
@@ -812,6 +909,7 @@ object PlaybackHolder {
         crossfadeEpoch += 1
         crossfadeRunnable?.let { main.removeCallbacks(it) }
         crossfadeRunnable = null
+        transitionPayload = null
         val cancelledId = crossfadeTrackId
         crossfadeTrackId = null
         // A cancelled blend may have left the outgoing player mid-ramp.
@@ -876,6 +974,7 @@ object PlaybackHolder {
 
             currentPayload = json
             currentTrackId = trackId
+            lastKnownPositionMs = payload.optLong("startMs", 0L).coerceAtLeast(0L)
             loadedDurationMs = payload.optLong("durationMs", 0L)
             lastError = null
             usingCache = cached != null
@@ -888,6 +987,13 @@ object PlaybackHolder {
             updateState()
             NativeEvents.emit("playbackError", stateJson())
         }
+    }
+
+    /** Copy of a load payload with a new start position (service revival). */
+    private fun withStartMs(payloadJson: String, startMs: Long): String = try {
+        JSONObject(payloadJson).put("startMs", startMs.coerceAtLeast(0L)).toString()
+    } catch (_: Exception) {
+        payloadJson
     }
 
     private fun emitTrackChange(event: String, payload: String) {
@@ -926,14 +1032,21 @@ object PlaybackHolder {
         if (ticker != null) return
         val runnable = object : Runnable {
             override fun run() {
-                maybeStartNativeCrossfade()
-                updateState()
                 val p = player
+                val active = p?.isPlaying == true || transitionPlayer != null
+                if (active) maybeStartNativeCrossfade()
+                updateState()
                 if (equalizerEnabled && p != null && mainEqualizer == null) {
                     equalizerFor(p, isMain = true)
                 }
                 if (p != null && reverbLevel > 0.01f && (reverb == null || reverbSessionId != p.audioSessionId)) ensureReverb(p)
-                main.postDelayed(this, 250L)
+                // Battery: 2 Hz only while audio is actually moving (fades,
+                // crossfade watchdog, position); 1 Hz while paused/idle is
+                // enough to reconcile state and the sleep deadline. The
+                // crossfade watchdog arms up to ~12 s ahead, so 2 Hz cannot
+                // miss its window, and this halves the main-thread wakeups
+                // that dominated the background drain.
+                main.postDelayed(this, if (active) 500L else 1_000L)
             }
         }
         ticker = runnable
@@ -956,10 +1069,12 @@ object PlaybackHolder {
             else -> "paused"
         }
         val duration = p.duration.takeIf { it > 0 && it != C.TIME_UNSET } ?: loadedDurationMs
+        val positionMs = p.currentPosition.coerceAtLeast(0L)
+        lastKnownPositionMs = positionMs
         val state = JSONObject()
             .put("status", status)
             .put("trackId", currentTrackId ?: JSONObject.NULL)
-            .put("positionMs", p.currentPosition.coerceAtLeast(0L))
+            .put("positionMs", positionMs)
             .put("durationMs", duration)
             .put("bufferedMs", p.bufferedPosition)
             .put("usingCache", usingCache)

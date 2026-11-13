@@ -408,7 +408,16 @@ class PlaybackService : MediaLibraryService() {
 
     fun refreshNotification() {
         val current = player ?: return
-        if (current.mediaItemCount == 0) return
+        if (current.mediaItemCount == 0) {
+            // Stop (sign-out, task removal) clears the item; leaving the
+            // foreground notification behind made the app look alive.
+            try {
+                getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } catch (_: Exception) {
+            }
+            return
+        }
         try {
             val manager = getSystemService(NotificationManager::class.java)
             manager.notify(NOTIFICATION_ID, buildNotification())
@@ -524,12 +533,30 @@ class PlaybackService : MediaLibraryService() {
         else if (command == "previous") PlaybackHolder.skipToPrevious()
     }
 
+    /**
+     * Releases the service only when it truly has nothing to keep alive.
+     *
+     * This used to fire 25 s after any start command whenever the player was
+     * not playing — so pausing in the background tore the player down, the
+     * notification vanished, and a later resume had no service to talk to
+     * (next/previous/seek/autoplay appeared dead). A paused track now keeps
+     * the session alive; it is released when playback is stopped or empty.
+     */
     private fun scheduleIdleStop() {
         idleCheck?.let { handler.removeCallbacks(it) }
-        val check = Runnable {
-            val current = player
-            if (current == null || (!current.isPlaying && current.playbackState != Player.STATE_BUFFERING)) {
-                stopSelf()
+        val check = object : Runnable {
+            override fun run() {
+                val current = player
+                val idle = current == null ||
+                    current.mediaItemCount == 0 ||
+                    current.playbackState == Player.STATE_IDLE ||
+                    current.playbackState == Player.STATE_ENDED
+                if (idle && !PlaybackHolder.isPlaying()) {
+                    idleCheck = null
+                    stopSelf()
+                } else {
+                    handler.postDelayed(this, IDLE_STOP_DELAY_MS)
+                }
             }
         }
         idleCheck = check
@@ -537,14 +564,21 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        if (player?.playWhenReady != true) {
-            stopSelf()
-        }
+        // Closing the app from Recents means the user is done with playback.
+        // Leaving the foreground service running kept the last song playing to
+        // its end (and showed an orphaned notification); stop it explicitly.
+        PlaybackHolder.stop()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
         super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
         idleCheck?.let { handler.removeCallbacks(it) }
+        try {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } catch (_: Exception) {
+        }
         idleCheck = null
         val currentPlayer = player
         if (currentPlayer != null) {

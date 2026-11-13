@@ -10,16 +10,20 @@ import androidx.media3.common.Player
  * One instance wraps whichever ExoPlayer is currently main: the crossfade
  * engine builds a fresh wrapper for the promoted transition player and hands
  * it to the session with MediaSession.setPlayer().
+ *
+ * The command set must be computed live. It used to be captured once in the
+ * constructor, before any media item existed — the session therefore kept
+ * advertising the empty-player commands (no seek), and seek/next/previous from
+ * the lock screen and Bluetooth controls silently did nothing.
  */
 class NeritiumForwardingPlayer(player: Player) : ForwardingPlayer(player) {
-    private val extendedCommands: Player.Commands = super.getAvailableCommands().buildUpon()
+    override fun getAvailableCommands(): Player.Commands = super.getAvailableCommands().buildUpon()
         .add(Player.COMMAND_SEEK_TO_NEXT)
         .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
         .add(Player.COMMAND_SEEK_TO_PREVIOUS)
         .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+        .add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
         .build()
-
-    override fun getAvailableCommands(): Player.Commands = extendedCommands
 
     override fun hasNextMediaItem(): Boolean = true
 

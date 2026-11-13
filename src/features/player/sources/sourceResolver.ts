@@ -221,24 +221,30 @@ async function verifyRecordingIdentity(
   if (confidence >= MIN_AUTO_MATCH_CONFIDENCE) return;
 
   // Provider flagged uncertainty — score the actual recording we got back.
+  let candidate;
   try {
     const { api } = await import("@/shared/api");
-    const candidate = await api.getTrack(stream.providerTrackId);
-    const score = scoreRecordingMatch(track, candidate);
-    if (score.confidence >= MIN_AUTO_MATCH_CONFIDENCE) return;
-    throw new SourceError(
-      "unavailable",
-      `Source returned a different recording (${score.reasons.join("; ") || "low match"})`,
-      provider.id,
-    );
+    candidate = await api.getTrack(stream.providerTrackId);
   } catch (err) {
-    if (err instanceof SourceError) throw err;
-    throw new SourceError(
-      "unavailable",
-      "Source returned a different recording that could not be verified",
-      provider.id,
+    // A failed *metadata lookup* is not evidence that the stream is the wrong
+    // recording. Treating it as one marked perfectly good tracks unavailable
+    // whenever the catalog request was slow/offline, so accept the stream the
+    // provider already resolved and keep the failure in the log.
+    log(
+      "yellow",
+      "sources",
+      `could not verify recording identity for ${provider.id} (${err instanceof Error ? err.message : String(err)}); playing the resolved stream`,
     );
+    return;
   }
+
+  const score = scoreRecordingMatch(track, candidate);
+  if (score.confidence >= MIN_AUTO_MATCH_CONFIDENCE) return;
+  throw new SourceError(
+    "unavailable",
+    `Source returned a different recording (${score.reasons.join("; ") || "low match"})`,
+    provider.id,
+  );
 }
 
 async function resolveWithProviders(

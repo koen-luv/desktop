@@ -22,7 +22,7 @@ import {
 const AUTO_CACHE_AUDIO = false;
 /** Tracks ahead to resolve while the app is open, so native can keep going
  *  (skip errors, crossfade, radio/autoplay) with the WebView frozen. */
-const PRELOAD_WINDOW = 8;
+const PRELOAD_WINDOW = 4;
 
 interface NativeAudioState {
   ok?: boolean;
@@ -73,6 +73,13 @@ export class AndroidPlayerRuntime {
   private pollIntervalMs = 150;
   private static readonly POLL_ACTIVE_MS = 150;
   private static readonly POLL_IDLE_MS = 1000;
+  /**
+   * Hidden WebView: native owns crossfade/queue advancement, so the renderer
+   * only needs an occasional reconciliation. Cutting 6.7 polls/s down to 0.5
+   * is most of the background battery cost of this runtime.
+   */
+  private static readonly POLL_HIDDEN_MS = 2000;
+  private errorRetryTrackId: string | null = null;
   private unsubscribe: (() => void) | null = null;
   private sleepUnsubscribe: (() => void) | null = null;
   private endedTrackId: string | null = null;
@@ -224,7 +231,22 @@ export class AndroidPlayerRuntime {
     this.syncCrossfadeFlag();
     this.reconcileWithNative();
     this.pollTimer = setInterval(() => this.poll(), this.pollIntervalMs);
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", () => {
+        const hidden = document.visibilityState === "hidden";
+        this.setPollCadence(hidden ? AndroidPlayerRuntime.POLL_HIDDEN_MS : this.activePollMs());
+        if (!hidden) this.poll();
+      });
+    }
+
     log("green", "boot", "android native player runtime initialized");
+  }
+
+  private activePollMs(): number {
+    return this.readState()?.status === "playing"
+      ? AndroidPlayerRuntime.POLL_ACTIVE_MS
+      : AndroidPlayerRuntime.POLL_IDLE_MS;
   }
 
   public getCurrentTrackId(): string | null {
@@ -636,18 +658,33 @@ export class AndroidPlayerRuntime {
     const resolveOne = async (t: Track): Promise<ResolvedPlaybackStream | null> => {
       const cached = this.preloaded.get(t.id);
       if (cached && (cached.stream.expiresAtMs === null || Date.now() < cached.stream.expiresAtMs - 15_000)) return cached.stream;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 12_000);
+      const attempt = async (forceRefresh: boolean): Promise<ResolvedPlaybackStream> => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 12_000);
+        try {
+          return await resolvePlaybackStream(t, controller.signal, "playback", quality, forceRefresh);
+        } finally {
+          clearTimeout(timeout);
+        }
+      };
       try {
-        const stream = await resolvePlaybackStream(t, controller.signal, "playback", quality);
+        let stream: ResolvedPlaybackStream;
+        try {
+          stream = await attempt(false);
+        } catch (err) {
+          // One forced re-resolve: a signed URL that expired between preload
+          // and playback is the common failure, not a dead track — and with
+          // the app in the background there is no second chance to fill this
+          // slot, which used to leave native's queue empty.
+          log("yellow", "preload", `retrying "${t.title}" with a fresh stream: ${err instanceof Error ? err.message : String(err)}`);
+          stream = await attempt(true);
+        }
         if (stream.expiresAtMs !== null && Date.now() >= stream.expiresAtMs - 15_000) return null;
         this.preloaded.set(t.id, { stream, at: Date.now() });
         return stream;
       } catch (err) {
         log("yellow", "preload", `next stream resolution failed for "${t.title}": ${err instanceof Error ? err.message : String(err)}`);
         return null;
-      } finally {
-        clearTimeout(timeout);
       }
     };
     // Immediate next first (must land in native ASAP for skip latency),
@@ -684,7 +721,7 @@ export class AndroidPlayerRuntime {
     log("cyan", "preload", `resolved ${payloads.length} upcoming stream(s), first: "${track.title}"`);
   }
 
-  public async loadAndPlay(track: Track, startPositionMs = 0): Promise<void> {
+  public async loadAndPlay(track: Track, startPositionMs = 0, forceRefresh = false): Promise<void> {
     // Start synchronously from the playback gesture so iOS can grant the
     // background media assertion before stream resolution awaits network I/O.
     this.startRendererKeepAlive();
@@ -726,6 +763,7 @@ export class AndroidPlayerRuntime {
 
     if (this.currentTrackId !== track.id) {
       this.erroredTrackId = null;
+      this.errorRetryTrackId = null;
     }
     this.currentTrackId = track.id;
     this.endedTrackId = null;
@@ -751,16 +789,30 @@ export class AndroidPlayerRuntime {
     try {
       const cached = this.preloaded.get(track.id);
       let stream: ResolvedPlaybackStream;
-      if (cached && (cached.stream.expiresAtMs === null || Date.now() < cached.stream.expiresAtMs - 15_000)) {
+      if (!forceRefresh && cached && (cached.stream.expiresAtMs === null || Date.now() < cached.stream.expiresAtMs - 15_000)) {
         stream = cached.stream;
         log("cyan", "playback", `using pre-resolved stream for "${track.title}"`);
       } else {
-        stream = await resolvePlaybackStream(
-          track,
-          controller.signal,
-          "playback",
-          usePlayerStore.getState().audioQuality,
-        );
+        const loadStream = (refresh: boolean) =>
+          resolvePlaybackStream(
+            track,
+            controller.signal,
+            "playback",
+            usePlayerStore.getState().audioQuality,
+            refresh,
+          );
+        try {
+          stream = await loadStream(forceRefresh);
+        } catch (resolveError) {
+          if (controller.signal.aborted) throw resolveError;
+          log(
+            "yellow",
+            "playback",
+            `stream resolve failed for "${track.title}", retrying fresh: ${resolveError instanceof Error ? resolveError.message : String(resolveError)}`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          stream = await loadStream(true);
+        }
       }
       this.preloaded.delete(track.id);
 
@@ -980,6 +1032,22 @@ export class AndroidPlayerRuntime {
         // an error when native is stuck on this track.
         if (this.erroredTrackId !== state.trackId) {
           this.erroredTrackId = state.trackId;
+          const failed = store.queue.find((t) => t.id === state.trackId) ?? store.currentTrack;
+          // One forced re-resolve before showing "track unavailable": player
+          // errors are usually an expired/blocked CDN URL, and the same song
+          // plays fine with a freshly signed one.
+          if (
+            failed &&
+            failed.id === state.trackId &&
+            this.errorRetryTrackId !== state.trackId &&
+            store.status !== "paused"
+          ) {
+            this.errorRetryTrackId = state.trackId;
+            this.erroredTrackId = null;
+            log("yellow", "playback", `retrying "${failed.title}" with a fresh stream after player error`);
+            void this.loadAndPlay(failed, state.positionMs ?? store.positionMs, true);
+            break;
+          }
           store.setStatus("error", message);
           this.onError?.({ trackId: state.trackId, message });
         }
@@ -990,9 +1058,11 @@ export class AndroidPlayerRuntime {
     }
 
     this.setPollCadence(
-      state.status === "playing"
-        ? AndroidPlayerRuntime.POLL_ACTIVE_MS
-        : AndroidPlayerRuntime.POLL_IDLE_MS,
+      typeof document !== "undefined" && document.visibilityState === "hidden"
+        ? AndroidPlayerRuntime.POLL_HIDDEN_MS
+        : state.status === "playing"
+          ? AndroidPlayerRuntime.POLL_ACTIVE_MS
+          : AndroidPlayerRuntime.POLL_IDLE_MS,
     );
   }
 

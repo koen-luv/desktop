@@ -514,8 +514,8 @@ export class PlayerRuntime {
       ) {
         this.recoveryAttempts++;
         this.recoveryHoldUntilMs = posMs + RECOVERY_HOLD_MS;
-        log("yellow", "playback", `audio error encountered â€” recovering via cache/stream at ${posMs}ms`);
-        void this.loadAndPlay(currentTrack, posMs, true);
+        log("yellow", "playback", `audio error encountered — recovering with a fresh stream at ${posMs}ms`);
+        void this.loadAndPlay(currentTrack, posMs, true, true);
         return;
       }
 
@@ -1075,6 +1075,8 @@ export class PlayerRuntime {
     track: Track,
     startPositionMs: number = 0,
     bypassCache: boolean = false,
+    /** Ask providers for a new signed URL instead of reusing the cached one. */
+    forceRefresh: boolean = false,
   ) {
     if (this.adoptTrackId === track.id) {
       // Queue advance after a completed crossfade: the promoted element is
@@ -1136,7 +1138,8 @@ export class PlayerRuntime {
     this.pauseForTransition();
 
     try {
-      const cachedAudio = bypassCache ? null : await neritiumDb.getAudio(track.id);
+      const cachedAudio =
+        bypassCache || forceRefresh ? null : await neritiumDb.getAudio(track.id);
       if (epoch !== this.loadEpoch || controller.signal.aborted) {
         return;
       }
@@ -1207,11 +1210,27 @@ export class PlayerRuntime {
         return;
       }
 
-      const stream = await resolvePlaybackStream(
-        track,
-        controller.signal,
-        usePlayerStore.getState().audioQuality,
-      );
+      // This resolver is stateless (no URL cache): every call mints a fresh
+      // signed stream, which is exactly what a retry after an error needs.
+      const loadStream = () =>
+        resolvePlaybackStream(
+          track,
+          controller.signal,
+          usePlayerStore.getState().audioQuality,
+        );
+      let stream;
+      try {
+        stream = await loadStream();
+      } catch (resolveError) {
+        if (controller.signal.aborted) throw resolveError;
+        log(
+          "yellow",
+          "playback",
+          `stream resolve failed for "${track.title}", retrying fresh: ${resolveError instanceof Error ? resolveError.message : String(resolveError)}`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        stream = await loadStream();
+      }
       this.ttfbMs = Math.round(performance.now() - this.loadStartTime);
 
       if (epoch !== this.loadEpoch || controller.signal.aborted) {
@@ -1404,8 +1423,8 @@ export class PlayerRuntime {
             log("red", "audio", `play failed: ${String(error)}`);
             if (currentTrack && this.recoveryAttempts < 1) {
               this.recoveryAttempts++;
-              log("yellow", "playback", "resume failed â€” attempting cache/stream recovery");
-              void this.loadAndPlay(currentTrack, usePlayerStore.getState().positionMs, true);
+              log("yellow", "playback", "resume failed — attempting fresh stream recovery");
+              void this.loadAndPlay(currentTrack, usePlayerStore.getState().positionMs, true, true);
               return;
             }
             usePlayerStore.getState().setStatus("paused");

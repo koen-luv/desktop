@@ -195,9 +195,10 @@ confirmed pre-existing by reproducing the hang in a clean worktree at HEAD
    error; the app reports the failure through its normal error states. Runtime
    verification was completed on the emulator instead. Allow network access for
    `app.neritium.android` in MIUI's data-usage settings on such devices.
-2. **Expired stream URLs.** A CDN can reject a resolved URL with an HTTP status
-   after it expires. The player surfaces the error and the queue advances to the
-   next track; a transparent re-resolve/retry is not implemented yet.
+2. **Expired stream URLs.** A CDN can still reject a resolved URL after it
+   expires. Both sides now recover transparently once: native reloads the same
+   item, the renderer re-resolves with a freshly signed URL and resumes at the
+   last position, and only a second failure advances the queue.
 3. **Reverb and pitch** use Android's `PresetReverb`/`PlaybackParameters`, which
    approximate the desktop Web Audio graph rather than matching it exactly.
 4. **Electron-only surfaces** (custom window chrome, Hyprland overlay, Touch Bar,
