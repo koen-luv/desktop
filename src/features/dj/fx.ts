@@ -7,7 +7,11 @@
  */
 
 export interface FxState {
-  /** 0..1 mapped onto a 40 Hz..18 kHz log sweep. */
+  /**
+   * 0..1 mapped onto a 40 Hz..18 kHz low-pass sweep. A deck must start open
+   * (1); the old neutral was 0.5, i.e. a 3 dB-resonant 850 Hz low-pass, which
+   * made every deck sound muffled before a single knob was touched.
+   */
   filter: number;
   /** Wet 0..1; delay length is derived from the deck tempo. */
   echo: number;
@@ -17,7 +21,7 @@ export interface FxState {
   reverb: number;
 }
 
-export const NEUTRAL_FX: FxState = { filter: 0.5, echo: 0, feedback: 0.4, reverb: 0 };
+export const NEUTRAL_FX: FxState = { filter: 1, echo: 0, feedback: 0.4, reverb: 0 };
 
 /** Log-scale cutoff for the filter knob. */
 export function filterCutoffHz(knob: number): number {

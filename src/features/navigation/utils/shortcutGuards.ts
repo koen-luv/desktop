@@ -39,7 +39,9 @@ export function hasBlockingModifier(
 
 export function isBlockingOverlayOpen(): boolean {
   return Boolean(
-    document.querySelector("[data-dialog-container], [data-dropdown-menu]"),
+    document.querySelector(
+      "[data-dialog-container], [data-dropdown-menu], [data-shortcut-blocker]",
+    ),
   );
 }
 

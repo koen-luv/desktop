@@ -14,9 +14,10 @@ import {
   crossfadeGains,
   deckGain,
   formatDeckTime,
-  needsResync,
+  TEMPO_RANGE,
   tempoToRate,
 } from "./mixMath";
+import { playerRuntime } from "@/features/player/engine/runtime";
 import { createDeckChain, NEUTRAL_EQ, type EqBand } from "./deckAudio";
 import { createDeckFx, NEUTRAL_FX, type FxState } from "./fx";
 import { loopedPosition, makeLoop, tapTempo } from "./loopMath";
@@ -316,7 +317,7 @@ function ChannelStrip({
       <Knob label="Mid" min={-24} max={12} step={1} defaultValue={0} value={state.eq.mid} size={30} format={(v) => `${v > 0 ? "+" : ""}${Math.round(v)}`} onChange={(n) => onEq("mid", n)} />
       <Knob label="Low" min={-24} max={12} step={1} defaultValue={0} value={state.eq.low} size={30} format={(v) => `${v > 0 ? "+" : ""}${Math.round(v)}`} onChange={(n) => onEq("low", n)} />
       <div className="my-[2px] h-px w-[26px] bg-border-primary" />
-      <Knob label="Filt" min={0} max={1} step={0.01} defaultValue={0.5} value={state.fx.filter} size={30} format={(v) => `${Math.round(v * 100)}`} onChange={(n) => onFx("filter", n)} />
+      <Knob label="Filt" min={0} max={1} step={0.01} defaultValue={1} value={state.fx.filter} size={30} format={(v) => `${Math.round(v * 100)}`} onChange={(n) => onFx("filter", n)} />
       <Knob label="Echo" min={0} max={1} step={0.01} defaultValue={0} value={state.fx.echo} size={30} format={(v) => `${Math.round(v * 100)}`} onChange={(n) => onFx("echo", n)} />
       <Knob label="Verb" min={0} max={1} step={0.01} defaultValue={0} value={state.fx.reverb} size={30} format={(v) => `${Math.round(v * 100)}`} onChange={(n) => onFx("reverb", n)} />
     </div>
@@ -415,20 +416,24 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     graph.fx.b.update(decks.b.fx, decks.b.bpm ?? 120);
   }, [crossfade, decks.a, decks.b, master, ensureGraph]);
 
-  // Transport clocks.
+  /**
+   * Deck clocks, for the readouts and the waveform playheads only.
+   *
+   * These used to force deck B onto deck A's position whenever they differed
+   * by more than 80 ms. Two different songs never share a position, so the
+   * moment both played, B was re-seeked on every tick — simultaneous playback
+   * was impossible. Beat-matching is tempo (and the Sync button), not jumping
+   * one deck onto the other's timeline.
+   */
   useEffect(() => {
     const id = window.setInterval(() => {
       const a = audioRef.current.a;
       const b = audioRef.current.b;
       if (!a || !b) return;
-      const clock = a.paused ? b.currentTime * 1000 : a.currentTime * 1000;
       setDecks((prev) => ({
         a: { ...prev.a, positionMs: a.currentTime * 1000, durationMs: (a.duration || 0) * 1000 },
         b: { ...prev.b, positionMs: b.currentTime * 1000, durationMs: (b.duration || 0) * 1000 },
       }));
-      if (!a.paused && !b.paused && needsResync(clock, b.currentTime * 1000)) {
-        b.currentTime = clock / 1000;
-      }
     }, 250);
     return () => window.clearInterval(id);
   }, []);
@@ -530,6 +535,7 @@ function DjSurface({ onClose }: { onClose: () => void }) {
             track,
             src: objectUrl,
             loading: false,
+            playing: false,
             durationMs: 0,
             positionMs: 0,
             loop: null,
@@ -566,8 +572,21 @@ function DjSurface({ onClose }: { onClose: () => void }) {
       const graph = ensureGraph();
       if (graph?.ctx.state === "suspended") await graph.ctx.resume();
       if (element.paused) {
-        await element.play().catch(() => undefined);
-        setDecks((prev) => ({ ...prev, [side]: { ...prev[side], playing: true } }));
+        try {
+          await element.play();
+          setDecks((prev) => ({ ...prev, [side]: { ...prev[side], playing: true, error: null } }));
+        } catch (error) {
+          // A rejected play() used to leave the deck claiming it was playing
+          // while silent; surface it instead.
+          setDecks((prev) => ({
+            ...prev,
+            [side]: {
+              ...prev[side],
+              playing: false,
+              error: error instanceof Error ? error.message : "Could not start playback",
+            },
+          }));
+        }
       } else {
         element.pause();
         setDecks((prev) => ({ ...prev, [side]: { ...prev[side], playing: false } }));
@@ -587,7 +606,16 @@ function DjSurface({ onClose }: { onClose: () => void }) {
   const syncTempo = useCallback(
     (side: "a" | "b") => {
       const other = side === "a" ? "b" : "a";
-      const tempo = decks[other].tempo;
+      const target = decks[side];
+      const source = decks[other];
+      // Copying the other deck's slider only beat-matches when both files
+      // happen to share a BPM. Match the effective tempos instead:
+      // thisRate = (other base BPM × other rate) / this base BPM.
+      let tempo = source.tempo;
+      if (target.bpm && source.bpm) {
+        const ratio = (source.bpm * tempoToRate(source.tempo)) / target.bpm;
+        tempo = Math.min(TEMPO_RANGE, Math.max(-TEMPO_RANGE, ratio - 1));
+      }
       setDecks((prev) => ({ ...prev, [side]: { ...prev[side], tempo } }));
       const element = audioRef.current[side];
       if (element) element.playbackRate = tempoToRate(tempo);
@@ -625,19 +653,31 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     (side: "a" | "b", beats: number) => {
       const element = audioRef.current[side];
       if (!element) return;
+      // Read the transport, not the 250 ms-cached state: a loop/hotcue taken
+      // from the cached position lands up to a quarter second off the grid.
+      const positionMs = element.currentTime * 1000;
       setDecks((prev) => {
         const deck = prev[side];
         const bpm = deck.bpm ?? 120;
         const start =
           quantise && deck.bpm
-            ? quantizePosition(deck.positionMs, deck.bpm, deck.anchorMs)
-            : deck.positionMs;
+            ? quantizePosition(positionMs, deck.bpm, deck.anchorMs)
+            : positionMs;
         const loop = makeLoop(start, beats, bpm);
         return { ...prev, [side]: { ...deck, loop } };
       });
-      if (element.paused) void element.play().catch(() => undefined);
+      if (element.paused) {
+        const graph = ensureGraph();
+        if (graph?.ctx.state === "suspended") void graph.ctx.resume();
+        void element
+          .play()
+          .then(() =>
+            setDecks((prev) => ({ ...prev, [side]: { ...prev[side], playing: true } })),
+          )
+          .catch(() => undefined);
+      }
     },
-    [quantise],
+    [ensureGraph, quantise],
   );
 
   const exitLoop = useCallback((side: "a" | "b") => {
@@ -646,13 +686,16 @@ function DjSurface({ onClose }: { onClose: () => void }) {
 
   const setHotcue = useCallback(
     (side: "a" | "b", index: number) => {
+      const element = audioRef.current[side];
+      if (!element) return;
+      const positionMs = element.currentTime * 1000;
       setDecks((prev) => {
         const deck = prev[side];
         const hotcues = [...deck.hotcues];
         hotcues[index] =
           quantise && deck.bpm
-            ? quantizePosition(deck.positionMs, deck.bpm, deck.anchorMs)
-            : deck.positionMs;
+            ? quantizePosition(positionMs, deck.bpm, deck.anchorMs)
+            : positionMs;
         return { ...prev, [side]: { ...deck, hotcues } };
       });
     },
@@ -810,16 +853,37 @@ function DjSurface({ onClose }: { onClose: () => void }) {
     return { a: queue[index], b: queue[index + 1] ?? queue[0] };
   }, [queue, currentIndex]);
 
+  /**
+   * DJ mode owns the output while it is open. The queue used to keep playing
+   * underneath the decks — two songs at once — and every advance re-seeded the
+   * decks mid-mix. Pause it once, like the stem mixer; it stays paused after
+   * closing because the user chose the decks.
+   */
   useEffect(() => {
+    const status = usePlayerStore.getState().status;
+    if (status === "playing" || status === "loading") playerRuntime?.pause();
+  }, []);
+
+  // Seed the decks with the current and next queue track exactly once, when
+  // the queue first becomes available. Later queue changes must not wipe a mix.
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (seededRef.current || !suggestions.a) return;
+    seededRef.current = true;
     void loadTrack("a", suggestions.a);
     void loadTrack("b", suggestions.b);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suggestions.a?.id, suggestions.b?.id]);
+  }, [loadTrack, suggestions.a, suggestions.b]);
 
   const chip = "rounded-[10px] border border-border-primary px-[12px] text-[12px] font-[500] transition-colors active:scale-[0.97] disabled:opacity-35";
 
+  // `data-dialog-container` marks this as a blocking overlay so the global
+  // transport shortcuts (space, arrows, N/P) cannot start the paused queue
+  // underneath the decks.
   return (
-    <div className="absolute inset-0 z-[95] flex flex-col gap-2 overflow-y-auto bg-bg-primary p-3">
+    <div
+      data-dialog-container="true"
+      className="absolute inset-0 z-[95] flex flex-col gap-2 overflow-y-auto bg-bg-primary p-3"
+    >
       {/* header */}
       <header className="flex flex-wrap items-center gap-[8px]">
         <h2 className="m-0 text-[21px] font-semibold tracking-tight text-text-primary">DJ</h2>
