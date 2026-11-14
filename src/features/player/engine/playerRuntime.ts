@@ -1519,6 +1519,7 @@ export class PlayerRuntime {
     const bytes = await downloadAudioBytes(stream.url, {
       contentLength: stream.contentLength,
       signal,
+      ...(stream.headers ? { headers: stream.headers } : {}),
     });
     if (!bytes || signal.aborted) return null;
     const mimeType = stream.mimeType || "audio/webm";

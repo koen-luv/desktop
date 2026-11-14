@@ -2,6 +2,13 @@ import type { Track } from "@/shared/types";
 import { api } from "@/shared/api";
 import { extractAudioStream } from "@/shared/api/innertubeClient";
 import { toVideoId } from "@/shared/media/innertube";
+import {
+  YtMusicExtractError,
+  extractYtMusicAudio,
+  streamExpiryFromUrl,
+  type YtMusicQuality,
+  type YtMusicStream,
+} from "@/shared/media/innertube/ytmusic";
 import { isYtDlpAvailable, resolveYtDlpStream } from "@/shared/media/ytdlp";
 import { isCodecSupported, canExecuteDirectInnertubePlans } from "./codecSupport";
 import {
@@ -12,6 +19,7 @@ import {
   streamExpiryMs,
 } from "../engine/streamResolverLegacy";
 import { SourceError, type ResolveContext, type ResolvedStream, type SourceProvider } from "./types";
+import type { AudioQuality } from "../store/playerStore";
 
 /**
  * Legitimate playback sources for Neritium.
@@ -162,17 +170,46 @@ export const neritiumProxyAacProvider = createNeritiumProvider({
   codec: "mp4a.40.2",
 });
 
+/** YouTube has no lossless tier; `lossless` resolves as `high`. */
+function toYtQuality(quality: AudioQuality): YtMusicQuality {
+  return quality === "low" ? "low" : quality === "standard" ? "standard" : "high";
+}
+
+function fromYtMusicStream(stream: YtMusicStream, ctx: ResolveContext): ResolvedStream {
+  return {
+    url: stream.url,
+    headers: stream.headers,
+    mimeType: stream.mimeType,
+    codec: stream.codec,
+    bitrate: stream.bitrate,
+    itag: stream.itag,
+    expiresAtMs: stream.expiresAtMs ?? streamExpiryFromUrl(stream.url),
+    providerId: "innertube-client",
+    providerTrackId: ctx.track.id,
+    quality: ctx.quality,
+    resolvedAt: stream.resolvedAt,
+  };
+}
+
 /**
  * Client-side Innertube extraction (the yt-dlp technique). Runs the Innertube
  * `player` request directly from the renderer, so it needs no Neritium backend and
  * keeps working when `api.tryliner.fun` is down. Highest priority: it resolves
  * from the exact videoId (track.id), so the recording is always the one asked
  * for. The Neritium providers below remain as fallbacks.
+ *
+ * The extraction itself is the Metrolist/InnerTubeX-style YouTube Music pipeline
+ * (`shared/media/innertube/ytmusic`): alternative client configurations with
+ * per-client request shapes and headers, signature deciphering + n-transform,
+ * PO-token attestation where required, quality-tiered format selection over the
+ * original audio track, signed-URL expiry, and intelligent retries with client
+ * health tracking. The previous direct-client extraction is preserved as the
+ * fallback so behaviour only ever widens.
  */
 export const innertubeClientProvider: SourceProvider = {
   id: "innertube-client",
   priority: 110,
-  label: "YouTube (client extraction)",
+  label: "YouTube Music (client extraction)",
 
   supports(track: Track): boolean {
     if (!track?.id) return false;
@@ -193,21 +230,39 @@ export const innertubeClientProvider: SourceProvider = {
   async resolve(ctx: ResolveContext): Promise<ResolvedStream> {
     // Prefer Opus where the platform can decode it, otherwise AAC/MP4.
     const preferredCodec = isCodecSupported("audio/webm", "opus") ? "opus" : "aac";
+    const videoId = toVideoId(ctx.track.id);
+    if (!videoId) {
+      throw new SourceError("unsupported", "Not a YouTube track", "innertube-client");
+    }
     try {
-      const result = await extractAudioStream(ctx.track.id, preferredCodec, ctx.signal);
-      return {
-        url: result.url,
-        mimeType: result.mimeType,
-        codec: result.codec,
-        bitrate: result.bitrate,
-        expiresAtMs: streamExpiryMs(result.url),
-        providerId: "innertube-client",
-        providerTrackId: ctx.track.id,
-        quality: ctx.quality,
-        resolvedAt: Date.now(),
-      };
+      const stream = await extractYtMusicAudio(videoId, {
+        signal: ctx.signal,
+        preferredCodec,
+        quality: toYtQuality(ctx.quality),
+      });
+      return fromYtMusicStream(stream, ctx);
     } catch (err) {
-      throw classifySourceError(err, "innertube-client");
+      if (err instanceof YtMusicExtractError && err.code === "cancelled") {
+        throw classifySourceError(new DOMException("Resolution cancelled", "AbortError"), "innertube-client");
+      }
+      // The classic direct-client extraction (unciphered VISIONOS/ANDROID/IOS
+      // URLs) stays wired as the safety net behind the YouTube Music pipeline.
+      try {
+        const result = await extractAudioStream(ctx.track.id, preferredCodec, ctx.signal);
+        return {
+          url: result.url,
+          mimeType: result.mimeType,
+          codec: result.codec,
+          bitrate: result.bitrate,
+          expiresAtMs: streamExpiryMs(result.url),
+          providerId: "innertube-client",
+          providerTrackId: ctx.track.id,
+          quality: ctx.quality,
+          resolvedAt: Date.now(),
+        };
+      } catch (legacyErr) {
+        throw classifySourceError(legacyErr, "innertube-client");
+      }
     }
   },
 };

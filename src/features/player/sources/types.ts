@@ -9,9 +9,13 @@ import type { AudioQuality } from "../store/playerStore";
  */
 export interface ResolvedStream {
   url: string;
+  /** HTTP headers the media request requires (User-Agent/Referer/Origin). */
+  headers?: Record<string, string>;
   mimeType: string;
   codec?: string;
   bitrate?: number;
+  /** YouTube itag (or equivalent format id) the provider selected. */
+  itag?: number;
   /** Epoch ms after which the signed URL must not be reused. `null` = unknown. */
   expiresAtMs: number | null;
   /** Provider that produced this stream. */

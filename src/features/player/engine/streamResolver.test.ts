@@ -4,6 +4,7 @@ import type { Track } from "@/shared/types";
 
 const mocks = vi.hoisted(() => ({
   resolveDirectAudioStream: vi.fn(),
+  extractYtMusicAudio: vi.fn(),
   searchRaw: vi.fn(),
   resolveSoundCloudStream: vi.fn(),
   createPlaybackSession: vi.fn(),
@@ -26,6 +27,13 @@ vi.mock("@/shared/media/innertube/poTokenClient", () => ({
 vi.mock("@/shared/media/innertube", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/shared/media/innertube")>();
   return { ...actual, resolveDirectAudioStream: mocks.resolveDirectAudioStream, searchRaw: mocks.searchRaw };
+});
+
+// The recovery stage after the profile chain is the YouTube Music extractor;
+// keep it off the network (it is covered by its own suite).
+vi.mock("@/shared/media/innertube/ytmusic", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/shared/media/innertube/ytmusic")>();
+  return { ...actual, extractYtMusicAudio: mocks.extractYtMusicAudio };
 });
 
 vi.mock("@/shared/media/soundcloud", async (importOriginal) => {
@@ -69,6 +77,8 @@ afterEach(() => {
   delete (window as unknown as { neritiumElectron?: unknown }).neritiumElectron;
   resetCodecProbeCache();
   mocks.resolveDirectAudioStream.mockReset();
+  mocks.extractYtMusicAudio.mockReset();
+  mocks.extractYtMusicAudio.mockRejectedValue(new Error("no YouTube Music client could serve the video"));
   mocks.searchRaw.mockReset();
   mocks.resolveSoundCloudStream.mockReset();
   mocks.createPlaybackSession.mockReset();
@@ -91,6 +101,41 @@ describe("resolvePlaybackStream for youtube ids", () => {
     mocks.resolveDirectAudioStream.mockRejectedValue(new Error("LOGIN_REQUIRED"));
 
     await expect(resolvePlaybackStream(track("dQw4w9WgXcQ"))).rejects.toThrow("LOGIN_REQUIRED");
+  });
+
+  it("falls back to YouTube Music extraction when the profile chain fails", async () => {
+    installDesktopShell();
+    mocks.resolveDirectAudioStream.mockRejectedValue(new Error("LOGIN_REQUIRED"));
+    mocks.extractYtMusicAudio.mockResolvedValue({
+      url: "https://rr1.googlevideo.com/videoplayback?itag=251&expire=1999999999",
+      headers: { Referer: "https://music.youtube.com/" },
+      mimeType: "audio/webm",
+      codec: "opus",
+      bitrate: 135_000,
+      itag: 251,
+      expiresAtMs: Date.parse("2033-05-18T00:00:00.000Z"),
+      clientId: "WEB_REMIX",
+      boundedRangeOnly: false,
+      resolvedAt: Date.now(),
+    });
+
+    const stream = await resolvePlaybackStream(track("dQw4w9WgXcQ"));
+
+    expect(mocks.extractYtMusicAudio).toHaveBeenCalledWith("dQw4w9WgXcQ", expect.objectContaining({ signal: undefined }));
+    expect(stream).toMatchObject({
+      url: "https://rr1.googlevideo.com/videoplayback?itag=251&expire=1999999999",
+      headers: { Referer: "https://music.youtube.com/" },
+      itag: 251,
+      codec: "opus",
+    });
+  });
+
+  it("keeps the original error when YouTube Music extraction also fails", async () => {
+    installDesktopShell();
+    mocks.resolveDirectAudioStream.mockRejectedValue(new Error("LOGIN_REQUIRED"));
+
+    await expect(resolvePlaybackStream(track("dQw4w9WgXcQ"))).rejects.toThrow("LOGIN_REQUIRED");
+    expect(mocks.extractYtMusicAudio).toHaveBeenCalledTimes(1);
   });
 });
 

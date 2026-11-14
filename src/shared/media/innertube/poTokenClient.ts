@@ -121,21 +121,24 @@ async function getMinter(): Promise<MinterEntry> {
 }
 
 /**
- * Mints (or returns a cached) PO token for a video id. Returns `null` when
+ * Mints (or returns a cached) PO token for a binding string. Returns `null` when
  * minting is impossible — callers then let the backend attempt the request
  * without integrity data rather than failing the track outright.
+ *
+ * The binding is whatever the token must attest: a video id for GVS media
+ * attestation, or the visitorData session for player-request attestation.
  */
-export async function mintPoToken(videoId: string): Promise<PoTokenBundle | null> {
-  if (!videoId) return null;
+export async function mintBoundPoToken(binding: string): Promise<PoTokenBundle | null> {
+  if (!binding) return null;
 
-  const cached = tokenCache.get(videoId);
+  const cached = tokenCache.get(binding);
   if (cached) return { poToken: cached };
 
   try {
     const entry = await getMinter();
-    const token = await entry.minter.mintAsWebsafeString(videoId);
+    const token = await entry.minter.mintAsWebsafeString(binding);
     if (!token) return null;
-    tokenCache.set(videoId, token);
+    tokenCache.set(binding, token);
     if (tokenCache.size > MAX_CACHED_TOKENS) {
       const oldest = tokenCache.keys().next().value;
       if (oldest) tokenCache.delete(oldest);
@@ -149,6 +152,11 @@ export async function mintPoToken(videoId: string): Promise<PoTokenBundle | null
     );
     return null;
   }
+}
+
+/** Mints a PO token bound to a video id (GVS media attestation). */
+export async function mintPoToken(videoId: string): Promise<PoTokenBundle | null> {
+  return mintBoundPoToken(videoId);
 }
 
 /** Test hook: forget the minter and every minted token. */

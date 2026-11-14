@@ -1,4 +1,6 @@
 import { resolveDirectAudioStream, toVideoId } from "@/shared/media/innertube";
+import { extractYtMusicAudio, type YtMusicStream } from "@/shared/media/innertube/ytmusic";
+import type { YtMusicQuality } from "@/shared/media/innertube/ytmusic";
 import { resolveSoundCloudStream, toSoundCloudTrackId } from "@/shared/media/soundcloud";
 import { resolveNeritiumStream } from "@/shared/media/neritium/neritiumPlayback";
 import { isAbortError } from "@/shared/utils/abort";
@@ -19,6 +21,23 @@ import { resolveYtDlpStream } from "@/shared/media/ytdlp";
 import type { AudioQuality } from "../store/playerStore";
 
 export type { BufferedPlaybackStream, PlayableTrack, PlaybackStream, UrlPlaybackStream } from "./playbackStream";
+
+function toYtQuality(quality: AudioQuality): YtMusicQuality {
+  return quality === "low" ? "low" : quality === "standard" ? "standard" : "high";
+}
+
+function fromYtMusicStream(stream: YtMusicStream): PlaybackStream {
+  return {
+    url: stream.url,
+    headers: stream.headers,
+    mimeType: stream.mimeType,
+    codec: stream.codec,
+    bitrate: stream.bitrate,
+    itag: stream.itag,
+    expiresAtMs: stream.expiresAtMs,
+    ...(stream.contentLength ? { contentLength: stream.contentLength } : {}),
+  };
+}
 
 /**
  * Thrown when a browser cannot resolve audio at all: the renderer is not
@@ -144,6 +163,17 @@ async function resolveYoutubeTrack(
     return fromInnertubeStream(await resolveDirectAudioStream(track.id, { signal }));
   } catch (error) {
     if (isAbortError(error, signal)) throw error;
+    // The YouTube Music extractor (Metrolist/InnerTubeX-style) knows more
+    // client identities than the profile chain above — WEB_REMIX with signature
+    // deciphering and PO-token attestation, plus alternative mobile clients —
+    // so it is the next recovery step before spawning a process.
+    try {
+      const music = await extractYtMusicAudio(videoId, { signal, quality: toYtQuality(quality) });
+      log("cyan", "playback", `playing YouTube Music extraction for "${track.title}" via ${music.clientId}`);
+      return fromYtMusicStream(music);
+    } catch (musicError) {
+      if (isAbortError(musicError, signal)) throw musicError;
+    }
     // Innertube can be refused (bot check / missing PO token) while a locally
     // installed yt-dlp still resolves the same video. It is the last resort
     // because spawning a process is slower than an in-renderer request.

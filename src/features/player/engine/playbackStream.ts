@@ -8,6 +8,10 @@ interface PlaybackStreamFormat {
   codec: string;
   bitrate: number;
   contentLength?: number;
+  /** HTTP headers the media request requires (User-Agent/Referer/Origin). */
+  headers?: Record<string, string>;
+  /** YouTube itag (or equivalent format id) the provider selected. */
+  itag?: number;
 }
 
 export interface UrlPlaybackStream extends PlaybackStreamFormat {
