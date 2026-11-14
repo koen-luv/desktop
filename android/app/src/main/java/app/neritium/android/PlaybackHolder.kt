@@ -40,6 +40,8 @@ object PlaybackHolder {
     private val queueLock = Any()
     private val nextQueue = ArrayDeque<String>()
     @Volatile private var queueAutoAdvance = false
+    /** Edge-trigger for the queueLow handshake with the renderer. */
+    @Volatile private var queueLowNotified = false
     @Volatile private var previousTrackPayload: String? = null
     private val history = ArrayDeque<String>()
     @Volatile private var currentPayload: String? = null
@@ -331,6 +333,7 @@ object PlaybackHolder {
                 if (validated != null) nextQueue.addLast(validated)
             }
             queueAutoAdvance = autoAdvance
+            if (validated != null) maybeEmitQueueLow()
         }
     }
 
@@ -352,6 +355,7 @@ object PlaybackHolder {
                 nextQueue.addAll(payloads)
             }
             queueAutoAdvance = autoAdvance
+            if (payloads.isNotEmpty()) maybeEmitQueueLow()
         }
     }
 
@@ -367,8 +371,33 @@ object PlaybackHolder {
 
     private fun peekNextLocked(): String? = synchronized(queueLock) { nextQueue.firstOrNull() }
 
-    private fun consumeNextLocked(): String? = synchronized(queueLock) {
-        if (nextQueue.isEmpty()) null else nextQueue.removeFirst()
+    private fun consumeNextLocked(): String? {
+        val taken = synchronized(queueLock) {
+            if (nextQueue.isEmpty()) null else nextQueue.removeFirst()
+        }
+        maybeEmitQueueLow()
+        return taken
+    }
+
+    /**
+     * Queue-low handshake with the renderer: when the forward queue runs thin
+     * (consumed by a native advance/crossfade, or stocked thin), tell JS to
+     * re-stock the window and extend the radio/autoplay queue now. Event
+     * handlers run even when background timers are throttled, and a queued
+     * event lands the moment the WebView thaws — so radio/autoplay keeps
+     * refilling while the screen is closed for as long as the renderer runs
+     * at all. Edge-triggered so an empty queue cannot spam a frozen renderer.
+     */
+    private fun maybeEmitQueueLow() {
+        val low = synchronized(queueLock) { nextQueue.size <= 1 }
+        if (low) {
+            if (!queueLowNotified) {
+                queueLowNotified = true
+                NativeEvents.emit("queueLow", "{}")
+            }
+        } else {
+            queueLowNotified = false
+        }
     }
 
     private fun removeFromNextQueue(trackId: String?) {
@@ -381,6 +410,7 @@ object PlaybackHolder {
                 if (id == trackId) it.remove()
             }
         }
+        maybeEmitQueueLow()
     }
 
     fun setPreviousTrack(payload: String?) {
@@ -438,6 +468,7 @@ object PlaybackHolder {
                             nextQueue.addFirst(leaving)
                             while (nextQueue.size > 32) nextQueue.removeLast()
                         }
+                        maybeEmitQueueLow()
                     }
                     emitTrackChange("playbackPreviousAdvanced", previous)
                 } else {
@@ -558,6 +589,7 @@ object PlaybackHolder {
             cancelCrossfadeLocked()
             synchronized(queueLock) { nextQueue.clear(); history.clear() }
             queueAutoAdvance = false
+            queueLowNotified = false
             previousTrackPayload = null
             transitionPayload = null
             currentPayload = null
@@ -1078,6 +1110,7 @@ object PlaybackHolder {
             .put("durationMs", duration)
             .put("bufferedMs", p.bufferedPosition)
             .put("usingCache", usingCache)
+            .put("crossfading", crossfadeTrackId != null || transitionPlayer != null)
             .put("error", lastError ?: JSONObject.NULL)
             .put("canSeek", duration > 0)
         lastState = state.toString()

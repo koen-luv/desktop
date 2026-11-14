@@ -298,6 +298,15 @@ class PlayerEngine {
         g.__playerEngineUnsub();
       }
 
+      // Native queue-low handshake: the Android runtime relays it when the
+      // native forward queue runs thin (and when the screen goes off), so the
+      // window is re-stocked and the radio/autoplay queue extended while JS
+      // can still run — event handlers fire even when background timers are
+      // throttled to a crawl.
+      window.addEventListener("neritium:queue-low", () => {
+        this.preloadNextTrack(usePlayerStore.getState());
+      });
+
       window.addEventListener("beforeunload", () => {
         this.telemetry.flushCurrentTrack();
       });
@@ -305,9 +314,11 @@ class PlayerEngine {
       let prevTrackId: string | null =
         usePlayerStore.getState().currentTrack?.id || null;
       let prevStatus: string = "idle";
+      let prevQueueLength = usePlayerStore.getState().queue.length;
       let newTrack = false;
       const unsub = usePlayerStore.subscribe((state) => {
         const trackId = state.currentTrack?.id || null;
+        const queueLength = state.queue.length;
         if (trackId !== prevTrackId) {
           prevTrackId = trackId;
           newTrack = true;
@@ -319,7 +330,13 @@ class PlayerEngine {
           }
           void this.fetchLyricsForTrack(state.currentTrack);
           this.preloadNextTrack(state);
+        } else if (queueLength !== prevQueueLength) {
+          // The queue grew (radio/autoplay refill) or shrank while the same
+          // track plays: re-stock the native window so background advancement
+          // keeps its runway.
+          this.preloadNextTrack(state);
         }
+        prevQueueLength = queueLength;
 
         if (state.status === "playing") {
           this.telemetry.onTick(true);
@@ -1113,6 +1130,13 @@ class PlayerEngine {
     this.radioAppendTimeout = setTimeout(() => {
       void this.appendSimilarTracksForSeed(session, seedTrackId);
     }, 400);
+    // Hidden-page timers are throttled to a crawl (and can freeze entirely
+    // with the screen off), so a pending refill must not wait on one.
+    if (typeof document !== "undefined" && document.hidden) {
+      clearTimeout(this.radioAppendTimeout);
+      this.radioAppendTimeout = null;
+      void this.appendSimilarTracksForSeed(session, seedTrackId);
+    }
   }
 
   private appendSimilarTracksForSeed(session: number, seedTrackId: string): Promise<void> {
@@ -1188,6 +1212,17 @@ class PlayerEngine {
     const queue = state.queue;
     const currentIndex = state.currentIndex;
     const currentId = state.currentTrack?.id || "none";
+    // Keep the radio/autoplay queue ahead of the native window from here too:
+    // after a background-adopted native advance no SKIP_NEXT dispatch happens,
+    // so without this check the queue would drain while the WebView is frozen.
+    if (state.currentTrack) {
+      this.maybeExtendQueue(
+        this.sessionId,
+        state.currentTrack.id,
+        currentIndex,
+        queue.length,
+      );
+    }
     let nextTrack: Track | null = null;
     if (currentIndex >= 0 && currentIndex < queue.length - 1) {
       nextTrack = queue[currentIndex + 1];
@@ -1221,7 +1256,11 @@ class PlayerEngine {
       return;
     }
 
-    const preloadKey = `${currentId}->${nextTrack.id}`;
+    // The key includes the queue length so a grown queue (radio/autoplay
+    // refill landing) re-stocks the native window instead of being skipped as
+    // "same current -> next pair" — that early return used to leave native
+    // with whatever few tracks existed at track-change time.
+    const preloadKey = `${currentId}->${nextTrack.id}:${queue.length}`;
     if (this.lastPreloadKey === preloadKey) return;
     this.lastPreloadKey = preloadKey;
 

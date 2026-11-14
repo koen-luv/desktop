@@ -22,7 +22,7 @@ import {
 const AUTO_CACHE_AUDIO = false;
 /** Tracks ahead to resolve while the app is open, so native can keep going
  *  (skip errors, crossfade, radio/autoplay) with the WebView frozen. */
-const PRELOAD_WINDOW = 4;
+const PRELOAD_WINDOW = 12;
 
 interface NativeAudioState {
   ok?: boolean;
@@ -32,6 +32,8 @@ interface NativeAudioState {
   durationMs?: number;
   bufferedMs?: number;
   playbackRate?: number;
+  /** A native (watchdog-armed) crossfade blend currently owns the tail. */
+  crossfading?: boolean;
   error?: string | null;
 }
 
@@ -228,6 +230,13 @@ export class AndroidPlayerRuntime {
       log("yellow", "audio", "native crossfade cancelled - sequential fallback restored");
     });
 
+    onNativeEvent("queueLow", () => {
+      // Native's forward queue is running thin (or the screen just went off):
+      // tell the engine to re-stock the window and extend the radio/autoplay
+      // queue now, while JS can still run.
+      this.emitQueueLow();
+    });
+
     this.syncCrossfadeFlag();
     this.reconcileWithNative();
     this.pollTimer = setInterval(() => this.poll(), this.pollIntervalMs);
@@ -237,6 +246,7 @@ export class AndroidPlayerRuntime {
         const hidden = document.visibilityState === "hidden";
         this.setPollCadence(hidden ? AndroidPlayerRuntime.POLL_HIDDEN_MS : this.activePollMs());
         if (!hidden) this.poll();
+        else this.emitQueueLow(); // top up the runway before the renderer freezes
       });
     }
 
@@ -269,6 +279,17 @@ export class AndroidPlayerRuntime {
   /** iOS only: keep the WKWebView renderer out of suspension while audio plays. */
   private startRendererKeepAlive(): void {
     if (this.bridge.getPlatform() === "ios") startBackgroundAudioKeepAlive();
+  }
+
+  /**
+   * Relays a native queue-low (or screen-off) signal to the engine's window
+   * handler. The engine re-stocks the native forward queue and extends the
+   * radio/autoplay queue from it.
+   */
+  private emitQueueLow(): void {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("neritium:queue-low"));
+    }
   }
 
   private stopRendererKeepAlive(): void {
@@ -510,8 +531,11 @@ export class AndroidPlayerRuntime {
   /** Starts the outgoing fade-out over the final stretch of the current song. */
   private maybeStartEndFade(state: NativeAudioState): void {
     // An active overlapping crossfade owns the tail; the sequential fade is
-    // only the fallback for when no blend could start.
+    // only the fallback for when no blend could start. A blend armed by the
+    // native watchdog (JS never saw it) must suppress this too — the ramp
+    // would drag the shared native volume to zero mid-blend and silence it.
     if (this.crossfadeTrackId !== null) return;
+    if (state.crossfading) return;
     const fadeOutMs = transitionSpec(
       usePlayerStore.getState().transitionPreset,
     ).fadeOutMs;
@@ -541,6 +565,9 @@ export class AndroidPlayerRuntime {
   private maybeStartCrossfade(state: NativeAudioState): void {
     const spec = transitionSpec(usePlayerStore.getState().transitionPreset);
     if (!spec.overlap || this.crossfadeTrackId || this.crossfadeInFlight) return;
+    // A native watchdog blend is already running; arming a second one would
+    // replace its transition player mid-blend.
+    if (state.crossfading) return;
 
     const duration = state.durationMs ?? 0;
     const position = state.positionMs ?? 0;
